@@ -27,22 +27,18 @@ async function resolveCurrentCoordinates() {
     throw new MerchantProductError('merchant_location_permission_required', `location_permission_${status}`);
   }
 
-  const current = await Location.getCurrentPositionAsync({
-    accuracy: Location.Accuracy.Balanced,
-  }).catch(() => null);
-  if (current) {
-    return {
-      latitude: current.coords.latitude,
-      longitude: current.coords.longitude,
-    };
+  // Last-known is instant and works without an active GPS fix (important on Fire OS / no GMS).
+  const lastKnown = await Location.getLastKnownPositionAsync({}).catch(() => null);
+  if (lastKnown) {
+    return { latitude: lastKnown.coords.latitude, longitude: lastKnown.coords.longitude };
   }
 
-  const lastKnown = await Location.getLastKnownPositionAsync({});
-  if (lastKnown) {
-    return {
-      latitude: lastKnown.coords.latitude,
-      longitude: lastKnown.coords.longitude,
-    };
+  // Fresh fix at Low accuracy (network-only) — faster and more reliable than Balanced on devices without GMS.
+  const current = await Location.getCurrentPositionAsync({
+    accuracy: Location.Accuracy.Low,
+  }).catch(() => null);
+  if (current) {
+    return { latitude: current.coords.latitude, longitude: current.coords.longitude };
   }
 
   throw new MerchantProductError('merchant_location_unavailable', 'location_unavailable');

@@ -54,10 +54,31 @@ export default function AccountScreen() {
   };
 
   const handlePollingToggle = async (value: boolean) => {
-    if (value) {
-      await enablePolling();
-    } else {
-      await disablePolling();
+    if (!value) { await disablePolling(); return; }
+    if (isExpoGo) {
+      Alert.alert(
+        'Feature Not Available',
+        'Location polling requires a development build. It is not supported in Expo Go.',
+        [{ text: 'OK' }],
+      );
+      return;
+    }
+    const result = await enablePolling();
+    if (result === 'not_available') {
+      Alert.alert(
+        'Feature Not Available',
+        'Location polling requires a development build. It is not supported in Expo Go.',
+        [{ text: 'OK' }],
+      );
+    } else if (result === 'error') {
+      Alert.alert(
+        'Polling Failed',
+        'Could not start location polling. Make sure location access is enabled for this app in your device settings.',
+        [
+          { text: 'Open Settings', onPress: openSettings },
+          { text: 'OK', style: 'cancel' },
+        ],
+      );
     }
   };
 
@@ -171,7 +192,7 @@ export default function AccountScreen() {
           right: (
             <Switch
               value={isPolling}
-              onValueChange={(v: boolean) => v ? enablePolling() : disablePolling()}
+              onValueChange={handlePollingToggle}
               trackColor={{ false: colors.gray300, true: colors.primary }}
               thumbColor={colors.white}
             />

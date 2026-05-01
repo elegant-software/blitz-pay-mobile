@@ -106,10 +106,16 @@ export function useGeofence() {
     setIsPolling(false);
   }, [config]);
 
-  const enablePolling = useCallback(async () => {
+  const enablePolling = useCallback(async (): Promise<'ok' | 'not_available' | 'error'> => {
     if (!(await TaskManager.isAvailableAsync())) {
       setError('TaskManager not available');
-      return;
+      return 'not_available';
+    }
+    // Foreground service polling only needs ACCESS_FINE_LOCATION — no "Always" required.
+    const { status: fg } = await Location.getForegroundPermissionsAsync();
+    if (fg !== 'granted') {
+      setError('foreground_permission_denied');
+      return 'error';
     }
     try {
       await startPolling();
@@ -117,8 +123,10 @@ export function useGeofence() {
       await storage.setItem(CONFIG_KEY, JSON.stringify(updated));
       setConfig(updated);
       setIsPolling(true);
+      return 'ok';
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : String(err));
+      return 'error';
     }
   }, [config]);
 

@@ -58,6 +58,7 @@ export type MerchantProductInput = {
   unitPrice: string;
   productCode?: string;
   imageUri?: string;
+  active?: boolean;
 };
 
 export type MerchantScope = {

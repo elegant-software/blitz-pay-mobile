@@ -155,8 +155,8 @@ export async function stopGeofencing(): Promise<void> {
 export async function startPolling(): Promise<void> {
   await Location.startLocationUpdatesAsync(GEOFENCE_POLL_TASK, {
     timeInterval: 30_000,
-    distanceInterval: 50,
-    accuracy: Location.Accuracy.Balanced,
+    distanceInterval: 0,           // fire on time alone — device may be stationary
+    accuracy: Location.Accuracy.Low, // network/cell-tower; works without GMS (e.g. Fire OS)
     foregroundService: {
       notificationTitle: 'BlitzPay Merchant',
       notificationBody: 'Monitoring branch proximity…',
@@ -170,21 +170,16 @@ export async function stopPolling(): Promise<void> {
   if (!(await TaskManager.isAvailableAsync())) {
     return;
   }
-  const registered = await TaskManager.isTaskRegisteredAsync(GEOFENCE_POLL_TASK);
   const started = await Location.hasStartedLocationUpdatesAsync(GEOFENCE_POLL_TASK);
-
-  if (!registered && !started) {
+  if (!started) {
     return;
   }
-
   try {
     await Location.stopLocationUpdatesAsync(GEOFENCE_POLL_TASK);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
-    if (message.includes('TaskNotFoundException') || message.includes('not found')) {
-      console.warn('[geofence] stopPolling skipped — poll task was already gone');
-      return;
-    }
+    // OS killed the task between our check and the stop call — nothing to do.
+    if (message.includes('TaskNotFoundException') || message.includes('not found')) return;
     throw err;
   }
 }
