@@ -3,7 +3,7 @@ import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet,
-  KeyboardAvoidingView, Platform, ActivityIndicator, Image, Alert, Switch,
+  KeyboardAvoidingView, Platform, ActivityIndicator, Image, Alert, Switch, Modal, FlatList,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,6 +13,7 @@ import { observability } from '../lib/observability';
 import { colors, spacing, radius, shadow } from '../lib/theme';
 import {
   createMerchantProduct,
+  fetchBranchProducts,
   fetchProductDetail,
   type MerchantScope,
   MerchantProductError,
@@ -75,6 +76,8 @@ export default function ProductEditScreen() {
     active: true,
   });
   const [merchantScope, setMerchantScope] = useState<MerchantScope | null>(null);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [categoryModalVisible, setCategoryModalVisible] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [errorKey, setErrorKey] = useState<string | null>(null);
@@ -91,6 +94,21 @@ export default function ProductEditScreen() {
         const activeScope = await resolveNearbyMerchantScope(coords);
         if (!active) return;
         setMerchantScope(activeScope);
+
+        // Load existing categories from branch products for the dropdown
+        fetchBranchProducts(activeScope.merchantId, activeScope.branchId)
+          .then((products) => {
+            const seen = new Set<string>();
+            const cats: string[] = [];
+            for (const p of products) {
+              if (p.categoryName && !seen.has(p.categoryName)) {
+                seen.add(p.categoryName);
+                cats.push(p.categoryName);
+              }
+            }
+            if (active) setCategories(cats.sort());
+          })
+          .catch(() => {}); // non-critical, dropdown just shows no options
 
         if (!isEdit || !route.params.productId) {
           setForm({
@@ -280,21 +298,24 @@ export default function ProductEditScreen() {
             </Field>
 
             <Field label={t('product_category')}>
-              <TextInput
-                style={styles.input}
-                value={form.category}
-                onChangeText={(v) => handleChange('category', v)}
-                placeholder="e.g. Beverages"
-                placeholderTextColor={colors.gray400}
-              />
+              <TouchableOpacity
+                style={styles.dropdownBtn}
+                onPress={() => setCategoryModalVisible(true)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.dropdownText, !form.category && styles.dropdownPlaceholder]}>
+                  {form.category || t('product_category')}
+                </Text>
+                <Ionicons name="chevron-down" size={16} color={colors.gray400} />
+              </TouchableOpacity>
             </Field>
 
-            <Field label={t('product_sku')}>
+            <Field label={t('product_code')}>
               <TextInput
                 style={styles.input}
                 value={form.productCode}
                 onChangeText={(v) => handleChange('productCode', v)}
-                placeholder="e.g. SKU-001"
+                placeholder="e.g. PROD-001"
                 placeholderTextColor={colors.gray400}
                 autoCapitalize="characters"
               />
@@ -350,6 +371,40 @@ export default function ProductEditScreen() {
           </View>
         </ScrollView>
       )}
+      <Modal visible={categoryModalVisible} transparent animationType="slide">
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setCategoryModalVisible(false)}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.modalTitle}>{t('product_category')}</Text>
+            <FlatList
+              data={categories}
+              keyExtractor={(item) => item}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[styles.modalOption, form.category === item && styles.modalOptionSelected]}
+                  onPress={() => { handleChange('category', item); setCategoryModalVisible(false); }}
+                >
+                  <Text style={[styles.modalOptionText, form.category === item && styles.modalOptionTextSelected]}>
+                    {item}
+                  </Text>
+                  {form.category === item && <Ionicons name="checkmark" size={18} color={colors.primary} />}
+                </TouchableOpacity>
+              )}
+              ListEmptyComponent={
+                <Text style={styles.modalEmpty}>{t('merchant_products_empty')}</Text>
+              }
+            />
+            {form.category ? (
+              <TouchableOpacity
+                style={styles.modalClearBtn}
+                onPress={() => { handleChange('category', ''); setCategoryModalVisible(false); }}
+              >
+                <Text style={styles.modalClearText}>{t('product_image_remove').replace('Image', 'Category')}</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -408,6 +463,47 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   toggleLabel: { fontSize: 15, fontWeight: '600', color: colors.onSurface },
+  dropdownBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: colors.surface, borderRadius: radius.lg,
+    paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
+    borderWidth: 1, borderColor: colors.gray200,
+  },
+  dropdownText: { fontSize: 15, color: colors.onSurface, flex: 1 },
+  dropdownPlaceholder: { color: colors.gray400 },
+  modalOverlay: {
+    flex: 1, backgroundColor: colors.overlayDark, justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    backgroundColor: colors.white, borderTopLeftRadius: radius.xxl, borderTopRightRadius: radius.xxl,
+    paddingTop: spacing.sm, paddingBottom: spacing.xl, maxHeight: '60%',
+  },
+  modalHandle: {
+    width: 36, height: 4, borderRadius: 2, backgroundColor: colors.gray300,
+    alignSelf: 'center', marginBottom: spacing.md,
+  },
+  modalTitle: {
+    fontSize: 16, fontWeight: '700', color: colors.onSurface,
+    paddingHorizontal: spacing.lg, marginBottom: spacing.sm,
+  },
+  modalOption: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg, paddingVertical: 14,
+    borderBottomWidth: 1, borderBottomColor: colors.gray100,
+  },
+  modalOptionSelected: { backgroundColor: `${colors.primary}10` },
+  modalOptionText: { fontSize: 15, color: colors.onSurface },
+  modalOptionTextSelected: { color: colors.primary, fontWeight: '600' },
+  modalEmpty: {
+    fontSize: 14, color: colors.gray500, textAlign: 'center',
+    padding: spacing.lg,
+  },
+  modalClearBtn: {
+    marginTop: spacing.sm, marginHorizontal: spacing.lg,
+    padding: spacing.md, alignItems: 'center',
+    borderRadius: radius.full, borderWidth: 1, borderColor: colors.error,
+  },
+  modalClearText: { fontSize: 14, fontWeight: '600', color: colors.error },
   imagePickerBtn: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
     backgroundColor: colors.surface, borderRadius: radius.lg,
