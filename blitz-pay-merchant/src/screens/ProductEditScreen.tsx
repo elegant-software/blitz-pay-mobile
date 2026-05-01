@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet,
@@ -10,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import { useLanguage } from '../lib/LanguageContext';
 import { observability } from '../lib/observability';
+import { resolveCurrentCoordinates } from '../lib/location';
 import { colors, spacing, radius, shadow } from '../lib/theme';
 import {
   createMerchantProduct,
@@ -36,26 +36,6 @@ type FormState = {
   active: boolean;
 };
 
-async function resolveCurrentCoordinates() {
-  const { status } = await Location.requestForegroundPermissionsAsync();
-  if (status !== Location.PermissionStatus.GRANTED) {
-    throw new MerchantProductError('merchant_location_permission_required', `location_permission_${status}`);
-  }
-
-  const lastKnown = await Location.getLastKnownPositionAsync({}).catch(() => null);
-  if (lastKnown) {
-    return { latitude: lastKnown.coords.latitude, longitude: lastKnown.coords.longitude };
-  }
-
-  const current = await Location.getCurrentPositionAsync({
-    accuracy: Location.Accuracy.Low,
-  }).catch(() => null);
-  if (current) {
-    return { latitude: current.coords.latitude, longitude: current.coords.longitude };
-  }
-
-  throw new MerchantProductError('merchant_location_unavailable', 'location_unavailable');
-}
 
 export default function ProductEditScreen() {
   const { t } = useLanguage();

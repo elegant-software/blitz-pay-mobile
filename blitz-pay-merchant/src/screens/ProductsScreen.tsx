@@ -1,5 +1,4 @@
 import React, { useCallback, useState } from 'react';
-import * as Location from 'expo-location';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator,
 } from 'react-native';
@@ -9,6 +8,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useLanguage } from '../lib/LanguageContext';
 import { observability } from '../lib/observability';
 import { colors, spacing, radius, shadow } from '../lib/theme';
+import { resolveCurrentCoordinates } from '../lib/location';
 import {
   fetchBranchProducts,
   type MerchantScope,
@@ -21,26 +21,6 @@ function formatCurrency(amount: number) {
   return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(amount);
 }
 
-async function resolveCurrentCoordinates() {
-  const { status } = await Location.requestForegroundPermissionsAsync();
-  if (status !== Location.PermissionStatus.GRANTED) {
-    throw new MerchantProductError('merchant_location_permission_required', `location_permission_${status}`);
-  }
-
-  const lastKnown = await Location.getLastKnownPositionAsync({}).catch(() => null);
-  if (lastKnown) {
-    return { latitude: lastKnown.coords.latitude, longitude: lastKnown.coords.longitude };
-  }
-
-  const current = await Location.getCurrentPositionAsync({
-    accuracy: Location.Accuracy.Low,
-  }).catch(() => null);
-  if (current) {
-    return { latitude: current.coords.latitude, longitude: current.coords.longitude };
-  }
-
-  throw new MerchantProductError('merchant_location_unavailable', 'location_unavailable');
-}
 
 function groupByCategory(products: Product[], uncategorizedLabel: string): { category: string; items: Product[] }[] {
   const map = new Map<string, Product[]>();
