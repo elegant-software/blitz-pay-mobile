@@ -58,6 +58,7 @@ export type MerchantProductInput = {
   unitPrice: string;
   productCode?: string;
   imageUri?: string;
+  categoryName?: string;
   active?: boolean;
 };
 
@@ -394,6 +395,8 @@ async function buildProductFormData(input: MerchantProductInput): Promise<FormDa
   formData.append('unitPrice', input.unitPrice);
   if (input.description) formData.append('description', input.description);
   if (input.productCode) formData.append('productCode', input.productCode);
+  if (input.categoryName) formData.append('categoryName', input.categoryName);
+  if (input.active !== undefined) formData.append('active', String(input.active));
   if (input.imageUri) await appendImage(formData, input.imageUri);
   return formData;
 }

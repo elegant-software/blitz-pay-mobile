@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import * as Location from 'expo-location';
+import * as ImagePicker from 'expo-image-picker';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet,
-  KeyboardAvoidingView, Platform, ActivityIndicator, Image,
+  KeyboardAvoidingView, Platform, ActivityIndicator, Image, Alert, Switch,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -29,6 +30,9 @@ type FormState = {
   description: string;
   price: string;
   imageUri: string;
+  category: string;
+  productCode: string;
+  active: boolean;
 };
 
 async function resolveCurrentCoordinates() {
@@ -66,6 +70,9 @@ export default function ProductEditScreen() {
     description: '',
     price: '',
     imageUri: '',
+    category: '',
+    productCode: '',
+    active: true,
   });
   const [merchantScope, setMerchantScope] = useState<MerchantScope | null>(null);
   const [loading, setLoading] = useState(true);
@@ -93,6 +100,9 @@ export default function ProductEditScreen() {
             description: '',
             price: '',
             imageUri: '',
+            category: '',
+            productCode: '',
+            active: true,
           });
           setLoading(false);
           return;
@@ -133,6 +143,9 @@ export default function ProductEditScreen() {
       description: product.description ?? '',
       price: product.unitPrice.toFixed(2),
       imageUri: product.imageUrl ?? '',
+      category: product.categoryName ?? '',
+      productCode: product.productCode != null ? String(product.productCode) : '',
+      active: product.active,
     });
   }
 
@@ -158,6 +171,9 @@ export default function ProductEditScreen() {
         description: form.description.trim() || undefined,
         unitPrice: Number(form.price.replace(',', '.')).toFixed(2),
         imageUri: form.imageUri.trim() || undefined,
+        categoryName: form.category.trim() || undefined,
+        productCode: form.productCode.trim() || undefined,
+        active: form.active,
       };
 
       if (isEdit && route.params.productId) {
@@ -176,6 +192,47 @@ export default function ProductEditScreen() {
   const handleChange = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((current) => ({ ...current, [key]: value }));
     if (errorKey) setErrorKey(null);
+  };
+
+  const handlePickImage = () => {
+    Alert.alert(t('product_image'), undefined, [
+      {
+        text: t('product_image_take_photo'),
+        onPress: async () => {
+          const { status } = await ImagePicker.requestCameraPermissionsAsync();
+          if (status !== 'granted') return;
+          const result = await ImagePicker.launchCameraAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            quality: 0.8,
+          });
+          if (!result.canceled && result.assets[0]) {
+            handleChange('imageUri', result.assets[0].uri);
+          }
+        },
+      },
+      {
+        text: t('product_image_choose_library'),
+        onPress: async () => {
+          const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+          if (status !== 'granted') return;
+          const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            quality: 0.8,
+          });
+          if (!result.canceled && result.assets[0]) {
+            handleChange('imageUri', result.assets[0].uri);
+          }
+        },
+      },
+      ...(form.imageUri ? [{
+        text: t('product_image_remove'),
+        style: 'destructive' as const,
+        onPress: () => handleChange('imageUri', ''),
+      }] : []),
+      { text: t('cancel'), style: 'cancel' as const },
+    ]);
   };
 
   return (
@@ -202,7 +259,10 @@ export default function ProductEditScreen() {
           <Text style={styles.stateText}>{t('merchant_product_loading')}</Text>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + spacing.xl }]} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + spacing.xl }]}
+          keyboardShouldPersistTaps="handled"
+        >
           <View style={[styles.card, shadow.sm]}>
             <Text style={styles.scopeLabel}>{t('merchant_branch_scope')}</Text>
             <Text style={styles.scopeValue}>{form.branchName || '—'}</Text>
@@ -210,45 +270,81 @@ export default function ProductEditScreen() {
 
           <View style={[styles.card, shadow.sm]}>
             <Field label={t('product_name')} required>
-              <TextInput style={styles.input} value={form.name} onChangeText={(value) => handleChange('name', value)} placeholder="Espresso" placeholderTextColor={colors.gray400} />
+              <TextInput
+                style={styles.input}
+                value={form.name}
+                onChangeText={(v) => handleChange('name', v)}
+                placeholder="Espresso"
+                placeholderTextColor={colors.gray400}
+              />
             </Field>
+
+            <Field label={t('product_category')}>
+              <TextInput
+                style={styles.input}
+                value={form.category}
+                onChangeText={(v) => handleChange('category', v)}
+                placeholder="e.g. Beverages"
+                placeholderTextColor={colors.gray400}
+              />
+            </Field>
+
+            <Field label={t('product_sku')}>
+              <TextInput
+                style={styles.input}
+                value={form.productCode}
+                onChangeText={(v) => handleChange('productCode', v)}
+                placeholder="e.g. SKU-001"
+                placeholderTextColor={colors.gray400}
+                autoCapitalize="characters"
+              />
+            </Field>
+
+            <View style={styles.toggleRow}>
+              <Text style={styles.toggleLabel}>{t('product_active')}</Text>
+              <Switch
+                value={form.active}
+                onValueChange={(v) => handleChange('active', v)}
+                trackColor={{ false: colors.gray300, true: colors.primary }}
+                thumbColor={colors.white}
+              />
+            </View>
+
             <Field label={t('product_description')}>
               <TextInput
                 style={[styles.input, styles.textarea]}
                 value={form.description}
-                onChangeText={(value) => handleChange('description', value)}
+                onChangeText={(v) => handleChange('description', v)}
                 placeholder={t('product_description')}
                 placeholderTextColor={colors.gray400}
                 multiline
                 numberOfLines={4}
               />
             </Field>
+
             <Field label={`${t('product_price')} (EUR)`} required>
               <TextInput
                 style={styles.input}
                 value={form.price}
-                onChangeText={(value) => handleChange('price', value)}
+                onChangeText={(v) => handleChange('price', v)}
                 placeholder="0.00"
                 placeholderTextColor={colors.gray400}
                 keyboardType="decimal-pad"
               />
             </Field>
-            <Field label={t('merchant_product_image_uri')}>
-              <TextInput
-                style={styles.input}
-                value={form.imageUri}
-                onChangeText={(value) => handleChange('imageUri', value)}
-                placeholder="https://…"
-                placeholderTextColor={colors.gray400}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-            </Field>
-            <Text style={styles.helperText}>{t('merchant_product_image_help')}</Text>
 
-            {form.imageUri ? (
-              <Image source={{ uri: form.imageUri }} style={styles.previewImage} resizeMode="cover" />
-            ) : null}
+            <Field label={t('product_image')}>
+              <TouchableOpacity style={styles.imagePickerBtn} onPress={handlePickImage} activeOpacity={0.7}>
+                <Ionicons name="camera-outline" size={18} color={colors.secondary} />
+                <Text style={styles.imagePickerText}>
+                  {form.imageUri ? t('product_image_choose_library') : t('product_image_take_photo')}
+                </Text>
+                <Ionicons name="chevron-forward" size={16} color={colors.gray400} />
+              </TouchableOpacity>
+              {form.imageUri ? (
+                <Image source={{ uri: form.imageUri }} style={styles.previewImage} resizeMode="cover" />
+              ) : null}
+            </Field>
 
             {errorKey ? <Text style={styles.errorText}>{t(errorKey as Parameters<typeof t>[0])}</Text> : null}
           </View>
@@ -282,20 +378,15 @@ const styles = StyleSheet.create({
   backBtn: { width: 40, height: 40, justifyContent: 'center' },
   headerTitle: { fontSize: 17, fontWeight: '700', color: colors.onSurface },
   saveBtn: {
-    minWidth: 72,
-    alignItems: 'center',
-    justifyContent: 'center',
+    minWidth: 72, alignItems: 'center', justifyContent: 'center',
     backgroundColor: colors.primary, borderRadius: radius.full,
     paddingHorizontal: spacing.md, paddingVertical: 6,
   },
   saveBtnDisabled: { opacity: 0.4 },
   saveBtnText: { fontSize: 14, fontWeight: '700', color: colors.black },
   stateCard: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    padding: spacing.xl,
+    flex: 1, alignItems: 'center', justifyContent: 'center',
+    gap: spacing.sm, padding: spacing.xl,
   },
   stateText: { fontSize: 14, color: colors.onSurface, textAlign: 'center' },
   scroll: { padding: spacing.md },
@@ -312,7 +403,18 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: colors.gray200,
   },
   textarea: { minHeight: 80, textAlignVertical: 'top' },
-  helperText: { fontSize: 12, color: colors.gray500, marginTop: -spacing.xs, marginBottom: spacing.sm },
-  previewImage: { width: '100%', height: 180, borderRadius: radius.lg, backgroundColor: colors.surface },
+  toggleRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    marginBottom: spacing.md,
+  },
+  toggleLabel: { fontSize: 15, fontWeight: '600', color: colors.onSurface },
+  imagePickerBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+    backgroundColor: colors.surface, borderRadius: radius.lg,
+    paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
+    borderWidth: 1, borderColor: colors.gray200,
+  },
+  imagePickerText: { flex: 1, fontSize: 15, color: colors.onSurface },
+  previewImage: { width: '100%', height: 180, borderRadius: radius.lg, backgroundColor: colors.surface, marginTop: spacing.sm },
   errorText: { marginTop: spacing.md, fontSize: 12, color: colors.error },
 });

@@ -27,13 +27,11 @@ async function resolveCurrentCoordinates() {
     throw new MerchantProductError('merchant_location_permission_required', `location_permission_${status}`);
   }
 
-  // Last-known is instant and works without an active GPS fix (important on Fire OS / no GMS).
   const lastKnown = await Location.getLastKnownPositionAsync({}).catch(() => null);
   if (lastKnown) {
     return { latitude: lastKnown.coords.latitude, longitude: lastKnown.coords.longitude };
   }
 
-  // Fresh fix at Low accuracy (network-only) — faster and more reliable than Balanced on devices without GMS.
   const current = await Location.getCurrentPositionAsync({
     accuracy: Location.Accuracy.Low,
   }).catch(() => null);
@@ -42,6 +40,23 @@ async function resolveCurrentCoordinates() {
   }
 
   throw new MerchantProductError('merchant_location_unavailable', 'location_unavailable');
+}
+
+function groupByCategory(products: Product[], uncategorizedLabel: string): { category: string; items: Product[] }[] {
+  const map = new Map<string, Product[]>();
+  for (const p of products) {
+    const key = p.categoryName ?? uncategorizedLabel;
+    const existing = map.get(key);
+    if (existing) existing.push(p);
+    else map.set(key, [p]);
+  }
+  const groups = Array.from(map.entries()).map(([category, items]) => ({ category, items }));
+  groups.sort((a, b) => {
+    if (a.category === uncategorizedLabel) return 1;
+    if (b.category === uncategorizedLabel) return -1;
+    return a.category.localeCompare(b.category);
+  });
+  return groups;
 }
 
 export default function ProductsScreen() {
@@ -89,6 +104,8 @@ export default function ProductsScreen() {
     }, [loadProducts]),
   );
 
+  const groups = groupByCategory(products, t('product_uncategorized'));
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
@@ -108,7 +125,10 @@ export default function ProductsScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingHorizontal: spacing.md, paddingBottom: 90 + insets.bottom, paddingTop: spacing.sm }} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={{ paddingHorizontal: spacing.md, paddingBottom: 90 + insets.bottom, paddingTop: spacing.sm }}
+        showsVerticalScrollIndicator={false}
+      >
         {loading ? (
           <View style={[styles.stateCard, shadow.sm]}>
             <ActivityIndicator color={colors.primary} />
@@ -128,32 +148,36 @@ export default function ProductsScreen() {
             <Text style={styles.stateTitle}>{t('merchant_products_empty')}</Text>
           </View>
         ) : (
-          products.map((product) => (
-            <TouchableOpacity
-              key={product.id}
-              style={[styles.productCard, shadow.sm, !product.active && styles.productCardInactive]}
-              onPress={() => navigation.navigate('ProductEdit', { productId: product.id, mode: 'edit' })}
-              activeOpacity={0.7}
-            >
-              <View style={styles.productLeft}>
-                <View style={[styles.productIcon, { backgroundColor: product.active ? `${colors.primary}15` : colors.surface }]}>
-                  <Ionicons name="cube-outline" size={22} color={product.active ? colors.primary : colors.gray400} />
-                </View>
-                <View style={styles.productInfo}>
-                  <Text style={[styles.productName, !product.active && styles.textMuted]}>{product.name}</Text>
-                  <Text style={styles.productCategory}>{product.categoryName ?? '—'}</Text>
-                  {product.productCode != null ? <Text style={styles.productMeta}>#{product.productCode}</Text> : null}
-                </View>
-              </View>
-              <View style={styles.productRight}>
-                <Text style={[styles.productPrice, !product.active && styles.textMuted]}>
-                  {formatCurrency(product.unitPrice)}
-                </Text>
-                <Text style={[styles.productStatus, !product.active && styles.productStatusInactive]}>
-                  {product.active ? t('product_status_active') : t('product_status_inactive')}
-                </Text>
-              </View>
-            </TouchableOpacity>
+          groups.map(({ category, items }) => (
+            <View key={category}>
+              <Text style={styles.categoryHeader}>{category}</Text>
+              {items.map((product) => (
+                <TouchableOpacity
+                  key={product.id}
+                  style={[styles.productCard, shadow.sm, !product.active && styles.productCardInactive]}
+                  onPress={() => navigation.navigate('ProductEdit', { productId: product.id, mode: 'edit' })}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.productLeft}>
+                    <View style={[styles.productIcon, { backgroundColor: product.active ? `${colors.primary}15` : colors.surface }]}>
+                      <Ionicons name="cube-outline" size={22} color={product.active ? colors.primary : colors.gray400} />
+                    </View>
+                    <View style={styles.productInfo}>
+                      <Text style={[styles.productName, !product.active && styles.textMuted]}>{product.name}</Text>
+                      {product.productCode != null ? <Text style={styles.productMeta}>#{product.productCode}</Text> : null}
+                    </View>
+                  </View>
+                  <View style={styles.productRight}>
+                    <Text style={[styles.productPrice, !product.active && styles.textMuted]}>
+                      {formatCurrency(product.unitPrice)}
+                    </Text>
+                    <Text style={[styles.productStatus, !product.active && styles.productStatusInactive]}>
+                      {product.active ? t('product_status_active') : t('product_status_inactive')}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
           ))
         )}
       </ScrollView>
@@ -178,21 +202,20 @@ const styles = StyleSheet.create({
   addBtnDisabled: { opacity: 0.45 },
   addBtnText: { fontSize: 14, fontWeight: '700', color: colors.black },
   stateCard: {
-    backgroundColor: colors.white,
-    borderRadius: radius.xl,
-    padding: spacing.lg,
-    alignItems: 'center',
-    gap: spacing.sm,
+    backgroundColor: colors.white, borderRadius: radius.xl,
+    padding: spacing.lg, alignItems: 'center', gap: spacing.sm,
   },
   stateTitle: { fontSize: 15, fontWeight: '600', color: colors.onSurface, textAlign: 'center' },
   retryBtn: {
-    marginTop: spacing.xs,
-    backgroundColor: colors.primary,
-    borderRadius: radius.full,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    marginTop: spacing.xs, backgroundColor: colors.primary,
+    borderRadius: radius.full, paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
   },
   retryBtnText: { fontSize: 14, fontWeight: '700', color: colors.black },
+  categoryHeader: {
+    fontSize: 13, fontWeight: '700', color: colors.gray500,
+    textTransform: 'uppercase', letterSpacing: 0.5,
+    marginTop: spacing.md, marginBottom: spacing.xs, paddingLeft: 2,
+  },
   productCard: {
     backgroundColor: colors.white, borderRadius: radius.xl,
     padding: spacing.md, marginBottom: spacing.sm,
@@ -203,7 +226,6 @@ const styles = StyleSheet.create({
   productIcon: { width: 44, height: 44, borderRadius: radius.md, justifyContent: 'center', alignItems: 'center' },
   productInfo: { flex: 1 },
   productName: { fontSize: 15, fontWeight: '700', color: colors.onSurface },
-  productCategory: { fontSize: 12, color: colors.gray500, marginTop: 1 },
   productMeta: { fontSize: 11, color: colors.gray400, marginTop: 1 },
   textMuted: { color: colors.gray400 },
   productRight: { alignItems: 'flex-end', gap: 4 },
