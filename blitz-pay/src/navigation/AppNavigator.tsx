@@ -20,6 +20,7 @@ import PaymentResultScreen from '../screens/PaymentResultScreen';
 import PaymentPendingScreen from '../screens/PaymentPendingScreen';
 import InvoicePdfPreviewScreen from '../screens/InvoicePdfPreviewScreen';
 import ProductDetailScreen from '../screens/ProductDetailScreen';
+import OrderDetailScreen from '../screens/OrderDetailScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -68,6 +69,7 @@ export default function AppNavigator() {
           />
           <Stack.Screen name="InvoicePdfPreview" component={InvoicePdfPreviewScreen} />
           <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
+          <Stack.Screen name="OrderDetail" component={OrderDetailScreen} />
         </>
       )}
     </Stack.Navigator>

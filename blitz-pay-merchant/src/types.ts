@@ -7,11 +7,11 @@ export type RootStackParamList = {
   Main: undefined;
   OrderDetail: {
     orderId: string;
-    orderNumber: string;
-    amount: number;
+    orderNumber?: string;
+    amount?: number;
     currency?: string;
     customerName?: string;
-    status: OrderStatus;
+    status?: OrderStatus;
   };
   ProductEdit: {
     productId?: string;

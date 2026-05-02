@@ -1,6 +1,8 @@
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { BasketCheckoutItemSummary } from './features/basket/types/basket';
+import type { PaymentChannel } from './features/merchant-catalog/types/catalog';
+import type { CheckoutPaymentMethod } from './features/order-payment/types/orderPayment';
 
 export type RootStackParamList = {
   Login: undefined;
@@ -19,6 +21,7 @@ export type RootStackParamList = {
     branchId?: string;
     branchName?: string;
     merchantLogoUrl?: string;
+    activePaymentChannels?: PaymentChannel[];
     basketSummary?: string;
     basketItemCount?: number;
     basketItems?: BasketCheckoutItemSummary[];
@@ -31,6 +34,7 @@ export type RootStackParamList = {
   Notifications: undefined;
   PaymentProcessing: {
     paymentRequestId: string;
+    orderId?: string;
     amount?: number;
     currency?: string;
     merchantName?: string;
@@ -40,16 +44,19 @@ export type RootStackParamList = {
   };
   PaymentResult: {
     paymentRequestId: string;
+    orderId?: string;
     status: 'succeeded' | 'failed' | 'cancelled';
     amount?: number;
     currency?: string;
     merchantName?: string;
     branchName?: string;
     merchantLogoUrl?: string;
+    paymentProvider?: string;
     reason?: string;
   };
   PaymentPending: {
     paymentRequestId: string;
+    orderId?: string;
     amount?: number;
     currency?: string;
     merchantName?: string;
@@ -74,6 +81,14 @@ export type RootStackParamList = {
     merchantLogoUrl?: string;
     categoryName?: string;
     productCode?: number;
+  };
+  OrderDetail: {
+    orderId: string;
+    merchantName?: string;
+    branchName?: string;
+    merchantLogoUrl?: string;
+    availableChannels?: PaymentChannel[];
+    preferredMethod?: CheckoutPaymentMethod;
   };
 };
 

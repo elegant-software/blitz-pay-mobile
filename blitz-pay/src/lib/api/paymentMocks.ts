@@ -4,7 +4,8 @@ import { config } from '../config';
 export const mockCreatePaymentIntent = async (params: {
   amount: number;
   currency: string;
-  merchantId?: string;
+  orderId: string;
+  merchantId: string;
   branchId?: string;
   productId?: string;
 }): Promise<StripeParams> => {
@@ -28,7 +29,8 @@ export const mockCreatePaymentIntent = async (params: {
 
     const data = await response.json();
     return {
-      paymentIntent: data.paymentIntent,
+      paymentRequestId: data.paymentRequestId,
+      clientSecret: data.clientSecret ?? data.paymentIntent,
       ephemeralKey: data.ephemeralKey || '',
       customer: data.customer || '',
       publishableKey: data.publishableKey,

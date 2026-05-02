@@ -40,6 +40,9 @@ export function isTerminalStatus(value: unknown): value is TerminalPaymentStatus
 
 export interface PaymentResult {
   paymentRequestId: string;
+  orderId?: string;
+  provider?: string | null;
+  orderStatus?: string | null;
   status: TerminalPaymentStatus;
   amount?: number;
   currency?: string;
@@ -50,6 +53,7 @@ export interface PaymentResult {
 export interface PaymentResultPushData {
   type: 'payment_result';
   paymentRequestId: string;
+  orderId?: string | null;
   status: TerminalPaymentStatus;
   reason?: string | null;
 }

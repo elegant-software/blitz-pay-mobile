@@ -361,10 +361,30 @@ export async function fetchBranchProducts(merchantId: string, branchId: string):
     },
   );
 
-  return response
+  observability.info('merchant_products_payload', {
+    event: 'fetch_branch_products',
+    merchantId,
+    branchId,
+    rowCount: response.length,
+    sampleProductIds: response.slice(0, 5).map((product) => String(product.productId ?? 'missing')).join(','),
+    sampleActive: response.slice(0, 5).map((product) => String(product.active ?? 'missing')).join(','),
+    sampleNames: response.slice(0, 5).map((product) => String(product.name ?? 'missing')).join(','),
+  });
+
+  const products = response
     .map(mapProduct)
     .filter((product): product is Product => product != null)
     .sort((a, b) => a.name.localeCompare(b.name));
+
+  observability.info('merchant_products_mapped', {
+    event: 'fetch_branch_products',
+    merchantId,
+    branchId,
+    count: products.length,
+    dropped: Math.max(0, response.length - products.length),
+  });
+
+  return products;
 }
 
 export async function fetchProductDetail(merchantId: string, branchId: string, productId: string): Promise<Product> {

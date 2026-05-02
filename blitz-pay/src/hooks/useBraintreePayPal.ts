@@ -5,9 +5,14 @@ import { observability } from '../lib/observability';
 import type { PayPalPaymentResult } from '../types/braintree';
 
 interface PresentArgs {
+  paymentRequestId?: string;
   amount: number;
   currency?: string;
   invoiceId?: string;
+  orderId: string;
+  merchantId: string;
+  branchId?: string;
+  productId?: string;
 }
 
 // Must match the `host` + `pathPrefix` declared in app.json under the
@@ -50,8 +55,12 @@ export function useBraintreePayPal() {
     async (args: PresentArgs): Promise<PayPalPaymentResult> => {
       setLoading(true);
       try {
-        const clientToken = await fetchClientToken();
+        const clientToken = await fetchClientToken({
+          merchantId: args.merchantId,
+          branchId: args.branchId,
+        });
         observability.info('braintree_client_token_received', {
+          paymentRequestId: args.paymentRequestId ?? null,
           length: clientToken.length,
         });
 
@@ -70,6 +79,7 @@ export function useBraintreePayPal() {
           }
           const e = err as { message?: string; code?: string } | null;
           observability.warn('braintree_paypal_error', {
+            paymentRequestId: args.paymentRequestId ?? null,
             code: e?.code ?? null,
             message: e?.message ?? String(err),
           });
@@ -88,6 +98,7 @@ export function useBraintreePayPal() {
           const code = typeof e.code === 'string' ? e.code : undefined;
           const message = typeof e.message === 'string' ? e.message : undefined;
           observability.warn('braintree_paypal_error', {
+            paymentRequestId: args.paymentRequestId ?? null,
             code: code ?? null,
             message: message ?? 'unknown',
           });
@@ -97,6 +108,7 @@ export function useBraintreePayPal() {
         const nonce = extractNonce(ppResult);
         if (!nonce) {
           observability.warn('braintree_paypal_missing_nonce', {
+            paymentRequestId: args.paymentRequestId ?? null,
             keys: ppResult && typeof ppResult === 'object' ? Object.keys(ppResult as object).join(',') : null,
           });
           return { status: 'failed', error: 'Missing PayPal nonce' };
@@ -106,11 +118,19 @@ export function useBraintreePayPal() {
           nonce,
           amount: args.amount,
           currency: args.currency ?? 'EUR',
+          orderId: args.orderId,
           invoiceId: args.invoiceId,
+          merchantId: args.merchantId,
+          branchId: args.branchId,
+          productId: args.productId,
         });
 
         if (saleResponse.status === 'succeeded') {
-          return { status: 'succeeded', transactionId: saleResponse.transactionId };
+          return {
+            status: 'succeeded',
+            paymentRequestId: saleResponse.paymentRequestId,
+            transactionId: saleResponse.transactionId,
+          };
         }
         return {
           status: 'failed',
@@ -122,6 +142,11 @@ export function useBraintreePayPal() {
           message === 'Network request failed' ||
           message.toLowerCase().includes('network') ||
           message.toLowerCase().includes('fetch');
+        observability.error('braintree_paypal_flow_failed', {
+          paymentRequestId: args.paymentRequestId ?? null,
+          orderId: args.orderId,
+          message,
+        });
         return { status: 'failed', error: isNetworkError ? 'error_server_unreachable' : message };
       } finally {
         setLoading(false);

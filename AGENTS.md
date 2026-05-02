@@ -65,6 +65,8 @@ Ask the user. Pausing to confirm costs a message; an unwanted destructive action
 - Expo Secure Store for auth/session state; controlled in-memory feature state for discovery, catalog, and baske (008-nearby-merchant-checkout)
 - TypeScript 5.3, React 19.2, React Native 0.83.6, Expo SDK 55 + React Navigation 6, Expo Location, Expo Secure Store, existing `fetchMerchantCommerceJson` API wrapper, existing `merchant-catalog` and `basket` feature modules (010-nearby-merchant-product-management)
 - Expo Secure Store for auth/session state; controlled in-memory feature state for merchant branch context, product drafts, and basket state (010-nearby-merchant-product-management)
+- TypeScript 5.3, React 19.2, React Native 0.83.6, Expo SDK 55 + Expo, React Navigation 6, `expo-secure-store`, existing `authedFetch` wrappers, existing TrueLayer / Stripe / Braintree integrations, existing observability helpers (011-order-payment-orchestration)
+- Backend order/payment APIs; `expo-secure-store` for auth session and in-flight payment persistence; in-memory feature stores for checkout and order session state (011-order-payment-orchestration)
 
 ## Recent Changes
 - 008-nearby-merchant-checkout: Added TypeScript 5.3, React 19.2, React Native 0.83.4, Expo SDK 55 + React Navigation 6, Expo Location, Expo Task Manager, Expo Secure Store, existing TrueLayer/Stripe/Braintree payment integrations

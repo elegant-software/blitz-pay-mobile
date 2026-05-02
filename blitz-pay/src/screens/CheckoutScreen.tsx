@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   ScrollView,
   StyleSheet,
-  Modal,
   ActivityIndicator,
   Image,
 } from 'react-native';
@@ -15,19 +14,13 @@ import { useNavigation, useRoute, type RouteProp } from '@react-navigation/nativ
 import * as Haptics from 'expo-haptics';
 import { useLanguage } from '../lib/LanguageContext';
 import { useAuth } from '../lib/auth';
-import { createTrueLayerPayment, runTrueLayerSdk } from '../lib/truelayer';
-import { paymentResultTracker } from '../lib/payments/paymentResultTracker';
-import { resolveFailureReasonKey } from '../lib/payments/failureReasons';
-import { registerDeviceForPayment } from '../lib/notifications/pushRegistration';
 import { observability } from '../lib/observability';
-import { useStripePayment } from '../hooks/useStripePayment';
-import { useBraintreePayPal } from '../hooks/useBraintreePayPal';
-import { mockCreatePaymentIntent } from '../lib/api/paymentMocks';
 import { config } from '../lib/config';
-import { colors, spacing, radius, shadow } from '../lib/theme';
+import { colors, spacing, radius } from '../lib/theme';
 import type { RootStackNav, RootStackParamList } from '../types';
-
-type PaymentMethod = 'bank' | 'card' | 'paypal';
+import { useOrderPayment } from '../features/order-payment/hooks/useOrderPayment';
+import type { CheckoutPaymentMethod } from '../features/order-payment/types/orderPayment';
+import { isMethodAvailable } from '../features/order-payment/types/orderPayment';
 
 function resolveImageUri(uri?: string): string | undefined {
   if (!uri) return undefined;
@@ -59,30 +52,55 @@ export default function CheckoutScreen() {
   const navigation = useNavigation<RootStackNav>();
   const route = useRoute<RouteProp<RootStackParamList, 'Checkout'>>();
   const insets = useSafeAreaInsets();
+  const { confirmCheckout } = useOrderPayment();
 
   const amount = route.params?.amount ?? 24.5;
   const merchantName = route.params?.merchantName ?? 'Merchant';
   const merchantId = route.params?.merchantId;
   const branchId = route.params?.branchId;
+  const branchName = route.params?.branchName;
+  const merchantLogoUrl = route.params?.merchantLogoUrl;
+  const activePaymentChannels = route.params?.activePaymentChannels ?? [];
   const basketSummary = route.params?.basketSummary;
   const basketItemCount = route.params?.basketItemCount ?? route.params?.basketItems?.length ?? 0;
   const basketItems = route.params?.basketItems ?? [];
   const invoiceId = route.params?.invoiceId;
 
-  const { initializePayment, openPaymentSheet } = useStripePayment();
-  const { presentPayPal } = useBraintreePayPal();
-
-  const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>('bank');
+  const [selectedMethod, setSelectedMethod] = useState<CheckoutPaymentMethod | null>(null);
   const [processing, setProcessing] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
   const [error, setError] = useState('');
+
+  const methods = useMemo(
+    () =>
+      [
+        {
+          key: 'bank' as const,
+          icon: 'business-outline',
+          label: t('bank_account_direct'),
+          sub: t('ach_transfer'),
+        },
+        {
+          key: 'card' as const,
+          icon: 'card-outline',
+          label: t('credit_debit_card'),
+          sub: t('visa_mastercard'),
+        },
+        {
+          key: 'paypal' as const,
+          icon: 'logo-paypal',
+          label: t('paypal'),
+          sub: t('express_checkout'),
+        },
+      ].filter((method) => isMethodAvailable(method.key, activePaymentChannels)),
+    [activePaymentChannels, t],
+  );
 
   const handleConfirm = async () => {
     setError('');
     setProcessing(true);
 
     observability.info('checkout_confirm_started', {
-      method: selectedMethod,
+      method: selectedMethod ?? null,
       amount,
       merchantName,
       merchantId: merchantId ?? null,
@@ -94,145 +112,32 @@ export default function CheckoutScreen() {
 
     try {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
-      if (selectedMethod === 'bank') {
-        const context = await createTrueLayerPayment({
-          token,
-          amount,
-          merchantName,
-          merchantId,
-          branchId,
-          itemSummary: basketSummary,
-          itemCount: basketItemCount,
-          invoiceId,
-          user,
-        });
-        const { paymentRequestId } = context;
-
-        // Register for push and arm the poller BEFORE handing off to the SDK,
-        // so the backend can reach us regardless of how the SDK flow ends.
-        void registerDeviceForPayment(paymentRequestId);
-        void paymentResultTracker.start(paymentRequestId);
-
-        observability.info('checkout_confirm_succeeded', {
-          method: selectedMethod,
-          amount,
-          merchantId: merchantId ?? null,
-          branchId: branchId ?? null,
-          basketItemCount,
-          invoiceId: invoiceId ?? null,
-          paymentRequestId,
-        });
-        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        navigation.replace('PaymentProcessing', {
-          paymentRequestId,
-          amount,
-          currency: 'EUR',
-          merchantName,
-          invoiceId,
-        });
-
-        // Fire the SDK after navigation. The tracker is the source of truth for
-        // the outcome; an SDK cancellation is fed back as a recovered result so
-        // the user lands on the result screen without waiting for the timeout.
-        void runTrueLayerSdk(context).catch((err: unknown) => {
-          const key = err instanceof Error ? err.message : 'truelayer_reason_unknown';
-          if (key === 'truelayer_cancelled' || resolveFailureReasonKey(key) === 'truelayer_cancelled') {
-            paymentResultTracker.applyRecoveredResult({
-              paymentRequestId,
-              status: 'cancelled',
-              reason: 'UserAborted',
-            });
-          }
-        });
-        return;
-      }
-
-      if (selectedMethod === 'card') {
-        const stripeParams = await mockCreatePaymentIntent({
-          amount,
-          currency: 'EUR',
-          merchantId,
-          branchId,
-          productId: basketItems[0]?.productId,
-        });
-        await initializePayment(stripeParams);
-        const result = await openPaymentSheet();
-
-        if (result.status === 'succeeded') {
-          observability.info('checkout_confirm_succeeded', {
-            method: selectedMethod,
-            amount,
-            merchantId: merchantId ?? null,
-            branchId: branchId ?? null,
-            basketItemCount,
-            invoiceId: invoiceId ?? null,
-          });
-          setShowSuccess(true);
-          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        } else if (result.status === 'failed') {
-          setError(result.error || 'Payment failed');
-          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        } else {
-          // cancelled
-          setProcessing(false);
-        }
-        return;
-      }
-
-      if (selectedMethod === 'paypal') {
-        const result = await presentPayPal({ amount, currency: 'EUR', invoiceId });
-
-        if (result.status === 'succeeded') {
-          observability.info('checkout_confirm_succeeded', {
-            method: selectedMethod,
-            amount,
-            merchantId: merchantId ?? null,
-            branchId: branchId ?? null,
-            basketItemCount,
-            invoiceId: invoiceId ?? null,
-            transactionId: result.transactionId ?? null,
-          });
-          setShowSuccess(true);
-          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        } else if (result.status === 'failed') {
-          observability.warn('checkout_confirm_failed', {
-            method: selectedMethod,
-            amount,
-            merchantId: merchantId ?? null,
-            branchId: branchId ?? null,
-            basketItemCount,
-            invoiceId: invoiceId ?? null,
-            reasonKey: 'paypal_failed',
-            message: result.error ?? 'paypal_failed',
-          });
-          setError(result.error ? t(result.error as Parameters<typeof t>[0]) ?? result.error : t('paypal_failed'));
-          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        } else {
-          observability.info('checkout_confirm_cancelled', {
-            method: selectedMethod,
-            amount,
-            merchantId: merchantId ?? null,
-            branchId: branchId ?? null,
-            basketItemCount,
-            invoiceId: invoiceId ?? null,
-          });
-          setProcessing(false);
-        }
-        return;
-      }
-
-      await new Promise((resolve) => setTimeout(resolve, 1800));
+      await confirmCheckout({
+        token,
+        amount,
+        merchantName,
+        merchantId,
+        branchId,
+        branchName,
+        merchantLogoUrl,
+        basketSummary,
+        basketItemCount,
+        basketItems,
+        invoiceId,
+        user,
+        selectedMethod,
+        availableChannels: activePaymentChannels,
+        navigation,
+      });
 
       observability.info('checkout_confirm_succeeded', {
-        method: selectedMethod,
+        method: selectedMethod ?? null,
         amount,
         merchantId: merchantId ?? null,
         branchId: branchId ?? null,
         basketItemCount,
         invoiceId: invoiceId ?? null,
       });
-      setShowSuccess(true);
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err) {
       const rawMessage = err instanceof Error ? err.message : String(err);
@@ -240,11 +145,16 @@ export default function CheckoutScreen() {
         rawMessage === 'Network request failed' ||
         rawMessage.toLowerCase().includes('network') ||
         rawMessage.toLowerCase().includes('fetch');
-      const key = isNetworkError ? 'error_server_unreachable' : (err instanceof Error ? err.message : 'truelayer_reason_unknown');
+      const key = isNetworkError
+        ? 'error_server_unreachable'
+        : rawMessage === 'truelayer_invalid_response'
+          ? 'truelayer_request_failed'
+          : (err instanceof Error ? err.message : 'truelayer_reason_unknown');
+
       observability.error(
         'checkout_confirm_failed',
         {
-          method: selectedMethod,
+          method: selectedMethod ?? null,
           amount,
           merchantId: merchantId ?? null,
           branchId: branchId ?? null,
@@ -254,48 +164,17 @@ export default function CheckoutScreen() {
           reasonKey: key,
           message: rawMessage,
         },
-        err instanceof Error ? err : undefined
+        err instanceof Error ? err : undefined,
       );
       setError(t(key as Parameters<typeof t>[0]));
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
-      const keepProcessing =
-        (selectedMethod === 'card' || selectedMethod === 'paypal') && showSuccess;
-      if (!keepProcessing) {
-        setProcessing(false);
-      }
+      setProcessing(false);
     }
   };
 
-  const handleContinue = () => {
-    setShowSuccess(false);
-    navigation.navigate('Main');
-  };
-
-  const methods = [
-    {
-      key: 'bank' as PaymentMethod,
-      icon: 'business-outline',
-      label: t('bank_account_direct'),
-      sub: t('ach_transfer'),
-    },
-    {
-      key: 'card' as PaymentMethod,
-      icon: 'card-outline',
-      label: t('credit_debit_card'),
-      sub: t('visa_mastercard'),
-    },
-    {
-      key: 'paypal' as PaymentMethod,
-      icon: 'logo-paypal',
-      label: t('paypal'),
-      sub: t('express_checkout'),
-    },
-  ];
-
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={12}>
           <Ionicons name="close" size={24} color={colors.onSurface} />
@@ -307,7 +186,6 @@ export default function CheckoutScreen() {
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: 100 + insets.bottom }} showsVerticalScrollIndicator={false}>
-        {/* Amount summary */}
         <View style={styles.amountCard}>
           <Text style={styles.amountLabel}>{t('total_due')}</Text>
           <Text style={styles.amountValue}>€{amount.toFixed(2)}</Text>
@@ -320,62 +198,68 @@ export default function CheckoutScreen() {
                 const productImageUri = resolveImageUri(item.imageUrl);
                 const imageMeta = summarizeImageUri(productImageUri);
                 return (
-                <View key={item.productId} style={styles.basketRow}>
-                  <View style={styles.basketRowMain}>
-                    {productImageUri ? (
-                      <Image
-                        source={{
-                          uri: productImageUri,
-                          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-                        }}
-                        style={styles.basketRowImage}
-                        resizeMode="cover"
-                        onLoadStart={() => {
-                          observability.info('checkout_product_image_load_started', {
-                            merchantId: merchantId ?? null,
-                            branchId: branchId ?? null,
-                            productId: item.productId,
-                            imageHost: imageMeta.host,
-                            imagePath: imageMeta.path,
-                          });
-                        }}
-                        onLoad={() => {
-                          observability.info('checkout_product_image_loaded', {
-                            merchantId: merchantId ?? null,
-                            branchId: branchId ?? null,
-                            productId: item.productId,
-                            imageHost: imageMeta.host,
-                            imagePath: imageMeta.path,
-                          });
-                        }}
-                        onError={(event) => {
-                          observability.warn('checkout_product_image_failed', {
-                            merchantId: merchantId ?? null,
-                            branchId: branchId ?? null,
-                            productId: item.productId,
-                            imageHost: imageMeta.host,
-                            imagePath: imageMeta.path,
-                            reason: event.nativeEvent.error ?? 'unknown_image_error',
-                          });
-                        }}
-                      />
-                    ) : (
-                      <View style={styles.basketRowIcon}>
-                        <Ionicons name="cube-outline" size={16} color={colors.gray600} />
-                      </View>
-                    )}
-                    <Text style={styles.basketRowName}>{item.quantity}× {item.productName}</Text>
+                  <View key={item.productId} style={styles.basketRow}>
+                    <View style={styles.basketRowMain}>
+                      {productImageUri ? (
+                        <Image
+                          source={{
+                            uri: productImageUri,
+                            headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+                          }}
+                          style={styles.basketRowImage}
+                          resizeMode="cover"
+                          onLoadStart={() => {
+                            observability.info('checkout_product_image_load_started', {
+                              merchantId: merchantId ?? null,
+                              branchId: branchId ?? null,
+                              productId: item.productId,
+                              imageHost: imageMeta.host,
+                              imagePath: imageMeta.path,
+                            });
+                          }}
+                          onLoad={() => {
+                            observability.info('checkout_product_image_loaded', {
+                              merchantId: merchantId ?? null,
+                              branchId: branchId ?? null,
+                              productId: item.productId,
+                              imageHost: imageMeta.host,
+                              imagePath: imageMeta.path,
+                            });
+                          }}
+                          onError={(event) => {
+                            observability.warn('checkout_product_image_failed', {
+                              merchantId: merchantId ?? null,
+                              branchId: branchId ?? null,
+                              productId: item.productId,
+                              imageHost: imageMeta.host,
+                              imagePath: imageMeta.path,
+                              reason: event.nativeEvent.error ?? 'unknown_image_error',
+                            });
+                          }}
+                        />
+                      ) : (
+                        <View style={styles.basketRowIcon}>
+                          <Ionicons name="cube-outline" size={16} color={colors.gray600} />
+                        </View>
+                      )}
+                      <Text style={styles.basketRowName}>{item.quantity}× {item.productName}</Text>
+                    </View>
+                    <Text style={styles.basketRowPrice}>€{item.lineTotal.toFixed(2)}</Text>
                   </View>
-                  <Text style={styles.basketRowPrice}>€{item.lineTotal.toFixed(2)}</Text>
-                </View>
-              )})}
+                );
+              })}
             </View>
           ) : null}
         </View>
 
-        {/* Payment methods */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t('payment_method')}</Text>
+          {methods.length === 0 ? (
+            <View style={styles.errorBox}>
+              <Ionicons name="alert-circle-outline" size={16} color={colors.error} />
+              <Text style={styles.errorText}>{t('payment_option_unavailable')}</Text>
+            </View>
+          ) : null}
           {methods.map((method) => (
             <TouchableOpacity
               key={method.key}
@@ -410,7 +294,6 @@ export default function CheckoutScreen() {
           </View>
         ) : null}
 
-        {/* Security note */}
         <View style={styles.securityNote}>
           <Ionicons name="shield-checkmark-outline" size={16} color={colors.success} />
           <View style={styles.securityTextBox}>
@@ -422,7 +305,6 @@ export default function CheckoutScreen() {
         </View>
       </ScrollView>
 
-      {/* Confirm button */}
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 12 }]}>
         <Text style={styles.authorizedBy}>{t('authorized_by')}</Text>
         <TouchableOpacity
@@ -444,27 +326,6 @@ export default function CheckoutScreen() {
         </TouchableOpacity>
         {processing ? <Text style={styles.processingText}>{t('processing_payment')}</Text> : null}
       </View>
-
-      {/* Success modal */}
-      <Modal visible={showSuccess} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.successCard}>
-            <View style={styles.successIcon}>
-              <Ionicons name="checkmark-circle" size={64} color={colors.success} />
-            </View>
-            <Text style={styles.successTitle}>{t('payment_successful')}</Text>
-            <Text style={styles.successDesc}>
-              {t('reward_msg')}
-            </Text>
-            <View style={styles.pointsBadge}>
-              <Text style={styles.pointsText}>{t('points_earned', { amount: '250' })}</Text>
-            </View>
-            <TouchableOpacity style={styles.continueBtn} onPress={handleContinue} activeOpacity={0.85}>
-              <Text style={styles.continueBtnText}>{t('continue_to_vault')}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }
@@ -661,36 +522,4 @@ const styles = StyleSheet.create({
     color: colors.gray600,
     textAlign: 'center',
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: spacing.lg,
-  },
-  successCard: {
-    backgroundColor: colors.background,
-    borderRadius: radius.xxl,
-    padding: spacing.xl,
-    alignItems: 'center',
-    width: '100%',
-  },
-  successIcon: { marginBottom: spacing.md },
-  successTitle: { fontSize: 22, fontWeight: '800', color: colors.onSurface, marginBottom: 8 },
-  successDesc: { fontSize: 14, color: colors.gray600, textAlign: 'center', lineHeight: 20, marginBottom: spacing.md },
-  pointsBadge: {
-    backgroundColor: `${colors.primary}15`,
-    borderRadius: radius.full,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 6,
-    marginBottom: spacing.lg,
-  },
-  pointsText: { fontSize: 16, fontWeight: '700', color: colors.primary },
-  continueBtn: {
-    backgroundColor: colors.onSurface,
-    borderRadius: radius.full,
-    paddingVertical: 14,
-    paddingHorizontal: spacing.xl,
-  },
-  continueBtnText: { fontSize: 15, fontWeight: '700', color: colors.white },
 });

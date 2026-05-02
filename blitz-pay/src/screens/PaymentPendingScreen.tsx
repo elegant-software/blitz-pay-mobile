@@ -13,23 +13,27 @@ export default function PaymentPendingScreen() {
   const navigation = useNavigation<RootStackNav>();
   const route = useRoute<RouteProp<RootStackParamList, 'PaymentPending'>>();
   const insets = useSafeAreaInsets();
-  const { paymentRequestId, amount, currency, merchantName } = route.params;
+  const { paymentRequestId, orderId, amount, currency, merchantName, branchName, merchantLogoUrl } = route.params;
 
   // Keep listening — a late push or recovery signal should still flip us to the
   // real result screen even after timeout.
-  const state = usePaymentResult(paymentRequestId);
+  const state = usePaymentResult(paymentRequestId, orderId);
 
   useEffect(() => {
     if (state.status === 'processing' || state.status === 'timeout') return;
     navigation.replace('PaymentResult', {
       paymentRequestId,
+      orderId: state.result.orderId ?? orderId,
       status: state.status,
       amount: state.result.amount ?? amount,
       currency: state.result.currency ?? currency,
       merchantName,
+      branchName,
+      merchantLogoUrl,
+      paymentProvider: state.result.provider ?? undefined,
       reason: state.result.reason ?? undefined,
     });
-  }, [state, navigation, paymentRequestId, amount, currency, merchantName]);
+  }, [state, navigation, paymentRequestId, orderId, amount, currency, merchantName, branchName, merchantLogoUrl]);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + spacing.lg }]}>
@@ -43,6 +47,7 @@ export default function PaymentPendingScreen() {
             {typeof amount === 'number' ? ` · ${currency ?? '€'}${amount.toFixed(2)}` : ''}
           </Text>
         ) : null}
+        {orderId ? <Text style={styles.meta}>{t('order_reference_label', { orderId })}</Text> : null}
       </View>
 
       <View style={[styles.actions, { paddingBottom: insets.bottom + spacing.md }]}>

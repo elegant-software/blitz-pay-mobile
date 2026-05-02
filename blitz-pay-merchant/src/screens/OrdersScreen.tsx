@@ -1,44 +1,45 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useLanguage } from '../lib/LanguageContext';
 import { colors, spacing, radius, shadow } from '../lib/theme';
-import type { RootStackNav, Order, OrderStatus } from '../types';
+import type { RootStackNav } from '../types';
+import { resolveCurrentCoordinates } from '../lib/location';
+import { resolveNearbyMerchantScope, type MerchantScope } from '../lib/merchantProducts';
+import { useMerchantOrders } from '../features/orders/hooks/useMerchantOrders';
+import type { MerchantOrderFilter, MerchantOrderStatus } from '../features/orders/types/order';
 
-const STATUS_COLORS: Record<OrderStatus, string> = {
+const STATUS_COLORS: Record<MerchantOrderStatus, string> = {
   pending: colors.warning,
   processing: colors.primary,
   completed: colors.success,
   cancelled: colors.error,
-  refunded: colors.gray500,
 };
 
-const MOCK_ORDERS: Order[] = [
-  { id: '1', orderNumber: '1042', customerName: 'Anna Müller', amount: 89.9, currency: 'EUR', status: 'pending', createdAt: new Date().toISOString(), items: [] },
-  { id: '2', orderNumber: '1041', customerName: 'Thomas Weber', amount: 245.0, currency: 'EUR', status: 'completed', createdAt: new Date(Date.now() - 3600000).toISOString(), items: [] },
-  { id: '3', orderNumber: '1040', customerName: 'Sarah Klein', amount: 55.5, currency: 'EUR', status: 'processing', createdAt: new Date(Date.now() - 7200000).toISOString(), items: [] },
-  { id: '4', orderNumber: '1039', customerName: 'Marco Rossi', amount: 312.0, currency: 'EUR', status: 'completed', createdAt: new Date(Date.now() - 86400000).toISOString(), items: [] },
-  { id: '5', orderNumber: '1038', customerName: 'Julia Braun', amount: 78.0, currency: 'EUR', status: 'cancelled', createdAt: new Date(Date.now() - 172800000).toISOString(), items: [] },
+const FILTER_TABS: Array<{ key: MerchantOrderFilter; labelKey: 'all_orders' | 'status_processing' | 'status_completed' | 'status_cancelled' }> = [
+  { key: 'ALL', labelKey: 'all_orders' },
+  { key: 'PROCESSING', labelKey: 'status_processing' },
+  { key: 'COMPLETED', labelKey: 'status_completed' },
+  { key: 'CANCELLED', labelKey: 'status_cancelled' },
 ];
 
-const FILTER_TABS: Array<{ key: OrderStatus | 'all'; label: string }> = [
-  { key: 'all', label: 'All' },
-  { key: 'pending', label: 'Pending' },
-  { key: 'processing', label: 'Processing' },
-  { key: 'completed', label: 'Completed' },
-];
-
-function formatCurrency(amount: number, currency = 'EUR') {
-  return new Intl.NumberFormat('de-DE', { style: 'currency', currency }).format(amount);
+function formatCurrency(amountMinor: number, currency = 'EUR') {
+  return new Intl.NumberFormat('de-DE', { style: 'currency', currency }).format(amountMinor / 100);
 }
 
 function formatDate(iso: string) {
   const d = new Date(iso);
-  return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleDateString('de-DE', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 export default function OrdersScreen() {
@@ -46,24 +47,57 @@ export default function OrdersScreen() {
   const navigation = useNavigation<RootStackNav>();
   const insets = useSafeAreaInsets();
   const [search, setSearch] = useState('');
-  const [activeFilter, setActiveFilter] = useState<OrderStatus | 'all'>('all');
+  const [activeFilter, setActiveFilter] = useState<MerchantOrderFilter>('ALL');
+  const [merchantScope, setMerchantScope] = useState<MerchantScope | null>(null);
+  const [scopeError, setScopeError] = useState<string | null>(null);
+  const { orders, loading, error, reload } = useMerchantOrders(merchantScope?.branchId ?? null, activeFilter);
 
-  const filtered = MOCK_ORDERS.filter((o) => {
-    const matchesFilter = activeFilter === 'all' || o.status === activeFilter;
-    const matchesSearch = !search || o.orderNumber.includes(search) || o.customerName.toLowerCase().includes(search.toLowerCase());
-    return matchesFilter && matchesSearch;
-  });
+  useEffect(() => {
+    let active = true;
+    void resolveCurrentCoordinates()
+      .then(resolveNearbyMerchantScope)
+      .then((scope) => {
+        if (!active) return;
+        setMerchantScope(scope);
+        setScopeError(null);
+      })
+      .catch((err: unknown) => {
+        if (!active) return;
+        setMerchantScope(null);
+        setScopeError(err instanceof Error ? err.message : 'merchant_products_branch_missing');
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const filtered = useMemo(
+    () =>
+      orders.filter((order) => {
+        if (!search) return true;
+        const q = search.toLowerCase();
+        return (
+          order.orderNumber.toLowerCase().includes(q) ||
+          (order.customerName ?? '').toLowerCase().includes(q)
+        );
+      }),
+    [orders, search],
+  );
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>{t('all_orders')}</Text>
+        <Text style={styles.title}>{t('orders_today_title')}</Text>
+        <Text style={styles.subtitle}>
+          {merchantScope?.branchName
+            ? `${t('merchant_branch_scope')}: ${merchantScope.branchName}`
+            : t('orders_today_subtitle')}
+        </Text>
         <View style={styles.searchBar}>
           <Ionicons name="search-outline" size={16} color={colors.gray500} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search by order # or customer..."
+            placeholder={t('merchant_orders_search_placeholder')}
             placeholderTextColor={colors.gray400}
             value={search}
             onChangeText={setSearch}
@@ -76,7 +110,6 @@ export default function OrdersScreen() {
         </View>
       </View>
 
-      {/* Filter tabs */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
         {FILTER_TABS.map((tab) => (
           <TouchableOpacity
@@ -85,31 +118,38 @@ export default function OrdersScreen() {
             onPress={() => setActiveFilter(tab.key)}
           >
             <Text style={[styles.filterTabText, activeFilter === tab.key && styles.filterTabTextActive]}>
-              {tab.label}
+              {t(tab.labelKey)}
             </Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
 
-      {/* Order list */}
       <ScrollView contentContainerStyle={{ paddingHorizontal: spacing.md, paddingBottom: 90 + insets.bottom, paddingTop: spacing.sm }} showsVerticalScrollIndicator={false}>
-        {filtered.length === 0 ? (
+        {loading ? (
+          <View style={styles.empty}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.emptyText}>{t('merchant_orders_loading')}</Text>
+          </View>
+        ) : scopeError || error ? (
+          <View style={styles.empty}>
+            <Ionicons name="alert-circle-outline" size={48} color={colors.error} />
+            <Text style={styles.emptyTitle}>{t('merchant_orders_error_title')}</Text>
+            <Text style={styles.emptyText}>{t((scopeError ?? error ?? 'merchant_orders_error_body') as Parameters<typeof t>[0])}</Text>
+            <TouchableOpacity style={styles.retryBtn} onPress={() => void reload()}>
+              <Text style={styles.retryBtnText}>{t('retry')}</Text>
+            </TouchableOpacity>
+          </View>
+        ) : filtered.length === 0 ? (
           <View style={styles.empty}>
             <Ionicons name="receipt-outline" size={48} color={colors.gray300} />
-            <Text style={styles.emptyText}>{t('no_data')}</Text>
+            <Text style={styles.emptyTitle}>{t('merchant_orders_empty_title')}</Text>
+            <Text style={styles.emptyText}>{t('merchant_orders_empty_body')}</Text>
           </View>
         ) : filtered.map((order) => (
           <TouchableOpacity
-            key={order.id}
+            key={order.orderId}
             style={[styles.orderCard, shadow.sm]}
-            onPress={() => navigation.navigate('OrderDetail', {
-              orderId: order.id,
-              orderNumber: order.orderNumber,
-              amount: order.amount,
-              currency: order.currency,
-              customerName: order.customerName,
-              status: order.status,
-            })}
+            onPress={() => navigation.navigate('OrderDetail', { orderId: order.orderId })}
             activeOpacity={0.7}
           >
             <View style={styles.orderTop}>
@@ -126,9 +166,9 @@ export default function OrdersScreen() {
             <View style={styles.orderBottom}>
               <View style={styles.customerRow}>
                 <Ionicons name="person-outline" size={14} color={colors.gray500} />
-                <Text style={styles.customerName}>{order.customerName}</Text>
+                <Text style={styles.customerName}>{order.customerName ?? t('customer_unknown')}</Text>
               </View>
-              <Text style={styles.orderAmount}>{formatCurrency(order.amount, order.currency)}</Text>
+              <Text style={styles.orderAmount}>{formatCurrency(order.amountMinor, order.currency)}</Text>
             </View>
           </TouchableOpacity>
         ))}
@@ -140,7 +180,8 @@ export default function OrdersScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.surface },
   header: { paddingHorizontal: spacing.md, paddingBottom: spacing.sm, backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.gray200 },
-  title: { fontSize: 24, fontWeight: '800', color: colors.onSurface, marginBottom: spacing.sm },
+  title: { fontSize: 24, fontWeight: '800', color: colors.onSurface },
+  subtitle: { marginTop: 4, marginBottom: spacing.sm, fontSize: 13, color: colors.gray600 },
   searchBar: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
     backgroundColor: colors.surface, borderRadius: radius.full,
@@ -169,5 +210,14 @@ const styles = StyleSheet.create({
   customerName: { fontSize: 13, color: colors.gray600 },
   orderAmount: { fontSize: 17, fontWeight: '700', color: colors.onSurface },
   empty: { alignItems: 'center', paddingTop: 80, gap: spacing.md },
-  emptyText: { fontSize: 15, color: colors.gray500 },
+  emptyTitle: { fontSize: 16, fontWeight: '700', color: colors.onSurface },
+  emptyText: { fontSize: 15, color: colors.gray500, textAlign: 'center' },
+  retryBtn: {
+    marginTop: spacing.sm,
+    backgroundColor: colors.primary,
+    borderRadius: radius.full,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
+  retryBtnText: { color: colors.black, fontWeight: '700' },
 });
