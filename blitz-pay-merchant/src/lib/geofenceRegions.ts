@@ -1,0 +1,48 @@
+import type { GeofenceRegion } from '../types/geofence';
+
+export const MERCHANT_REGIONS: GeofenceRegion[] = [
+  {
+    id: 'merchant_001',
+    merchantId: 'merchant_001',
+    merchantName: 'Coffee Corner',
+    latitude: 48.8566,
+    longitude: 2.3522,
+    radius: 150,
+    notifyOnEnter: true,
+    notifyOnExit: false,
+    enabled: true,
+  },
+  {
+    id: 'merchant_002',
+    merchantId: 'merchant_002',
+    merchantName: 'Urban Bistro',
+    latitude: 48.8738,
+    longitude: 2.2950,
+    radius: 150,
+    notifyOnEnter: true,
+    notifyOnExit: false,
+    enabled: true,
+  },
+  {
+    id: 'merchant_003',
+    merchantId: 'merchant_003',
+    merchantName: 'Tech Store',
+    latitude: 48.8606,
+    longitude: 2.3376,
+    radius: 150,
+    notifyOnEnter: true,
+    notifyOnExit: false,
+    enabled: true,
+  },
+  {
+    id: 'home_001',
+    merchantId: 'home_001',
+    merchantName: 'Home',
+    latitude: 53.1017046,
+    longitude: 8.913568,
+    radius: 150,
+    notifyOnEnter: true,
+    notifyOnExit: false,
+    enabled: true,
+  },
+];

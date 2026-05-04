@@ -1,14 +1,18 @@
 import React, { useState } from 'react';
 import {
-  View, Text, TouchableOpacity, ScrollView, StyleSheet, Switch, Modal,
+  View, Text, TouchableOpacity, ScrollView, StyleSheet, Switch, Modal, Alert, Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useLanguage } from '../lib/LanguageContext';
 import { useAuth } from '../lib/auth';
+import { useGeofence } from '../hooks/useGeofence';
 import { colors, spacing, radius, shadow } from '../lib/theme';
 import type { Language } from '../lib/translations';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
+
+const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
 export default function AccountScreen() {
   const { t, language, setLanguage } = useLanguage();
@@ -19,10 +23,63 @@ export default function AccountScreen() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [biometricEnabled, setBiometricEnabled] = useState(biometricEnrolled);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const { isMonitoring, isPolling, enable: enableGeofence, disable: disableGeofence, enablePolling, disablePolling, needsSettingsForBackground, openSettings } = useGeofence();
 
   const handleBiometricToggle = async (value: boolean) => {
     setBiometricEnabled(value);
     if (value) await enrollBiometric();
+  };
+
+  const handleGeofenceToggle = async (value: boolean) => {
+    if (!value) { await disableGeofence(); return; }
+    const result = await enableGeofence();
+    if (result === 'not_available') {
+      Alert.alert(
+        'Feature Not Available',
+        'Geofencing requires a development build. It is not supported in Expo Go.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+    if (result === 'background_denied') {
+      Alert.alert(
+        '"Always" Location Required',
+        'Branch Proximity monitoring needs "Always" location access to detect branches in the background.\n\nGo to Settings → BlitzPay Merchant → Location → Always.',
+        [
+          { text: 'Not Now', style: 'cancel' },
+          { text: 'Open Settings', onPress: openSettings },
+        ],
+      );
+    }
+  };
+
+  const handlePollingToggle = async (value: boolean) => {
+    if (!value) { await disablePolling(); return; }
+    if (isExpoGo) {
+      Alert.alert(
+        'Feature Not Available',
+        'Location polling requires a development build. It is not supported in Expo Go.',
+        [{ text: 'OK' }],
+      );
+      return;
+    }
+    const result = await enablePolling();
+    if (result === 'not_available') {
+      Alert.alert(
+        'Feature Not Available',
+        'Location polling requires a development build. It is not supported in Expo Go.',
+        [{ text: 'OK' }],
+      );
+    } else if (result === 'error') {
+      Alert.alert(
+        'Polling Failed',
+        'Could not start location polling. Make sure location access is enabled for this app in your device settings.',
+        [
+          { text: 'Open Settings', onPress: openSettings },
+          { text: 'OK', style: 'cancel' },
+        ],
+      );
+    }
   };
 
   const handleLogout = async () => {
@@ -111,6 +168,36 @@ export default function AccountScreen() {
             />
           ),
         },
+        {
+          icon: 'location-outline' as const,
+          label: t('geofence_enabled'),
+          onPress: needsSettingsForBackground ? openSettings : undefined,
+          showArrow: needsSettingsForBackground,
+          right: needsSettingsForBackground ? (
+            <Text style={styles.settingsLink}>{t('open_settings')}</Text>
+          ) : (
+            <Switch
+              value={isMonitoring}
+              onValueChange={handleGeofenceToggle}
+              trackColor={{ false: colors.gray300, true: colors.primary }}
+              thumbColor={colors.white}
+            />
+          ),
+        },
+        ...(isMonitoring ? [{
+          icon: 'timer-outline' as const,
+          label: t('geofence_polling'),
+          onPress: undefined,
+          showArrow: false,
+          right: (
+            <Switch
+              value={isPolling}
+              onValueChange={handlePollingToggle}
+              trackColor={{ false: colors.gray300, true: colors.primary }}
+              thumbColor={colors.white}
+            />
+          ),
+        }] : []),
       ],
     },
     {
@@ -236,6 +323,7 @@ const styles = StyleSheet.create({
   langBtnActive: { backgroundColor: colors.primary },
   langText: { fontSize: 12, fontWeight: '700', color: colors.gray600 },
   langTextActive: { color: colors.black },
+  settingsLink: { fontSize: 12, fontWeight: '600', color: colors.primary },
   logoutBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     backgroundColor: `${colors.error}10`, borderRadius: radius.xl,

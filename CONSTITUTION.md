@@ -48,6 +48,9 @@ All React Native / Expo code in this repo follows the **Feature-Based + MVVM + C
 ### VII. Simplicity Over Abstraction
 Three similar lines beat a premature abstraction. No framework-ish helpers, feature flags, or compatibility shims until a second real caller exists. Remove dead code instead of deprecating it.
 
+### IX. App Targeting Must Follow Product Intent
+Changes must be applied to the product that matches the business domain named in the request. Merchant-facing features, fixes, and catalog/admin workflows belong in `blitz-pay-merchant/`. Consumer-facing discovery, checkout, payment, and shopper flows belong in `blitz-pay/`. If the target app is ambiguous, stop and confirm before editing code.
+
 ## Security & Compliance Requirements
 
 - Tokens: access token in `sessionStorage` (web) / `expo-secure-store` (mobile). Never in plain `localStorage`, never in a log line, never in a query string.

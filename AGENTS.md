@@ -4,9 +4,10 @@ Operating manual for AI coding agents (Claude Code, Codex, etc.) working in this
 
 ## Required Reading Order
 1. `CONSTITUTION.md` — binding rules and the source of truth for observability, security, native config, i18n, architecture pattern, and linked business references.
-2. `docs/architecture.md` — canonical Feature-Based + MVVM + Controlled State Management pattern; folder structure and layer rules.
-3. `CLAUDE.md` — commands, screen inventory, auth flow, env vars.
-4. `specs/` — the active feature spec if the task references an issue number.
+2. `docs/references/business-guidelines.md` — merchant/branch business rules and app-targeting expectations.
+3. `docs/architecture.md` — canonical Feature-Based + MVVM + Controlled State Management pattern; folder structure and layer rules.
+4. `CLAUDE.md` — commands, screen inventory, auth flow, env vars.
+5. `specs/` — the active feature spec if the task references an issue number.
 
 ## Ground Rules
 
@@ -15,6 +16,7 @@ Operating manual for AI coding agents (Claude Code, Codex, etc.) working in this
 - **Don't add features beyond the task.** Bug fixes don't get surrounding cleanup. No speculative abstractions.
 - **Default to no comments.** Only comment non-obvious *why*. Never narrate *what* the code does.
 - **No new `.md` files** unless the user asks. `CONSTITUTION.md`, `AGENTS.md`, and `CLAUDE.md` are the exception because they were explicitly requested.
+- **Target the correct app by default.** Merchant-facing requests go in `blitz-pay-merchant/`. Consumer-facing requests go in `blitz-pay/`. If the request does not make the target app obvious, ask before editing.
 
 ## Payment / TrueLayer Work — Special Rules
 
@@ -61,6 +63,8 @@ Ask the user. Pausing to confirm costs a message; an unwanted destructive action
 ## Active Technologies
 - TypeScript 5.3, React 19.2, React Native 0.83.4, Expo SDK 55 + React Navigation 6, Expo Location, Expo Task Manager, Expo Secure Store, existing TrueLayer/Stripe/Braintree payment integrations (008-nearby-merchant-checkout)
 - Expo Secure Store for auth/session state; controlled in-memory feature state for discovery, catalog, and baske (008-nearby-merchant-checkout)
+- TypeScript 5.3, React 19.2, React Native 0.83.6, Expo SDK 55 + React Navigation 6, Expo Location, Expo Secure Store, existing `fetchMerchantCommerceJson` API wrapper, existing `merchant-catalog` and `basket` feature modules (010-nearby-merchant-product-management)
+- Expo Secure Store for auth/session state; controlled in-memory feature state for merchant branch context, product drafts, and basket state (010-nearby-merchant-product-management)
 
 ## Recent Changes
 - 008-nearby-merchant-checkout: Added TypeScript 5.3, React 19.2, React Native 0.83.4, Expo SDK 55 + React Navigation 6, Expo Location, Expo Task Manager, Expo Secure Store, existing TrueLayer/Stripe/Braintree payment integrations

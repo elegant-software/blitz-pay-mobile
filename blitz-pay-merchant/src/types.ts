@@ -54,13 +54,13 @@ export interface OrderItem {
 
 export interface Product {
   id: string;
+  branchId?: string;
   name: string;
   description?: string;
   unitPrice: number;
   imageUrl?: string;
   categoryName?: string;
-  sku?: string;
-  stock?: number;
+  productCode?: number;
   active: boolean;
 }
 

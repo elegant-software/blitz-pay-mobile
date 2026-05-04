@@ -16,6 +16,8 @@ interface StoredSession {
 
 export interface UserProfile {
   id: string;
+  // TODO: Re-enable claim-based merchant scoping after the product flow stops relying on location-only resolution.
+  merchantId: string | null;
   email: string;
   name: string;
   emailVerified: boolean;
@@ -46,11 +48,40 @@ function decodeJwt(token: string): Record<string, unknown> {
   }
 }
 
+function readStringClaim(claims: Record<string, unknown>, key: string): string | null {
+  const value = claims[key];
+  return typeof value === 'string' && value.trim() ? value : null;
+}
+
+function resolveMerchantId(claims: Record<string, unknown>): string | null {
+  const directKeys = [
+    'merchantId',
+    'merchant_id',
+    'merchant-id',
+    'merchant',
+    'merchant_id_claim',
+  ];
+
+  for (const key of directKeys) {
+    const value = readStringClaim(claims, key);
+    if (value) return value;
+  }
+
+  const merchantObject = claims.merchant;
+  if (merchantObject && typeof merchantObject === 'object') {
+    const nestedId = readStringClaim(merchantObject as Record<string, unknown>, 'id');
+    if (nestedId) return nestedId;
+  }
+
+  return null;
+}
+
 function parseUser(idToken: string): UserProfile | null {
   const c = decodeJwt(idToken);
   if (!c.sub) return null;
   return {
     id: c.sub as string,
+    merchantId: resolveMerchantId(c),
     email: (c.email as string) ?? '',
     name: (c.name as string) ?? (c.preferred_username as string) ?? '',
     emailVerified: (c.email_verified as boolean) ?? false,
@@ -84,6 +115,7 @@ async function refreshAccessToken(refreshToken: string): Promise<StoredSession |
 
 const BYPASS_USER: UserProfile = {
   id: 'dev-bypass',
+  merchantId: 'dev-bypass-merchant',
   email: 'merchant@blitzpay.local',
   name: 'Demo Merchant',
   emailVerified: true,
