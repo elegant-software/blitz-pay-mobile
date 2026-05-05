@@ -181,6 +181,7 @@ export default function MerchantScreen() {
         branchId: checkoutContext.branchId,
         branchName: checkoutContext.branchName,
         merchantLogoUrl: visibleLogoUrl,
+        activePaymentChannels: branch?.activePaymentChannels ?? [],
         basketSummary: checkoutContext.itemSummary,
         basketItemCount: checkoutContext.itemCount,
         basketItems: checkoutContext.basketItems,

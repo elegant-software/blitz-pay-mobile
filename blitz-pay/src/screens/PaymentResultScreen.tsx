@@ -15,7 +15,7 @@ export default function PaymentResultScreen() {
   const navigation = useNavigation<RootStackNav>();
   const route = useRoute<RouteProp<RootStackParamList, 'PaymentResult'>>();
   const insets = useSafeAreaInsets();
-  const { status, amount, currency, merchantName, reason } = route.params;
+  const { status, amount, currency, merchantName, orderId, reason } = route.params;
 
   // Translate the raw SDK/backend reason into a user-friendly bucket; fall
   // back to the generic body copy if we don't recognise the code.
@@ -61,6 +61,7 @@ export default function PaymentResultScreen() {
             {merchantName ? ` · ${merchantName}` : ''}
           </Text>
         ) : null}
+        {orderId ? <Text style={styles.reference}>{t('order_reference_label', { orderId })}</Text> : null}
         <Text style={styles.body}>{view.body}</Text>
       </View>
 
@@ -89,6 +90,7 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 24, fontWeight: '800', color: colors.onSurface, marginTop: spacing.md },
   amount: { fontSize: 16, fontWeight: '600', color: colors.gray700 },
+  reference: { fontSize: 13, color: colors.gray600 },
   body: { fontSize: 14, color: colors.gray700, textAlign: 'center', marginTop: spacing.sm },
   primaryBtn: {
     backgroundColor: colors.onSurface,

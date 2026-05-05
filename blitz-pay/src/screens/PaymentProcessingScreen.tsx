@@ -10,9 +10,9 @@ export default function PaymentProcessingScreen() {
   const { t } = useLanguage();
   const navigation = useNavigation<RootStackNav>();
   const route = useRoute<RouteProp<RootStackParamList, 'PaymentProcessing'>>();
-  const { paymentRequestId, amount, currency, merchantName, invoiceId } = route.params;
+  const { paymentRequestId, orderId, amount, currency, merchantName, branchName, merchantLogoUrl, invoiceId } = route.params;
 
-  const state = usePaymentResult(paymentRequestId);
+  const state = usePaymentResult(paymentRequestId, orderId);
 
   useEffect(() => {
     if (state.status === 'processing') return;
@@ -20,22 +20,29 @@ export default function PaymentProcessingScreen() {
     if (state.status === 'timeout') {
       navigation.replace('PaymentPending', {
         paymentRequestId,
+        orderId,
         amount,
         currency,
         merchantName,
+        branchName,
+        merchantLogoUrl,
       });
       return;
     }
 
     navigation.replace('PaymentResult', {
       paymentRequestId,
+      orderId: state.result.orderId ?? orderId,
       status: state.status,
       amount: state.result.amount ?? amount,
       currency: state.result.currency ?? currency,
       merchantName,
+      branchName,
+      merchantLogoUrl,
+      paymentProvider: state.result.provider ?? undefined,
       reason: state.result.reason ?? undefined,
     });
-  }, [state, navigation, paymentRequestId, amount, currency, merchantName, invoiceId]);
+  }, [state, navigation, paymentRequestId, orderId, amount, currency, merchantName, branchName, merchantLogoUrl, invoiceId]);
 
   return (
     <View style={styles.container}>
@@ -49,6 +56,7 @@ export default function PaymentProcessingScreen() {
             {typeof amount === 'number' ? ` · ${currency ?? '€'}${amount.toFixed(2)}` : ''}
           </Text>
         ) : null}
+        {orderId ? <Text style={styles.meta}>{t('order_reference_label', { orderId })}</Text> : null}
       </View>
     </View>
   );

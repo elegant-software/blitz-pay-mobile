@@ -7,16 +7,19 @@ import {
 } from 'rn-truelayer-payments-sdk';
 import { config } from './config';
 import { observability } from './observability';
+import { notifySessionExpired } from './auth';
 
 type PaymentRequestParams = {
   token: string | null;
   amount: number;
   merchantName: string;
+  orderId: string;
   merchantId?: string;
   branchId?: string;
   itemSummary?: string;
   itemCount?: number;
   invoiceId?: string;
+  currency?: string;
   user?: {
     id?: string;
     email?: string;
@@ -39,15 +42,11 @@ function getRedirectUri(): string {
   return `${config.trueLayerRedirectScheme}://${config.trueLayerRedirectHost}/${config.trueLayerRedirectPath}`;
 }
 
-function generateUuid(): string {
-  const cryptoRef = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto;
-  if (cryptoRef?.randomUUID) {
-    return cryptoRef.randomUUID();
-  }
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
+function logRedirectUriMismatch(expectedRedirectUri: string, actualRedirectUri: string | undefined): void {
+  if (!actualRedirectUri || actualRedirectUri === expectedRedirectUri) return;
+  observability.error('truelayer_redirect_mismatch', {
+    expectedRedirectUri,
+    actualRedirectUri,
   });
 }
 
@@ -66,6 +65,34 @@ function readString(source: PaymentApiResponse, keys: string[]): string | undefi
   return undefined;
 }
 
+function describeValue(source: PaymentApiResponse, keys: string[]): {
+  matchedKey?: string;
+  valueType: string;
+  stringLength?: number;
+  isEmptyString?: boolean;
+} {
+  for (const key of keys) {
+    if (!(key in source)) continue;
+    const value = source[key];
+    if (typeof value === 'string') {
+      return {
+        matchedKey: key,
+        valueType: 'string',
+        stringLength: value.length,
+        isEmptyString: value.trim().length === 0,
+      };
+    }
+    if (value === null) {
+      return { matchedKey: key, valueType: 'null' };
+    }
+    if (Array.isArray(value)) {
+      return { matchedKey: key, valueType: 'array' };
+    }
+    return { matchedKey: key, valueType: typeof value };
+  }
+  return { valueType: 'missing' };
+}
+
 function extractPaymentContext(payload: PaymentApiResponse): {
   paymentId?: string;
   resourceToken?: string;
@@ -75,15 +102,20 @@ function extractPaymentContext(payload: PaymentApiResponse): {
   paymentRequestId?: string;
 } {
   const payment = typeof payload.payment === 'object' && payload.payment ? (payload.payment as PaymentApiResponse) : undefined;
-  const source = payment ?? payload;
+  const nested = payment ?? payload;
+
+  const read = (keys: string[]): string | undefined =>
+    readString(nested, keys) ?? (nested !== payload ? readString(payload, keys) : undefined);
 
   return {
-    paymentId: readString(source, ['paymentId', 'payment_id', 'id']),
-    resourceToken: readString(source, ['resourceToken', 'resource_token']),
-    redirectUri: readString(source, ['redirectUri', 'redirect_uri', 'redirectReturnUri']),
-    preferredCountryCode: readString(source, ['preferredCountryCode', 'preferred_country_code']),
-    environment: source.environment != null ? getEnvironment(source.environment) : undefined,
-    paymentRequestId: readString(source, ['paymentRequestId', 'payment_request_id']),
+    paymentId: read(['paymentId', 'payment_id', 'id']),
+    resourceToken: read(['resourceToken', 'resource_token']),
+    redirectUri: read(['redirectUri', 'redirect_uri', 'redirectReturnUri']),
+    preferredCountryCode: read(['preferredCountryCode', 'preferred_country_code']),
+    environment: (nested.environment ?? payload.environment) != null
+      ? getEnvironment(nested.environment ?? payload.environment)
+      : undefined,
+    paymentRequestId: read(['paymentRequestId', 'payment_request_id', 'orderId', 'order_id']),
   };
 }
 
@@ -92,33 +124,33 @@ async function createPaymentRequest({
   token,
   amount,
   merchantName,
+  orderId,
   merchantId,
   branchId,
   itemSummary,
   itemCount,
   invoiceId,
+  currency,
   user,
 }: PaymentRequestParams): Promise<PaymentInitResponse> {
   const redirectUri = getRedirectUri();
   const hasToken = Boolean(token);
 
-  const paymentRequestId = generateUuid();
-  const orderId = invoiceId ?? `order_${paymentRequestId}`;
   const userDisplayName = user?.name ?? user?.email ?? 'BlitzPay Customer';
+  const userEmail = user?.email?.trim() || undefined;
 
   const amountMinorUnits = Math.round(amount * 100);
   const requestBody = {
-    paymentRequestId,
     orderId,
     amountMinorUnits,
-    currency: 'GBP',
+    currency: (currency ?? 'EUR').toUpperCase(),
     userDisplayName,
+    ...(userEmail ? { userEmail } : {}),
     redirectReturnUri: redirectUri,
   };
 
   observability.info('truelayer_payment_request_started', {
     url: config.trueLayerPaymentsUrl,
-    paymentRequestId,
     orderId,
     amount,
     amountMinorUnits,
@@ -127,11 +159,11 @@ async function createPaymentRequest({
     branchId: branchId ?? null,
     itemSummary: itemSummary ?? null,
     itemCount: itemCount ?? null,
-    userDisplayName,
     redirectReturnUri: redirectUri,
     hasToken,
+    hasUserId: Boolean(user?.id),
+    hasUserEmail: Boolean(user?.email),
     platform: Platform.OS,
-    requestBody: JSON.stringify(requestBody),
   });
 
   let response: Response;
@@ -164,11 +196,18 @@ async function createPaymentRequest({
     observability.error('truelayer_payment_request_failed', {
       status: response.status,
       url: config.trueLayerPaymentsUrl,
-      paymentRequestId,
       orderId,
-      requestBody: JSON.stringify(requestBody),
+      redirectReturnUri: redirectUri,
       body: bodySnippet,
     });
+    if (response.status === 401) {
+      observability.warn('auth_session_expired', {
+        path: '/v1/payments/request',
+        url: config.trueLayerPaymentsUrl,
+        method: 'POST',
+      });
+      notifySessionExpired();
+    }
     throw new Error(response.status === 401 ? 'session_expired' : 'truelayer_request_failed');
   }
 
@@ -180,20 +219,39 @@ async function createPaymentRequest({
   })) as PaymentApiResponse;
 
   const context = extractPaymentContext(payload);
+  const paymentIdDetails = describeValue(payload, ['paymentId', 'payment_id', 'id']);
+  const nestedPayment =
+    typeof payload.payment === 'object' && payload.payment ? (payload.payment as PaymentApiResponse) : undefined;
+  const nestedPaymentIdDetails = nestedPayment
+    ? describeValue(nestedPayment, ['paymentId', 'payment_id', 'id'])
+    : { valueType: 'missing' as const };
   observability.info('truelayer_payment_request_response_received', {
-    paymentRequestId: context.paymentRequestId ?? paymentRequestId,
+    paymentRequestId: context.paymentRequestId ?? null,
     hasPaymentId: Boolean(context.paymentId),
     hasResourceToken: Boolean(context.resourceToken),
     payloadKeys: Object.keys(payload ?? {}).join(','),
   });
 
-  if (!context.paymentId || !context.resourceToken) {
+  if (!context.paymentRequestId || !context.paymentId || !context.resourceToken) {
+    logRedirectUriMismatch(redirectUri, context.redirectUri);
     observability.error('truelayer_invalid_response', {
-      paymentRequestId: context.paymentRequestId ?? paymentRequestId,
+      paymentRequestId: context.paymentRequestId ?? null,
+      hasPaymentRequestId: Boolean(context.paymentRequestId),
       hasPaymentId: Boolean(context.paymentId),
       hasResourceToken: Boolean(context.resourceToken),
+      redirectUriExpected: redirectUri,
+      redirectUriReturned: context.redirectUri ?? null,
       payloadKeys: Object.keys(payload ?? {}).join(','),
-      hint: 'Backend must return paymentId and resourceToken in POST /v1/payments/request response.',
+      paymentIdMatchedKey: paymentIdDetails.matchedKey ?? null,
+      paymentIdValueType: paymentIdDetails.valueType,
+      paymentIdStringLength: paymentIdDetails.stringLength ?? null,
+      paymentIdIsEmptyString: paymentIdDetails.isEmptyString ?? null,
+      nestedPaymentKeys: nestedPayment ? Object.keys(nestedPayment).join(',') : null,
+      nestedPaymentIdMatchedKey: nestedPaymentIdDetails.matchedKey ?? null,
+      nestedPaymentIdValueType: nestedPaymentIdDetails.valueType,
+      nestedPaymentIdStringLength: nestedPaymentIdDetails.stringLength ?? null,
+      nestedPaymentIdIsEmptyString: nestedPaymentIdDetails.isEmptyString ?? null,
+      hint: 'POST /v1/payments/request must return non-empty paymentRequestId, paymentId, and resourceToken values.',
     });
     throw new Error('truelayer_invalid_response');
   }
@@ -204,7 +262,7 @@ async function createPaymentRequest({
     redirectUri: context.redirectUri ?? redirectUri,
     preferredCountryCode: context.preferredCountryCode ?? config.trueLayerPreferredCountryCode,
     environment: context.environment ?? getEnvironment(config.trueLayerEnvironment),
-    paymentRequestId: context.paymentRequestId ?? paymentRequestId,
+    paymentRequestId: context.paymentRequestId,
   };
 
   observability.info('truelayer_payment_request_succeeded', {
@@ -212,6 +270,7 @@ async function createPaymentRequest({
     environment: String(normalized.environment),
     redirectUri: normalized.redirectUri,
     preferredCountryCode: normalized.preferredCountryCode ?? null,
+    orderId,
   });
   return normalized;
 }
@@ -264,6 +323,13 @@ export async function runTrueLayerSdk(context: PaymentInitResponse): Promise<voi
 
   let result: TrueLayerResult;
   try {
+    observability.info('truelayer_sdk_process_payment_started', {
+      paymentId: context.paymentId,
+      paymentRequestId: context.paymentRequestId,
+      environment: String(context.environment),
+      redirectUri: context.redirectUri,
+      preferredCountryCode: context.preferredCountryCode ?? null,
+    });
     result = await TrueLayerPaymentsSDKWrapper.processPayment(
       { paymentId: context.paymentId, resourceToken: context.resourceToken, redirectUri: context.redirectUri },
       { shouldPresentResultScreen: true, preferredCountryCode: context.preferredCountryCode },

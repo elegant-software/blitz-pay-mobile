@@ -1,26 +1,26 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, Modal,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import { useLanguage } from '../lib/LanguageContext';
 import { colors, spacing, radius, shadow } from '../lib/theme';
-import type { RootStackParamList, OrderStatus } from '../types';
+import type { RootStackParamList } from '../types';
+import { useMerchantOrderDetail } from '../features/orders/hooks/useMerchantOrderDetail';
 
 type RouteProps = RouteProp<RootStackParamList, 'OrderDetail'>;
 
-const STATUS_COLORS: Record<OrderStatus, string> = {
+const STATUS_COLORS = {
   pending: colors.warning,
   processing: colors.primary,
   completed: colors.success,
   cancelled: colors.error,
-  refunded: colors.gray500,
-};
+} as const;
 
-function formatCurrency(amount: number, currency = 'EUR') {
-  return new Intl.NumberFormat('de-DE', { style: 'currency', currency }).format(amount);
+function formatCurrency(amountMinor: number, currency = 'EUR') {
+  return new Intl.NumberFormat('de-DE', { style: 'currency', currency }).format(amountMinor / 100);
 }
 
 export default function OrderDetailScreen() {
@@ -28,27 +28,10 @@ export default function OrderDetailScreen() {
   const navigation = useNavigation();
   const route = useRoute<RouteProps>();
   const insets = useSafeAreaInsets();
-  const { orderId, orderNumber, amount, currency, customerName, status: initialStatus } = route.params;
-
-  const [status, setStatus] = useState<OrderStatus>(initialStatus);
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [pendingAction, setPendingAction] = useState<'complete' | 'cancel' | null>(null);
-
-  const handleAction = (action: 'complete' | 'cancel') => {
-    setPendingAction(action);
-    setShowConfirmModal(true);
-  };
-
-  const confirmAction = () => {
-    if (pendingAction === 'complete') setStatus('completed');
-    else if (pendingAction === 'cancel') setStatus('cancelled');
-    setShowConfirmModal(false);
-    setPendingAction(null);
-  };
+  const { order, loading, error } = useMerchantOrderDetail(route.params.orderId);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={22} color={colors.onSurface} />
@@ -57,87 +40,66 @@ export default function OrderDetailScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: 120 + insets.bottom }} showsVerticalScrollIndicator={false}>
-        {/* Order summary card */}
-        <View style={[styles.summaryCard, shadow.md]}>
-          <View style={styles.summaryTop}>
-            <View>
-              <Text style={styles.orderNum}>{t('order_number')}{orderNumber}</Text>
-              <Text style={styles.orderId}>ID: {orderId}</Text>
+      {loading ? (
+        <View style={styles.centerState}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.centerText}>{t('merchant_order_detail_loading')}</Text>
+        </View>
+      ) : !order || error ? (
+        <View style={styles.centerState}>
+          <Ionicons name="alert-circle-outline" size={40} color={colors.error} />
+          <Text style={styles.centerTitle}>{t('merchant_order_detail_error_title')}</Text>
+          <Text style={styles.centerText}>{t('merchant_order_detail_error_body')}</Text>
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={{ paddingBottom: 96 + insets.bottom }} showsVerticalScrollIndicator={false}>
+          <View style={[styles.summaryCard, shadow.md]}>
+            <View style={styles.summaryTop}>
+              <View>
+                <Text style={styles.orderNum}>{t('order_number')}{order.orderNumber}</Text>
+                <Text style={styles.orderId}>ID: {order.orderId}</Text>
+              </View>
+              <View style={[styles.statusPill, { backgroundColor: `${STATUS_COLORS[order.status]}15` }]}>
+                <Text style={[styles.statusText, { color: STATUS_COLORS[order.status] }]}>
+                  {t(`status_${order.status}` as Parameters<typeof t>[0])}
+                </Text>
+              </View>
             </View>
-            <View style={[styles.statusPill, { backgroundColor: `${STATUS_COLORS[status]}15` }]}>
-              <Text style={[styles.statusText, { color: STATUS_COLORS[status] }]}>
-                {t(`status_${status}` as Parameters<typeof t>[0])}
+
+            <View style={styles.divider} />
+
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>{t('customer')}</Text>
+              <Text style={styles.detailValue}>{order.customerName ?? t('customer_unknown')}</Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>{t('order_total')}</Text>
+              <Text style={[styles.detailValue, styles.amountText]}>
+                {formatCurrency(order.amountMinor, order.currency)}
               </Text>
             </View>
           </View>
 
-          <View style={styles.divider} />
-
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>{t('customer')}</Text>
-            <Text style={styles.detailValue}>{customerName ?? '—'}</Text>
-          </View>
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>{t('order_total')}</Text>
-            <Text style={[styles.detailValue, styles.amountText]}>
-              {formatCurrency(amount, currency)}
-            </Text>
-          </View>
-        </View>
-
-        {/* Items placeholder */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('order_items')}</Text>
-          <View style={[styles.emptyItems, shadow.sm]}>
-            <Ionicons name="cube-outline" size={32} color={colors.gray300} />
-            <Text style={styles.emptyItemsText}>Item details loaded from API</Text>
-          </View>
-        </View>
-      </ScrollView>
-
-      {/* Action buttons */}
-      {(status === 'pending' || status === 'processing') && (
-        <View style={[styles.actions, { paddingBottom: insets.bottom + spacing.md }]}>
-          <TouchableOpacity
-            style={styles.cancelBtn}
-            onPress={() => handleAction('cancel')}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.cancelBtnText}>{t('cancel_order')}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.completeBtn}
-            onPress={() => handleAction('complete')}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.completeBtnText}>{t('mark_completed')}</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {/* Confirm modal */}
-      <Modal visible={showConfirmModal} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>{t('confirm')}</Text>
-            <Text style={styles.modalDesc}>
-              {pendingAction === 'complete' ? t('mark_completed') : t('cancel_order')}?
-            </Text>
-            <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.modalCancel} onPress={() => setShowConfirmModal(false)}>
-                <Text style={styles.modalCancelText}>{t('cancel')}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalConfirm, pendingAction === 'cancel' && styles.modalConfirmDanger]}
-                onPress={confirmAction}
-              >
-                <Text style={styles.modalConfirmText}>{t('confirm')}</Text>
-              </TouchableOpacity>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>{t('order_items')}</Text>
+            <View style={[styles.itemsCard, shadow.sm]}>
+              {order.items.length === 0 ? (
+                <Text style={styles.emptyItemsText}>{t('merchant_order_items_empty')}</Text>
+              ) : (
+                order.items.map((item) => (
+                  <View key={`${order.orderId}-${item.productId}`} style={styles.itemRow}>
+                    <View style={styles.itemText}>
+                      <Text style={styles.itemName}>{item.quantity}× {item.name}</Text>
+                      <Text style={styles.itemMeta}>{formatCurrency(item.unitPriceMinor, order.currency)}</Text>
+                    </View>
+                    <Text style={styles.itemTotal}>{formatCurrency(item.lineTotalMinor, order.currency)}</Text>
+                  </View>
+                ))
+              )}
             </View>
           </View>
-        </View>
-      </Modal>
+        </ScrollView>
+      )}
     </View>
   );
 }
@@ -151,6 +113,9 @@ const styles = StyleSheet.create({
   },
   backBtn: { width: 40, height: 40, justifyContent: 'center' },
   headerTitle: { fontSize: 17, fontWeight: '700', color: colors.onSurface },
+  centerState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xl, gap: spacing.md },
+  centerTitle: { fontSize: 16, fontWeight: '700', color: colors.onSurface },
+  centerText: { fontSize: 14, color: colors.gray600, textAlign: 'center' },
   summaryCard: {
     backgroundColor: colors.white, borderRadius: radius.xl,
     margin: spacing.md, padding: spacing.lg,
@@ -167,47 +132,14 @@ const styles = StyleSheet.create({
   amountText: { fontSize: 18, fontWeight: '800' },
   section: { paddingHorizontal: spacing.md },
   sectionTitle: { fontSize: 17, fontWeight: '700', color: colors.onSurface, marginBottom: spacing.sm },
-  emptyItems: {
+  itemsCard: {
     backgroundColor: colors.white, borderRadius: radius.xl,
-    padding: spacing.xl, alignItems: 'center', gap: spacing.sm,
+    padding: spacing.lg,
   },
+  itemRow: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md, marginBottom: spacing.sm },
+  itemText: { flex: 1 },
+  itemName: { fontSize: 14, fontWeight: '600', color: colors.onSurface },
+  itemMeta: { marginTop: 4, fontSize: 12, color: colors.gray600 },
+  itemTotal: { fontSize: 14, fontWeight: '700', color: colors.onSurface },
   emptyItemsText: { fontSize: 13, color: colors.gray500 },
-  actions: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    flexDirection: 'row', gap: spacing.sm,
-    paddingHorizontal: spacing.md, paddingTop: spacing.md,
-    backgroundColor: colors.white, borderTopWidth: 1, borderTopColor: colors.gray200,
-  },
-  cancelBtn: {
-    flex: 1, padding: spacing.md, borderRadius: radius.full,
-    borderWidth: 1.5, borderColor: colors.error, alignItems: 'center',
-  },
-  cancelBtnText: { fontSize: 15, fontWeight: '600', color: colors.error },
-  completeBtn: {
-    flex: 2, padding: spacing.md, borderRadius: radius.full,
-    backgroundColor: colors.success, alignItems: 'center',
-  },
-  completeBtnText: { fontSize: 15, fontWeight: '700', color: colors.white },
-  modalOverlay: {
-    flex: 1, backgroundColor: colors.overlayDark,
-    justifyContent: 'center', alignItems: 'center', padding: spacing.lg,
-  },
-  modalCard: {
-    backgroundColor: colors.white, borderRadius: radius.xxl,
-    padding: spacing.xl, width: '100%',
-  },
-  modalTitle: { fontSize: 18, fontWeight: '700', color: colors.onSurface, marginBottom: 8 },
-  modalDesc: { fontSize: 14, color: colors.gray600, marginBottom: spacing.lg },
-  modalActions: { flexDirection: 'row', gap: spacing.sm },
-  modalCancel: {
-    flex: 1, padding: spacing.md, borderRadius: radius.full,
-    borderWidth: 1.5, borderColor: colors.gray300, alignItems: 'center',
-  },
-  modalCancelText: { fontSize: 15, fontWeight: '600', color: colors.onSurface },
-  modalConfirm: {
-    flex: 1, padding: spacing.md, borderRadius: radius.full,
-    backgroundColor: colors.success, alignItems: 'center',
-  },
-  modalConfirmDanger: { backgroundColor: colors.error },
-  modalConfirmText: { fontSize: 15, fontWeight: '700', color: colors.white },
 });

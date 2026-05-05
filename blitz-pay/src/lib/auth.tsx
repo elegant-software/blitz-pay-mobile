@@ -119,10 +119,15 @@ const defaultAuth: AuthState = {
 };
 
 const AuthContext = createContext<AuthState>(defaultAuth);
+let notifySessionExpiredImpl: (() => void) | null = null;
 
 interface AuthProviderProps {
   children: ReactNode;
   onSessionExpired?: () => void;
+}
+
+export function notifySessionExpired(): void {
+  notifySessionExpiredImpl?.();
 }
 
 export function AuthProvider({ children, onSessionExpired }: AuthProviderProps) {
@@ -135,6 +140,25 @@ export function AuthProvider({ children, onSessionExpired }: AuthProviderProps) 
   const [isBiometricAvailable, setIsBiometricAvailable] = useState(false);
   const [biometricEnrolled, setBiometricEnrolled] = useState(false);
   const initStarted = useRef(false);
+
+  const clearSessionState = React.useCallback(async () => {
+    await storage.deleteItem(SESSION_KEY);
+    setAuthenticated(false);
+    setToken(null);
+    setUser(null);
+    onSessionExpired?.();
+  }, [onSessionExpired]);
+
+  useEffect(() => {
+    notifySessionExpiredImpl = () => {
+      void clearSessionState();
+    };
+    return () => {
+      if (notifySessionExpiredImpl) {
+        notifySessionExpiredImpl = null;
+      }
+    };
+  }, [clearSessionState]);
 
   useEffect(() => {
     if (isBypass) return;
@@ -199,11 +223,7 @@ export function AuthProvider({ children, onSessionExpired }: AuthProviderProps) 
             setUser(parseUser(renewed.idToken));
             scheduleRefresh(renewed);
           } else {
-            await storage.deleteItem(SESSION_KEY);
-            setAuthenticated(false);
-            setToken(null);
-            setUser(null);
-            onSessionExpired?.();
+            await clearSessionState();
           }
         });
       }, msUntilRefresh);
@@ -308,10 +328,7 @@ export function AuthProvider({ children, onSessionExpired }: AuthProviderProps) 
   };
 
   const logout = async (): Promise<void> => {
-    await storage.deleteItem(SESSION_KEY);
-    setAuthenticated(false);
-    setToken(null);
-    setUser(null);
+    await clearSessionState();
   };
 
   const enrollBiometric = async (): Promise<void> => {

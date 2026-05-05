@@ -66,14 +66,18 @@ export function useGeofence() {
     }
     try {
       await startGeofencing();
+      // On Fire OS, startGeofencing falls back to polling — sync state from actual task.
+      const polling = await TaskManager.isTaskRegisteredAsync(GEOFENCE_POLL_TASK);
       const updated: GeofenceConfig = {
         ...config,
         geofencingEnabled: true,
-        backgroundPermissionGranted: true,
+        pollingEnabled: polling,
+        backgroundPermissionGranted: !polling,
       };
       await storage.setItem(CONFIG_KEY, JSON.stringify(updated));
       setConfig(updated);
       setIsMonitoring(true);
+      setIsPolling(polling);
       setPermissionStatus(Location.PermissionStatus.GRANTED);
       return 'ok';
     } catch (err: unknown) {
@@ -98,7 +102,7 @@ export function useGeofence() {
   }, []);
 
   const disable = useCallback(async () => {
-    await stopGeofencing();
+    try { await stopGeofencing(); } catch { /* best-effort stop */ }
     const updated: GeofenceConfig = { ...config, geofencingEnabled: false, pollingEnabled: false };
     await storage.setItem(CONFIG_KEY, JSON.stringify(updated));
     setConfig(updated);
@@ -131,7 +135,7 @@ export function useGeofence() {
   }, [config]);
 
   const disablePolling = useCallback(async () => {
-    await stopPolling();
+    try { await stopPolling(); } catch { /* best-effort stop */ }
     const updated: GeofenceConfig = { ...config, pollingEnabled: false };
     await storage.setItem(CONFIG_KEY, JSON.stringify(updated));
     setConfig(updated);

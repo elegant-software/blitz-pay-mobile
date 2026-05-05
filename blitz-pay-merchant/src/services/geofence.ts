@@ -1,9 +1,16 @@
 import * as Location from 'expo-location';
+import { Platform } from 'react-native';
 import { storage } from '../lib/storage';
 import { config } from '../lib/config';
 import { MERCHANT_REGIONS } from '../lib/geofenceRegions';
 import { GEOFENCE_TASK, GEOFENCE_POLL_TASK } from '../lib/geofenceConstants';
 import type { ProximityReportPayload, ProximityReportResponse } from '../types/geofence';
+
+// Fire OS is Android-based but ships without Google Mobile Services, so
+// Location.startGeofencingAsync (which requires GMS) will always fail there.
+const isFireOS =
+  Platform.OS === 'android' &&
+  (Platform.constants as { Manufacturer?: string }).Manufacturer?.toLowerCase() === 'amazon';
 
 const SESSION_KEY = 'blitzpay_merchant_session';
 const COOLDOWN_KEY = 'geofence_cooldown';
@@ -110,6 +117,12 @@ export async function startGeofencing(): Promise<void> {
   const { status: fg } = await Location.requestForegroundPermissionsAsync();
   if (fg !== 'granted') throw new Error('foreground_permission_denied');
 
+  // Fire OS has no GMS — skip native geofencing and use the polling foreground service instead.
+  if (isFireOS) {
+    await startPolling();
+    return;
+  }
+
   const { status: bg } = await Location.requestBackgroundPermissionsAsync();
   if (bg !== 'granted') throw new Error('background_permission_denied');
 
@@ -136,7 +149,14 @@ export async function startGeofencing(): Promise<void> {
     notifyOnExit: r.notifyOnExit,
   }));
 
-  await Location.startGeofencingAsync(GEOFENCE_TASK, regions);
+  try {
+    await Location.startGeofencingAsync(GEOFENCE_TASK, regions);
+  } catch {
+    // GMS unavailable on this device (e.g. non-Amazon Android without Play Services)
+    console.warn('[geofence] startGeofencingAsync threw — falling back to polling');
+    await startPolling();
+    return;
+  }
 
   const started = await Location.hasStartedGeofencingAsync(GEOFENCE_TASK);
   if (!started) {

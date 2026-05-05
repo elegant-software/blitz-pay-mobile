@@ -1,7 +1,8 @@
 import { initPaymentSheet, CardBrand } from '@stripe/stripe-react-native';
 
 export interface StripeParams {
-  paymentIntent: string;
+  paymentRequestId: string;
+  clientSecret: string;
   ephemeralKey: string;
   customer: string;
   publishableKey: string;
@@ -15,7 +16,7 @@ export const initializeStripePaymentSheet = async (
     merchantDisplayName,
     customerId: params.customer,
     customerEphemeralKeySecret: params.ephemeralKey,
-    paymentIntentClientSecret: params.paymentIntent,
+    paymentIntentClientSecret: params.clientSecret,
     // Set allowsDelayedPaymentMethods to true if you want to support methods like SEPA Debit
     allowsDelayedPaymentMethods: true,
     defaultBillingDetails: {

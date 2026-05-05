@@ -9,16 +9,22 @@ function parseNumber(value: string | undefined, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function joinUrl(base: string, path: string): string {
+  const trimmedBase = base.replace(/\/+$/, '');
+  const trimmedPath = path.startsWith('/') ? path : `/${path}`;
+  return `${trimmedBase}${trimmedPath}`;
+}
+
+const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? 'https://api-blitzpay-staging.elegantsoftware.de';
+
 export const config = {
   keycloakUrl: process.env.EXPO_PUBLIC_KEYCLOAK_URL ?? 'http://localhost:8080',
   keycloakRealm: process.env.EXPO_PUBLIC_KEYCLOAK_REALM ?? 'blitzpay',
   keycloakClientId: process.env.EXPO_PUBLIC_KEYCLOAK_CLIENT_ID ?? 'blitzpay-spa',
   authBypass: process.env.EXPO_PUBLIC_AUTH_BYPASS === 'true',
   stripePublishableKey: process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '',
-  apiUrl: process.env.EXPO_PUBLIC_API_URL ?? 'https://api-blitzpay-staging.elegantsoftware.de',
-  trueLayerPaymentsUrl:
-    process.env.EXPO_PUBLIC_TRUELAYER_PAYMENTS_URL ??
-    'https://api-blitzpay-staging.elegantsoftware.de/v1/payments/request',
+  apiUrl,
+  trueLayerPaymentsUrl: joinUrl(apiUrl, '/v1/payments/request'),
   trueLayerEnvironment: process.env.EXPO_PUBLIC_TRUELAYER_ENVIRONMENT ?? 'sandbox',
   trueLayerRedirectScheme: process.env.EXPO_PUBLIC_TRUELAYER_REDIRECT_SCHEME ?? 'blitzpay',
   trueLayerRedirectHost: process.env.EXPO_PUBLIC_TRUELAYER_REDIRECT_HOST ?? 'payments',

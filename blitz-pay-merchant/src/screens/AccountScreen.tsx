@@ -31,30 +31,43 @@ export default function AccountScreen() {
   };
 
   const handleGeofenceToggle = async (value: boolean) => {
-    if (!value) { await disableGeofence(); return; }
+    if (!value) {
+      try { await disableGeofence(); } catch { /* state already reset inside disable() */ }
+      return;
+    }
     const result = await enableGeofence();
     if (result === 'not_available') {
       Alert.alert(
         'Feature Not Available',
         'Geofencing requires a development build. It is not supported in Expo Go.',
-        [{ text: 'OK' }]
+        [{ text: 'OK' }],
       );
-      return;
-    }
-    if (result === 'background_denied') {
+    } else if (result === 'foreground_denied') {
+      Alert.alert(
+        'Location Permission Required',
+        'Allow location access so BlitzPay Merchant can detect your active branch.',
+        [{ text: 'Not Now', style: 'cancel' }, { text: 'Open Settings', onPress: openSettings }],
+      );
+    } else if (result === 'background_denied') {
       Alert.alert(
         '"Always" Location Required',
         'Branch Proximity monitoring needs "Always" location access to detect branches in the background.\n\nGo to Settings → BlitzPay Merchant → Location → Always.',
-        [
-          { text: 'Not Now', style: 'cancel' },
-          { text: 'Open Settings', onPress: openSettings },
-        ],
+        [{ text: 'Not Now', style: 'cancel' }, { text: 'Open Settings', onPress: openSettings }],
+      );
+    } else if (result === 'error') {
+      Alert.alert(
+        'Could Not Start Monitoring',
+        'Branch proximity monitoring failed to start. Please check that location access is enabled for this app.',
+        [{ text: 'Not Now', style: 'cancel' }, { text: 'Open Settings', onPress: openSettings }],
       );
     }
   };
 
   const handlePollingToggle = async (value: boolean) => {
-    if (!value) { await disablePolling(); return; }
+    if (!value) {
+      try { await disablePolling(); } catch { /* state already reset inside disablePolling() */ }
+      return;
+    }
     if (isExpoGo) {
       Alert.alert(
         'Feature Not Available',
