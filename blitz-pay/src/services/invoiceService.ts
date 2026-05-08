@@ -1,5 +1,6 @@
 import RNBlobUtil from 'react-native-blob-util';
 import { config } from '../lib/config';
+import { notifySessionExpired } from '../lib/auth';
 import type { InvoiceFormState, GeneratedPdf } from '../types/invoice';
 
 export async function generateInvoicePdf(
@@ -73,6 +74,12 @@ export async function generateInvoicePdf(
       message.toLowerCase().includes('fetch') ||
       message.toLowerCase().includes('connect');
     throw new Error(isNetwork ? 'error_server_unreachable' : 'error_pdf_generation_failed');
+  }
+
+  if (response.respInfo.status === 401) {
+    await RNBlobUtil.fs.unlink(path).catch(() => {});
+    notifySessionExpired();
+    throw new Error('error_session_expired');
   }
 
   if (response.respInfo.status !== 200) {

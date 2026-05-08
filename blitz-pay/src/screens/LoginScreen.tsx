@@ -66,7 +66,7 @@ export default function LoginScreen() {
           `Keycloak server appears unreachable at ${config.keycloakUrl}/realms/${config.keycloakRealm} — check that the host is resolvable from this device and the server is running.`,
         );
       }
-      const knownKeys = ['wrong_credentials', 'account_locked', 'network_error'] as const;
+      const knownKeys = ['wrong_credentials', 'account_locked', 'access_denied', 'network_error'] as const;
       const key = knownKeys.find((k) => k === msg);
       setError(key ? t(key) : t('network_error'));
     } finally {

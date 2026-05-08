@@ -1,5 +1,5 @@
 import { StripeParams } from '../../services/stripe';
-import { config } from '../config';
+import { authedFetch } from './authedFetch';
 
 export const mockCreatePaymentIntent = async (params: {
   amount: number;
@@ -9,15 +9,12 @@ export const mockCreatePaymentIntent = async (params: {
   branchId?: string;
   productId?: string;
 }): Promise<StripeParams> => {
-  const url = `${config.apiUrl}/v1/payments/stripe/create-intent`;
-  console.log(`[Stripe] Calling backend at: ${url}`);
-  
+  console.log('[Stripe] Calling backend: POST /v1/payments/stripe/create-intent');
+
   try {
-    const response = await fetch(url, {
+    const response = await authedFetch('/v1/payments/stripe/create-intent', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(params),
     });
 

@@ -67,6 +67,15 @@ function parseUser(idToken: string): UserProfile | null {
   };
 }
 
+const REQUIRED_GROUP = '/blitzpay-mobile-users';
+
+function hasRequiredGroup(accessToken: string): boolean {
+  const claims = decodeJwt(accessToken);
+  const groups = claims.groups;
+  if (!Array.isArray(groups)) return false;
+  return (groups as string[]).includes(REQUIRED_GROUP);
+}
+
 // ─── Token refresh ───────────────────────────────────────────────────────────
 
 async function refreshAccessToken(refreshToken: string): Promise<StoredSession | null> {
@@ -273,6 +282,7 @@ export function AuthProvider({ children, onSessionExpired }: AuthProviderProps) 
 
     if (!res.ok) {
       const body = await res.json().catch(() => ({})) as { error?: string; error_description?: string };
+      console.error('[auth] login failed', { status: res.status, error: body.error, description: body.error_description });
       observability.warn('auth_login_failed', {
         status: res.status,
         error: body.error ?? 'unknown',
@@ -285,6 +295,11 @@ export function AuthProvider({ children, onSessionExpired }: AuthProviderProps) 
     }
 
     const d = await res.json() as { access_token: string; refresh_token: string; id_token: string; expires_in: number };
+
+    if (!hasRequiredGroup(d.access_token)) {
+      throw new Error('access_denied');
+    }
+
     const session: StoredSession = {
       accessToken: d.access_token,
       refreshToken: d.refresh_token,
