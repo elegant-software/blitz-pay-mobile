@@ -67,13 +67,31 @@ export function useNearbyMerchants() {
         longitude: coords.longitude,
       }).catch(() => undefined);
 
+      let locationLabel = `${coords.latitude.toFixed(3)}, ${coords.longitude.toFixed(3)}`;
+      try {
+        const [place] = await Location.reverseGeocodeAsync({
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+        });
+        if (place) {
+          const parts = [
+            place.district,
+            place.city ?? place.subregion ?? place.region,
+            place.country,
+          ].filter(Boolean);
+          if (parts.length > 0) locationLabel = parts.join(', ');
+        }
+      } catch {
+        // keep raw coords as fallback
+      }
+
       const refreshMarker = await readNearbyMerchantRefreshMarker();
       setState({
         merchants,
         loading: false,
         errorKey: null,
         permissionDenied: false,
-        locationLabel: `${coords.latitude.toFixed(3)}, ${coords.longitude.toFixed(3)}`,
+        locationLabel,
         refreshedAt: refreshMarker ?? String(Date.now()),
       });
     } catch {
