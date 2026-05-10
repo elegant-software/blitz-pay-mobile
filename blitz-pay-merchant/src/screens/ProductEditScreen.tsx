@@ -13,7 +13,6 @@ import { observability } from '../lib/observability';
 import { colors, spacing, radius, shadow } from '../lib/theme';
 import {
   createMerchantProduct,
-  deactivateMerchantProduct,
   fetchBranchProducts,
   fetchProductDetail,
   MerchantProductError,
@@ -67,7 +66,6 @@ export default function ProductEditScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [errorKey, setErrorKey] = useState<string | null>(null);
-  const [initialActive, setInitialActive] = useState(true);
 
   useEffect(() => {
     let active = true;
@@ -100,7 +98,6 @@ export default function ProductEditScreen() {
           .catch(() => {}); // non-critical, dropdown just shows no options
 
         if (!isEdit || !route.params.productId) {
-          setInitialActive(true);
           setForm({
             branchId: activeBranchScope.branchId,
             branchName: activeBranchScope.branchName ?? activeBranchScope.branchId,
@@ -123,7 +120,6 @@ export default function ProductEditScreen() {
           route.params.productId,
         );
         if (!active) return;
-        setInitialActive(product.active);
         hydrateForm(product, activeBranchScope.branchName ?? activeBranchScope.branchId);
         setLoading(false);
       } catch (error) {
@@ -180,20 +176,9 @@ export default function ProductEditScreen() {
       setErrorKey('merchant_branch_access_denied');
       return;
     }
-    if ((!isEdit && !form.active) || (isEdit && initialActive === false && form.active === true)) {
-      setErrorKey('merchant_product_status_toggle_unsupported');
-      return;
-    }
-
     setSaving(true);
     setErrorKey(null);
     try {
-      if (isEdit && route.params.productId && initialActive && !form.active) {
-        await deactivateMerchantProduct(activeBranchScope.merchantId, route.params.productId, form.branchId);
-        navigation.goBack();
-        return;
-      }
-
       const input = {
         branchId: form.branchId,
         name: form.name.trim(),
@@ -201,7 +186,9 @@ export default function ProductEditScreen() {
         unitPrice: Number(form.price.replace(',', '.')).toFixed(2),
         imageUri: form.imageUri.trim() || undefined,
         categoryId: form.categoryId.trim() || undefined,
+        categoryName: form.category.trim() || undefined,
         productCode: form.productCode.trim() || undefined,
+        active: form.active,
       };
 
       if (isEdit && route.params.productId) {

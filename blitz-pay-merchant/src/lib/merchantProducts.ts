@@ -60,6 +60,8 @@ export type MerchantProductInput = {
   productCode?: string;
   imageUri?: string;
   categoryId?: string;
+  categoryName?: string;
+  active?: boolean;
 };
 
 export type MerchantScope = {
@@ -425,6 +427,8 @@ async function buildProductFormData(input: MerchantProductInput): Promise<FormDa
   if (input.description) formData.append('description', input.description);
   if (input.productCode) formData.append('productCode', input.productCode);
   if (input.categoryId) formData.append('categoryId', input.categoryId);
+  if (input.categoryName) formData.append('categoryName', input.categoryName);
+  if (input.active !== undefined) formData.append('active', String(input.active));
   if (input.imageUri) await appendImage(formData, input.imageUri);
   return formData;
 }
@@ -486,38 +490,4 @@ export async function updateMerchantProduct(
     }
     throw error;
   }
-}
-
-export async function deactivateMerchantProduct(
-  merchantId: string,
-  productId: string,
-  branchId: string,
-): Promise<void> {
-  assertAuthorizedBranchIdentifiers(merchantId, branchId);
-  const search = new URLSearchParams({ branchId });
-
-  const response = await authedFetch(buildPath(`/merchants/${merchantId}/products/${productId}?${search.toString()}`), {
-    method: 'DELETE',
-  });
-
-  if (!response.ok) {
-    const body = await response.text().catch(() => '');
-    observability.error('merchant_products_request_failed', {
-      event: 'deactivate_product',
-      merchantId,
-      branchId,
-      productId,
-      status: response.status,
-      reason: body.slice(0, 500) || 'empty_body',
-    });
-    throw new MerchantProductError(mapSaveFailureKey(response.status), body || 'merchant_product_save_failed', response.status);
-  }
-
-  observability.info('merchant_products_request_succeeded', {
-    event: 'deactivate_product',
-    merchantId,
-    branchId,
-    productId,
-    status: response.status,
-  });
 }
