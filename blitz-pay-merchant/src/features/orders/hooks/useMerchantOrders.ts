@@ -10,7 +10,7 @@ export function useMerchantOrders(branchId: string | null, filter: MerchantOrder
   const reload = useCallback(async () => {
     if (!branchId) {
       setOrders([]);
-      setError('merchant_products_branch_missing');
+      setError('merchant_branch_access_missing');
       setLoading(false);
       return;
     }

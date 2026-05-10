@@ -1,5 +1,6 @@
 import { authedFetch } from '../../../lib/api';
 import { observability } from '../../../lib/observability';
+import type { ActiveBranchScope } from '../../../lib/auth';
 import type {
   MerchantOrderDetail,
   MerchantOrderItem,
@@ -105,6 +106,14 @@ export async function fetchMerchantOrders(branchId: string): Promise<MerchantOrd
   const orders = rows
     .map(parseSummary)
     .filter((order) => {
+      if (order.branchId && order.branchId !== branchId) {
+        observability.warn('merchant_orders_branch_scope_mismatch', {
+          expectedBranchId: branchId,
+          actualBranchId: order.branchId,
+          orderId: order.orderId,
+        });
+        return false;
+      }
       const createdAt = new Date(order.createdAt);
       const today = new Date();
       return (
@@ -123,8 +132,12 @@ export async function fetchMerchantOrders(branchId: string): Promise<MerchantOrd
   return orders;
 }
 
-export async function fetchMerchantOrderDetail(orderId: string): Promise<MerchantOrderDetail> {
-  observability.info('merchant_order_detail_started', { orderId });
+export async function fetchMerchantOrderDetail(orderId: string, activeBranchScope: ActiveBranchScope): Promise<MerchantOrderDetail> {
+  observability.info('merchant_order_detail_started', {
+    orderId,
+    merchantId: activeBranchScope.merchantId,
+    branchId: activeBranchScope.branchId,
+  });
   const response = await authedFetch(`/v1/orders/${encodeURIComponent(orderId)}`, {
     method: 'GET',
     headers: { Accept: 'application/json' },
@@ -132,12 +145,36 @@ export async function fetchMerchantOrderDetail(orderId: string): Promise<Merchan
 
   if (!response.ok) {
     const reason = await readError(response);
-    observability.error('merchant_order_detail_failed', { orderId, status: response.status, reason });
+    observability.error('merchant_order_detail_failed', {
+      orderId,
+      merchantId: activeBranchScope.merchantId,
+      branchId: activeBranchScope.branchId,
+      status: response.status,
+      reason,
+    });
     throw new Error('merchant_order_detail_load_failed');
   }
 
   const payload = (await response.json()) as RawOrder;
   const order = parseDetail(payload);
-  observability.info('merchant_order_detail_succeeded', { orderId: order.orderId, status: order.status });
+  if (
+    order.merchantId !== activeBranchScope.merchantId ||
+    (order.branchId != null && order.branchId !== activeBranchScope.branchId)
+  ) {
+    observability.warn('merchant_order_detail_access_denied', {
+      orderId: order.orderId,
+      expectedMerchantId: activeBranchScope.merchantId,
+      expectedBranchId: activeBranchScope.branchId,
+      actualMerchantId: order.merchantId,
+      actualBranchId: order.branchId ?? null,
+    });
+    throw new Error('merchant_branch_access_denied');
+  }
+
+  observability.info('merchant_order_detail_succeeded', {
+    orderId: order.orderId,
+    status: order.status,
+    branchId: activeBranchScope.branchId,
+  });
   return order;
 }

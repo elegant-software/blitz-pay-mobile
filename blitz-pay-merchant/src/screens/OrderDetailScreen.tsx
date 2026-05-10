@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import { useLanguage } from '../lib/LanguageContext';
+import { useAuth } from '../lib/auth';
 import { colors, spacing, radius, shadow } from '../lib/theme';
 import type { RootStackParamList } from '../types';
 import { useMerchantOrderDetail } from '../features/orders/hooks/useMerchantOrderDetail';
@@ -25,10 +26,11 @@ function formatCurrency(amountMinor: number, currency = 'EUR') {
 
 export default function OrderDetailScreen() {
   const { t } = useLanguage();
+  const { activeBranchScope } = useAuth();
   const navigation = useNavigation();
   const route = useRoute<RouteProps>();
   const insets = useSafeAreaInsets();
-  const { order, loading, error } = useMerchantOrderDetail(route.params.orderId);
+  const { order, loading, error } = useMerchantOrderDetail(route.params.orderId, activeBranchScope);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -49,7 +51,7 @@ export default function OrderDetailScreen() {
         <View style={styles.centerState}>
           <Ionicons name="alert-circle-outline" size={40} color={colors.error} />
           <Text style={styles.centerTitle}>{t('merchant_order_detail_error_title')}</Text>
-          <Text style={styles.centerText}>{t('merchant_order_detail_error_body')}</Text>
+          <Text style={styles.centerText}>{t((error ?? 'merchant_order_detail_error_body') as Parameters<typeof t>[0])}</Text>
         </View>
       ) : (
         <ScrollView contentContainerStyle={{ paddingBottom: 96 + insets.bottom }} showsVerticalScrollIndicator={false}>
