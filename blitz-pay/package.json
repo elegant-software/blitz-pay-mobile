@@ -12,7 +12,8 @@
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit --pretty false",
     "test": "node ./scripts/run-tests.js",
-    "test:device": "node ./scripts/device-tests.js"
+    "test:device": "node ./scripts/device-tests.js",
+    "test:contract": "jest --testPathPattern=__contract__"
   },
   "dependencies": {
     "@expo/metro-runtime": "~55.0.10",
@@ -59,10 +60,22 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
+    "@types/jest": "^29.5.14",
     "@types/node": "^25.6.0",
     "@types/react": "~19.2.10",
+    "babel-jest": "^29.7.0",
+    "jest": "^29.7.0",
     "patch-package": "^8.0.1",
     "typescript": "^5.3.3"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": [
+      "**/__contract__/**/*.test.ts"
+    ],
+    "transform": {
+      "^.+\\.tsx?$": "babel-jest"
+    }
   },
   "private": true
 }
