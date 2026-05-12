@@ -1,17 +1,27 @@
 import { useEffect, useState } from 'react';
+import type { ActiveBranchScope } from '../../../lib/auth';
 import { fetchMerchantOrderDetail } from '../services/orderService';
 import type { MerchantOrderDetail } from '../types/order';
 
-export function useMerchantOrderDetail(orderId: string) {
+export function useMerchantOrderDetail(orderId: string, activeBranchScope: ActiveBranchScope | null) {
   const [order, setOrder] = useState<MerchantOrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
+    if (!activeBranchScope) {
+      setOrder(null);
+      setError('merchant_branch_access_missing');
+      setLoading(false);
+      return () => {
+        active = false;
+      };
+    }
+
     setLoading(true);
     setError(null);
-    void fetchMerchantOrderDetail(orderId)
+    void fetchMerchantOrderDetail(orderId, activeBranchScope)
       .then((nextOrder) => {
         if (active) setOrder(nextOrder);
       })
@@ -25,7 +35,7 @@ export function useMerchantOrderDetail(orderId: string) {
     return () => {
       active = false;
     };
-  }, [orderId]);
+  }, [activeBranchScope, orderId]);
 
   return { order, loading, error };
 }

@@ -5,15 +5,13 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useAuth } from '../lib/auth';
 import { useLanguage } from '../lib/LanguageContext';
 import { observability } from '../lib/observability';
 import { colors, spacing, radius, shadow } from '../lib/theme';
-import { resolveCurrentCoordinates } from '../lib/location';
 import {
   fetchBranchProducts,
-  type MerchantScope,
   MerchantProductError,
-  resolveNearbyMerchantScope,
 } from '../lib/merchantProducts';
 import type { RootStackNav, Product } from '../types';
 
@@ -41,42 +39,39 @@ function groupByCategory(products: Product[], uncategorizedLabel: string): { cat
 
 export default function ProductsScreen() {
   const { t } = useLanguage();
+  const { activeBranchScope, branchScopeError, retryBranchScope } = useAuth();
   const navigation = useNavigation<RootStackNav>();
   const insets = useSafeAreaInsets();
   const [products, setProducts] = useState<Product[]>([]);
-  const [branchName, setBranchName] = useState<string | null>(null);
-  const [branchId, setBranchId] = useState<string | null>(null);
-  const [merchantScope, setMerchantScope] = useState<MerchantScope | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorKey, setErrorKey] = useState<string | null>(null);
 
   const loadProducts = useCallback(async () => {
+    if (!activeBranchScope) {
+      setProducts([]);
+      setErrorKey(branchScopeError ?? 'merchant_products_branch_missing');
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setErrorKey(null);
 
     try {
-      const coords = await resolveCurrentCoordinates();
-      const activeScope = await resolveNearbyMerchantScope(coords);
-
-      const branchProducts = await fetchBranchProducts(activeScope.merchantId, activeScope.branchId);
-      setMerchantScope(activeScope);
-      setBranchId(activeScope.branchId);
-      setBranchName(activeScope.branchName);
+      const branchProducts = await fetchBranchProducts(activeBranchScope.merchantId, activeBranchScope.branchId);
       setProducts(branchProducts);
       setLoading(false);
     } catch (error) {
       observability.warn('merchant_products_branch_resolution_failed', {
-        merchantId: merchantScope?.merchantId ?? null,
+        merchantId: activeBranchScope.merchantId,
+        branchId: activeBranchScope.branchId,
         reason: error instanceof Error ? error.message : 'unknown_error',
       });
-      setMerchantScope(null);
       setProducts([]);
-      setBranchId(null);
-      setBranchName(null);
       setErrorKey(error instanceof MerchantProductError ? error.key : 'merchant_products_load_failed');
       setLoading(false);
     }
-  }, []);
+  }, [activeBranchScope, branchScopeError]);
 
   useFocusEffect(
     useCallback(() => {
@@ -92,13 +87,15 @@ export default function ProductsScreen() {
         <View>
           <Text style={styles.title}>{t('products')}</Text>
           <Text style={styles.subtitle}>
-            {branchName ? `${t('merchant_branch_scope')}: ${branchName}` : t('merchant_branch_scope_pending')}
+            {activeBranchScope?.branchId
+              ? `${t('merchant_branch_scope_authorized')}: ${activeBranchScope.branchName ?? activeBranchScope.branchId}`
+              : t('merchant_branch_scope_pending')}
           </Text>
         </View>
         <TouchableOpacity
-          style={[styles.addBtn, !branchId && styles.addBtnDisabled]}
-          onPress={() => branchId && navigation.navigate('ProductEdit', { mode: 'create' })}
-          disabled={!branchId}
+          style={[styles.addBtn, !activeBranchScope?.branchId && styles.addBtnDisabled]}
+          onPress={() => activeBranchScope?.branchId && navigation.navigate('ProductEdit', { mode: 'create' })}
+          disabled={!activeBranchScope?.branchId}
         >
           <Ionicons name="add" size={20} color={colors.black} />
           <Text style={styles.addBtnText}>{t('add_product')}</Text>
@@ -118,7 +115,10 @@ export default function ProductsScreen() {
           <View style={[styles.stateCard, shadow.sm]}>
             <Ionicons name="alert-circle-outline" size={24} color={colors.error} />
             <Text style={styles.stateTitle}>{t(errorKey as Parameters<typeof t>[0])}</Text>
-            <TouchableOpacity style={styles.retryBtn} onPress={loadProducts}>
+            <TouchableOpacity
+              style={styles.retryBtn}
+              onPress={() => void (branchScopeError ? retryBranchScope() : loadProducts())}
+            >
               <Text style={styles.retryBtnText}>{t('retry')}</Text>
             </TouchableOpacity>
           </View>

@@ -7,17 +7,15 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
+import { useAuth } from '../lib/auth';
 import { useLanguage } from '../lib/LanguageContext';
 import { observability } from '../lib/observability';
-import { resolveCurrentCoordinates } from '../lib/location';
 import { colors, spacing, radius, shadow } from '../lib/theme';
 import {
   createMerchantProduct,
   fetchBranchProducts,
   fetchProductDetail,
-  type MerchantScope,
   MerchantProductError,
-  resolveNearbyMerchantScope,
   updateMerchantProduct,
 } from '../lib/merchantProducts';
 import type { Product, RootStackParamList } from '../types';
@@ -31,9 +29,15 @@ type FormState = {
   description: string;
   price: string;
   imageUri: string;
+  categoryId: string;
   category: string;
   productCode: string;
   active: boolean;
+};
+
+type CategoryOption = {
+  id: string;
+  name: string;
 };
 
 
@@ -43,6 +47,7 @@ export default function ProductEditScreen() {
   const route = useRoute<RouteProps>();
   const insets = useSafeAreaInsets();
   const isEdit = route.params.mode === 'edit';
+  const { activeBranchScope, branchScopeError, retryBranchScope } = useAuth();
 
   const [form, setForm] = useState<FormState>({
     branchId: '',
@@ -51,12 +56,12 @@ export default function ProductEditScreen() {
     description: '',
     price: '',
     imageUri: '',
+    categoryId: '',
     category: '',
     productCode: '',
     active: true,
   });
-  const [merchantScope, setMerchantScope] = useState<MerchantScope | null>(null);
-  const [categories, setCategories] = useState<string[]>([]);
+  const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [categoryModalVisible, setCategoryModalVisible] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -70,34 +75,37 @@ export default function ProductEditScreen() {
       setErrorKey(null);
 
       try {
-        const coords = await resolveCurrentCoordinates();
-        const activeScope = await resolveNearbyMerchantScope(coords);
+        if (!activeBranchScope) {
+          setErrorKey(branchScopeError ?? 'merchant_products_branch_missing');
+          setLoading(false);
+          return;
+        }
         if (!active) return;
-        setMerchantScope(activeScope);
 
         // Load existing categories from branch products for the dropdown
-        fetchBranchProducts(activeScope.merchantId, activeScope.branchId)
+        fetchBranchProducts(activeBranchScope.merchantId, activeBranchScope.branchId)
           .then((products) => {
             const seen = new Set<string>();
-            const cats: string[] = [];
+            const cats: CategoryOption[] = [];
             for (const p of products) {
-              if (p.categoryName && !seen.has(p.categoryName)) {
-                seen.add(p.categoryName);
-                cats.push(p.categoryName);
+              if (p.categoryId && p.categoryName && !seen.has(p.categoryId)) {
+                seen.add(p.categoryId);
+                cats.push({ id: p.categoryId, name: p.categoryName });
               }
             }
-            if (active) setCategories(cats.sort());
+            if (active) setCategories(cats.sort((a, b) => a.name.localeCompare(b.name)));
           })
           .catch(() => {}); // non-critical, dropdown just shows no options
 
         if (!isEdit || !route.params.productId) {
           setForm({
-            branchId: activeScope.branchId,
-            branchName: activeScope.branchName,
+            branchId: activeBranchScope.branchId,
+            branchName: activeBranchScope.branchName ?? activeBranchScope.branchId,
             name: '',
             description: '',
             price: '',
             imageUri: '',
+            categoryId: '',
             category: '',
             productCode: '',
             active: true,
@@ -107,21 +115,21 @@ export default function ProductEditScreen() {
         }
 
         const product = await fetchProductDetail(
-          activeScope.merchantId,
-          activeScope.branchId,
+          activeBranchScope.merchantId,
+          activeBranchScope.branchId,
           route.params.productId,
         );
         if (!active) return;
-        hydrateForm(product, activeScope.branchName);
+        hydrateForm(product, activeBranchScope.branchName ?? activeBranchScope.branchId);
         setLoading(false);
       } catch (error) {
         if (!active) return;
         observability.warn('merchant_product_branch_resolution_failed', {
-          merchantId: merchantScope?.merchantId ?? null,
+          merchantId: activeBranchScope?.merchantId ?? null,
+          branchId: activeBranchScope?.branchId ?? null,
           productId: route.params.productId ?? null,
           reason: error instanceof Error ? error.message : 'unknown_error',
         });
-        setMerchantScope(null);
         setErrorKey(error instanceof MerchantProductError ? error.key : 'merchant_product_load_failed');
         setLoading(false);
       }
@@ -131,7 +139,7 @@ export default function ProductEditScreen() {
     return () => {
       active = false;
     };
-  }, [isEdit, route.params.productId]);
+  }, [activeBranchScope, branchScopeError, isEdit, route.params.productId]);
 
   function hydrateForm(product: Product, currentBranchName: string) {
     setForm({
@@ -141,6 +149,7 @@ export default function ProductEditScreen() {
       description: product.description ?? '',
       price: product.unitPrice.toFixed(2),
       imageUri: product.imageUrl ?? '',
+      categoryId: product.categoryId ?? '',
       category: product.categoryName ?? '',
       productCode: product.productCode != null ? String(product.productCode) : '',
       active: product.active,
@@ -155,11 +164,18 @@ export default function ProductEditScreen() {
   }, [form.branchId, form.name, form.price]);
 
   const handleSave = async () => {
-    if (!merchantScope?.merchantId || !canSave) {
+    if (!activeBranchScope) {
+      setErrorKey(branchScopeError ?? 'merchant_products_branch_missing');
+      return;
+    }
+    if (!canSave) {
       setErrorKey('merchant_product_validation_failed');
       return;
     }
-
+    if (form.branchId !== activeBranchScope.branchId) {
+      setErrorKey('merchant_branch_access_denied');
+      return;
+    }
     setSaving(true);
     setErrorKey(null);
     try {
@@ -169,15 +185,16 @@ export default function ProductEditScreen() {
         description: form.description.trim() || undefined,
         unitPrice: Number(form.price.replace(',', '.')).toFixed(2),
         imageUri: form.imageUri.trim() || undefined,
+        categoryId: form.categoryId.trim() || undefined,
         categoryName: form.category.trim() || undefined,
         productCode: form.productCode.trim() || undefined,
         active: form.active,
       };
 
       if (isEdit && route.params.productId) {
-        await updateMerchantProduct(merchantScope.merchantId, route.params.productId, input);
+        await updateMerchantProduct(activeBranchScope.merchantId, route.params.productId, input);
       } else {
-        await createMerchantProduct(merchantScope.merchantId, input);
+        await createMerchantProduct(activeBranchScope.merchantId, input);
       }
       navigation.goBack();
     } catch (error) {
@@ -262,7 +279,7 @@ export default function ProductEditScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <View style={[styles.card, shadow.sm]}>
-            <Text style={styles.scopeLabel}>{t('merchant_branch_scope')}</Text>
+            <Text style={styles.scopeLabel}>{t('merchant_branch_scope_authorized')}</Text>
             <Text style={styles.scopeValue}>{form.branchName || '—'}</Text>
           </View>
 
@@ -347,7 +364,16 @@ export default function ProductEditScreen() {
               ) : null}
             </Field>
 
-            {errorKey ? <Text style={styles.errorText}>{t(errorKey as Parameters<typeof t>[0])}</Text> : null}
+            {errorKey ? (
+              <View>
+                <Text style={styles.errorText}>{t(errorKey as Parameters<typeof t>[0])}</Text>
+                {branchScopeError ? (
+                  <TouchableOpacity onPress={() => void retryBranchScope()}>
+                    <Text style={styles.retryInline}>{t('retry')}</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            ) : null}
           </View>
         </ScrollView>
       )}
@@ -358,16 +384,20 @@ export default function ProductEditScreen() {
             <Text style={styles.modalTitle}>{t('product_category')}</Text>
             <FlatList
               data={categories}
-              keyExtractor={(item) => item}
+              keyExtractor={(item) => item.id}
               renderItem={({ item }) => (
                 <TouchableOpacity
-                  style={[styles.modalOption, form.category === item && styles.modalOptionSelected]}
-                  onPress={() => { handleChange('category', item); setCategoryModalVisible(false); }}
+                  style={[styles.modalOption, form.categoryId === item.id && styles.modalOptionSelected]}
+                  onPress={() => {
+                    handleChange('categoryId', item.id);
+                    handleChange('category', item.name);
+                    setCategoryModalVisible(false);
+                  }}
                 >
-                  <Text style={[styles.modalOptionText, form.category === item && styles.modalOptionTextSelected]}>
-                    {item}
+                  <Text style={[styles.modalOptionText, form.categoryId === item.id && styles.modalOptionTextSelected]}>
+                    {item.name}
                   </Text>
-                  {form.category === item && <Ionicons name="checkmark" size={18} color={colors.primary} />}
+                  {form.categoryId === item.id && <Ionicons name="checkmark" size={18} color={colors.primary} />}
                 </TouchableOpacity>
               )}
               ListEmptyComponent={
@@ -377,7 +407,11 @@ export default function ProductEditScreen() {
             {form.category ? (
               <TouchableOpacity
                 style={styles.modalClearBtn}
-                onPress={() => { handleChange('category', ''); setCategoryModalVisible(false); }}
+                onPress={() => {
+                  handleChange('categoryId', '');
+                  handleChange('category', '');
+                  setCategoryModalVisible(false);
+                }}
               >
                 <Text style={styles.modalClearText}>{t('product_image_remove').replace('Image', 'Category')}</Text>
               </TouchableOpacity>
@@ -493,4 +527,5 @@ const styles = StyleSheet.create({
   imagePickerText: { flex: 1, fontSize: 15, color: colors.onSurface },
   previewImage: { width: '100%', height: 180, borderRadius: radius.lg, backgroundColor: colors.surface, marginTop: spacing.sm },
   errorText: { marginTop: spacing.md, fontSize: 12, color: colors.error },
+  retryInline: { marginTop: spacing.xs, fontSize: 13, fontWeight: '700', color: colors.primary },
 });

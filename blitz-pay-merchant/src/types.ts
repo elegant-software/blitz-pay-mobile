@@ -59,6 +59,7 @@ export interface Product {
   description?: string;
   unitPrice: number;
   imageUrl?: string;
+  categoryId?: string;
   categoryName?: string;
   productCode?: number;
   active: boolean;

@@ -20,6 +20,7 @@ type MerchantProductResponse = {
   description?: string;
   unitPrice?: number;
   imageUrl?: string;
+  categoryId?: string;
   categoryName?: string;
   productCode?: number;
   active?: boolean;
@@ -58,6 +59,7 @@ export type MerchantProductInput = {
   unitPrice: string;
   productCode?: string;
   imageUri?: string;
+  categoryId?: string;
   categoryName?: string;
   active?: boolean;
 };
@@ -79,6 +81,12 @@ export class MerchantProductError extends Error {
   ) {
     super(message);
     this.name = 'MerchantProductError';
+  }
+}
+
+function assertAuthorizedBranchIdentifiers(merchantId: string, branchId: string): void {
+  if (!merchantId || !branchId) {
+    throw new MerchantProductError('merchant_branch_access_missing', 'missing_authorized_branch_scope');
   }
 }
 
@@ -113,6 +121,7 @@ function mapProduct(response: MerchantProductResponse): Product | null {
     description: response.description,
     unitPrice: response.unitPrice,
     imageUrl: response.imageUrl,
+    categoryId: response.categoryId,
     categoryName: response.categoryName,
     productCode: response.productCode,
     active: Boolean(response.active),
@@ -349,6 +358,7 @@ export async function resolveNearbyMerchantScope(
 }
 
 export async function fetchBranchProducts(merchantId: string, branchId: string): Promise<Product[]> {
+  assertAuthorizedBranchIdentifiers(merchantId, branchId);
   const search = new URLSearchParams({ branchId });
   const response = await requestJson<MerchantProductResponse[]>(
     `/merchants/${merchantId}/products?${search.toString()}`,
@@ -388,6 +398,7 @@ export async function fetchBranchProducts(merchantId: string, branchId: string):
 }
 
 export async function fetchProductDetail(merchantId: string, branchId: string, productId: string): Promise<Product> {
+  assertAuthorizedBranchIdentifiers(merchantId, branchId);
   const search = new URLSearchParams({ branchId });
   const response = await requestJson<MerchantProductResponse>(
     `/merchants/${merchantId}/products/${productId}?${search.toString()}`,
@@ -415,6 +426,7 @@ async function buildProductFormData(input: MerchantProductInput): Promise<FormDa
   formData.append('unitPrice', input.unitPrice);
   if (input.description) formData.append('description', input.description);
   if (input.productCode) formData.append('productCode', input.productCode);
+  if (input.categoryId) formData.append('categoryId', input.categoryId);
   if (input.categoryName) formData.append('categoryName', input.categoryName);
   if (input.active !== undefined) formData.append('active', String(input.active));
   if (input.imageUri) await appendImage(formData, input.imageUri);
@@ -422,6 +434,7 @@ async function buildProductFormData(input: MerchantProductInput): Promise<FormDa
 }
 
 export async function createMerchantProduct(merchantId: string, input: MerchantProductInput): Promise<Product> {
+  assertAuthorizedBranchIdentifiers(merchantId, input.branchId);
   try {
     const response = await requestJson<MerchantProductResponse>(
       `/merchants/${merchantId}/products`,
@@ -452,6 +465,7 @@ export async function updateMerchantProduct(
   productId: string,
   input: MerchantProductInput,
 ): Promise<Product> {
+  assertAuthorizedBranchIdentifiers(merchantId, input.branchId);
   try {
     const response = await requestJson<MerchantProductResponse>(
       `/merchants/${merchantId}/products/${productId}`,

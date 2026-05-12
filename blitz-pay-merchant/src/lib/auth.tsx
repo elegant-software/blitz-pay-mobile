@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useRef, useState, type Rea
 import { Platform } from 'react-native';
 import { storage } from './storage';
 import { config } from './config';
+import { observability } from './observability';
 
 const LocalAuthentication = Platform.OS !== 'web'
   ? require('expo-local-authentication')
@@ -14,13 +15,28 @@ interface StoredSession {
   expiresAt: number;
 }
 
+export interface BranchMembership {
+  groupPath: string;
+  merchantId: string;
+  branchId: string;
+}
+
+export interface ActiveBranchScope {
+  merchantId: string;
+  branchId: string;
+  branchName: string | null;
+  source: 'branch_membership';
+  status: 'resolved';
+}
+
 export interface UserProfile {
   id: string;
-  // TODO: Re-enable claim-based merchant scoping after the product flow stops relying on location-only resolution.
   merchantId: string | null;
   email: string;
   name: string;
   emailVerified: boolean;
+  branchMemberships: BranchMembership[];
+  activeBranchId: string | null;
 }
 
 export interface AuthState {
@@ -28,8 +44,12 @@ export interface AuthState {
   authenticated: boolean;
   token: string | null;
   user: UserProfile | null;
+  activeBranchScope: ActiveBranchScope | null;
+  branchScopeError: string | null;
   isBiometricAvailable: boolean;
   biometricEnrolled: boolean;
+  retryBranchScope: () => Promise<void>;
+  selectActiveBranch: (branchId: string) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   loginWithBiometric: () => Promise<void>;
   logout: () => Promise<void>;
@@ -38,6 +58,8 @@ export interface AuthState {
 
 const SESSION_KEY = 'blitzpay_merchant_session';
 const BIOMETRIC_KEY = 'blitzpay_merchant_biometric_enrolled';
+const ACTIVE_BRANCH_KEY = 'blitzpay_merchant_active_branch_id';
+const BRANCH_GROUP_PATTERN = /^\/merchants\/merchant_([^/]+)\/branch_([^/]+)$/;
 
 function decodeJwt(token: string): Record<string, unknown> {
   try {
@@ -51,6 +73,13 @@ function decodeJwt(token: string): Record<string, unknown> {
 function readStringClaim(claims: Record<string, unknown>, key: string): string | null {
   const value = claims[key];
   return typeof value === 'string' && value.trim() ? value : null;
+}
+
+function readStringArrayClaim(claims: Record<string, unknown>, key: string): string[] {
+  const value = claims[key];
+  if (typeof value === 'string' && value.trim()) return [value];
+  if (!Array.isArray(value)) return [];
+  return value.filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0);
 }
 
 function resolveMerchantId(claims: Record<string, unknown>): string | null {
@@ -76,15 +105,106 @@ function resolveMerchantId(claims: Record<string, unknown>): string | null {
   return null;
 }
 
-function parseUser(idToken: string): UserProfile | null {
-  const c = decodeJwt(idToken);
-  if (!c.sub) return null;
+function parseBranchMemberships(claims: Record<string, unknown>): { memberships: BranchMembership[]; invalidCount: number } {
+  const groups = [
+    ...readStringArrayClaim(claims, 'access_group'),
+    ...readStringArrayClaim(claims, 'groups'),
+  ];
+  const seen = new Set<string>();
+  const memberships: BranchMembership[] = [];
+  let invalidCount = 0;
+
+  for (const groupPath of groups) {
+    const match = groupPath.match(BRANCH_GROUP_PATTERN);
+    if (!match) {
+      if (groupPath.startsWith('/merchants/')) invalidCount += 1;
+      continue;
+    }
+
+    const [, merchantId, branchId] = match;
+    const key = `${merchantId}:${branchId}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    memberships.push({
+      groupPath,
+      merchantId,
+      branchId,
+    });
+  }
+
+  return { memberships, invalidCount };
+}
+
+function buildBranchScope(
+  memberships: BranchMembership[],
+  activeBranchId: string | null,
+): { activeBranchId: string | null; activeBranchScope: ActiveBranchScope | null; errorKey: string | null } {
+  if (memberships.length === 0) {
+    return { activeBranchId: null, activeBranchScope: null, errorKey: 'merchant_branch_access_missing' };
+  }
+
+  const selectedMembership =
+    memberships.find((membership) => membership.branchId === activeBranchId) ??
+    memberships[0] ??
+    null;
+
+  if (!selectedMembership) {
+    return { activeBranchId: null, activeBranchScope: null, errorKey: 'merchant_branch_access_invalid' };
+  }
+
   return {
-    id: c.sub as string,
-    merchantId: resolveMerchantId(c),
-    email: (c.email as string) ?? '',
-    name: (c.name as string) ?? (c.preferred_username as string) ?? '',
-    emailVerified: (c.email_verified as boolean) ?? false,
+    activeBranchId: selectedMembership.branchId,
+    activeBranchScope: {
+      merchantId: selectedMembership.merchantId,
+      branchId: selectedMembership.branchId,
+      branchName: null,
+      source: 'branch_membership',
+      status: 'resolved',
+    },
+    errorKey: null,
+  };
+}
+
+function parseUser(accessToken: string, idToken: string, preferredActiveBranchId: string | null): {
+  profile: UserProfile | null;
+  activeBranchScope: ActiveBranchScope | null;
+  errorKey: string | null;
+  invalidMembershipCount: number;
+} {
+  const accessClaims = decodeJwt(accessToken);
+  const idClaims = decodeJwt(idToken);
+  const profileClaims = idClaims.sub ? idClaims : accessClaims;
+
+  if (!profileClaims.sub) {
+    return {
+      profile: null,
+      activeBranchScope: null,
+      errorKey: 'merchant_branch_access_invalid',
+      invalidMembershipCount: 0,
+    };
+  }
+
+  const { memberships, invalidCount } = parseBranchMemberships(accessClaims);
+  const branchScope = buildBranchScope(memberships, preferredActiveBranchId);
+  const merchantId =
+    resolveMerchantId(accessClaims) ??
+    resolveMerchantId(profileClaims) ??
+    memberships[0]?.merchantId ??
+    null;
+
+  return {
+    profile: {
+      id: profileClaims.sub as string,
+      merchantId,
+      email: (profileClaims.email as string) ?? '',
+      name: (profileClaims.name as string) ?? (profileClaims.preferred_username as string) ?? '',
+      emailVerified: (profileClaims.email_verified as boolean) ?? false,
+      branchMemberships: memberships,
+      activeBranchId: branchScope.activeBranchId,
+    },
+    activeBranchScope: branchScope.activeBranchScope,
+    errorKey: invalidCount > 0 && memberships.length === 0 ? 'merchant_branch_access_invalid' : branchScope.errorKey,
+    invalidMembershipCount: invalidCount,
   };
 }
 
@@ -119,6 +239,22 @@ const BYPASS_USER: UserProfile = {
   email: 'merchant@blitzpay.local',
   name: 'Demo Merchant',
   emailVerified: true,
+  branchMemberships: [
+    {
+      groupPath: '/merchants/merchant_dev-bypass-merchant/branch_branch_demo',
+      merchantId: 'dev-bypass-merchant',
+      branchId: 'branch_demo',
+    },
+  ],
+  activeBranchId: 'branch_demo',
+};
+
+const BYPASS_BRANCH_SCOPE: ActiveBranchScope = {
+  merchantId: 'dev-bypass-merchant',
+  branchId: 'branch_demo',
+  branchName: 'Demo Branch',
+  source: 'branch_membership',
+  status: 'resolved',
 };
 
 const defaultAuth: AuthState = {
@@ -126,8 +262,12 @@ const defaultAuth: AuthState = {
   authenticated: false,
   token: null,
   user: null,
+  activeBranchScope: null,
+  branchScopeError: null,
   isBiometricAvailable: false,
   biometricEnrolled: false,
+  retryBranchScope: async () => {},
+  selectActiveBranch: async () => {},
   login: async () => {},
   loginWithBiometric: async () => {},
   logout: async () => {},
@@ -143,9 +283,66 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [authenticated, setAuthenticated] = useState(isBypass);
   const [token, setToken] = useState<string | null>(isBypass ? 'bypass-token' : null);
   const [user, setUser] = useState<UserProfile | null>(isBypass ? BYPASS_USER : null);
+  const [activeBranchScope, setActiveBranchScope] = useState<ActiveBranchScope | null>(isBypass ? BYPASS_BRANCH_SCOPE : null);
+  const [branchScopeError, setBranchScopeError] = useState<string | null>(null);
   const [isBiometricAvailable, setIsBiometricAvailable] = useState(false);
   const [biometricEnrolled, setBiometricEnrolled] = useState(false);
   const initStarted = useRef(false);
+
+  async function readActiveBranchId(): Promise<string | null> {
+    try {
+      return await storage.getItem(ACTIVE_BRANCH_KEY);
+    } catch {
+      return null;
+    }
+  }
+
+  async function writeActiveBranchId(branchId: string | null): Promise<void> {
+    try {
+      if (branchId) await storage.setItem(ACTIVE_BRANCH_KEY, branchId);
+      else await storage.deleteItem(ACTIVE_BRANCH_KEY);
+    } catch {
+      // non-fatal
+    }
+  }
+
+  async function applySessionUser(accessToken: string, idToken: string, source: string): Promise<UserProfile | null> {
+    const preferredActiveBranchId = await readActiveBranchId();
+    observability.info('merchant_branch_scope_resolution_started', {
+      source,
+      preferredActiveBranchId: preferredActiveBranchId ?? null,
+    });
+
+    const parsed = parseUser(accessToken, idToken, preferredActiveBranchId);
+    setUser(parsed.profile);
+    setActiveBranchScope(parsed.activeBranchScope);
+    setBranchScopeError(parsed.errorKey);
+
+    if (parsed.profile?.activeBranchId) {
+      await writeActiveBranchId(parsed.profile.activeBranchId);
+    } else {
+      await writeActiveBranchId(null);
+    }
+
+    if (parsed.profile && parsed.profile.branchMemberships.length > 0 && parsed.profile.activeBranchId) {
+      observability.info('merchant_branch_scope_resolution_succeeded', {
+        source,
+        membershipCount: parsed.profile.branchMemberships.length,
+        invalidMembershipCount: parsed.invalidMembershipCount,
+        activeBranchId: parsed.profile.activeBranchId ?? null,
+        merchantId: parsed.profile.merchantId ?? null,
+      });
+    } else {
+      observability.warn('merchant_branch_scope_resolution_failed', {
+        source,
+        reason: parsed.errorKey ?? 'profile_parse_failed',
+        membershipCount: parsed.profile?.branchMemberships.length ?? 0,
+        invalidMembershipCount: parsed.invalidMembershipCount,
+      });
+    }
+
+    return parsed.profile;
+  }
 
   useEffect(() => {
     if (isBypass) return;
@@ -169,7 +366,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const stored = JSON.parse(raw) as StoredSession;
           if (stored.expiresAt > Date.now() + 60_000) {
             setToken(stored.accessToken);
-            setUser(parseUser(stored.idToken));
+            await applySessionUser(stored.accessToken, stored.idToken, 'stored_session');
             setAuthenticated(true);
             setInitialized(true);
             scheduleRefresh(stored);
@@ -179,7 +376,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (renewed) {
               await storage.setItem(SESSION_KEY, JSON.stringify(renewed));
               setToken(renewed.accessToken);
-              setUser(parseUser(renewed.idToken));
+              await applySessionUser(renewed.accessToken, renewed.idToken, 'session_refresh');
               setAuthenticated(true);
               setInitialized(true);
               scheduleRefresh(renewed);
@@ -202,13 +399,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (renewed) {
             await storage.setItem(SESSION_KEY, JSON.stringify(renewed));
             setToken(renewed.accessToken);
-            setUser(parseUser(renewed.idToken));
+            await applySessionUser(renewed.accessToken, renewed.idToken, 'scheduled_refresh');
             scheduleRefresh(renewed);
           } else {
             await storage.deleteItem(SESSION_KEY);
+            await writeActiveBranchId(null);
             setAuthenticated(false);
             setToken(null);
             setUser(null);
+            setActiveBranchScope(null);
+            setBranchScopeError(null);
           }
         });
       }, ms);
@@ -248,7 +448,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
     await storage.setItem(SESSION_KEY, JSON.stringify(session));
     setToken(d.access_token);
-    setUser(parseUser(d.id_token));
+    await applySessionUser(d.access_token, d.id_token, 'login');
     setAuthenticated(true);
     scheduleRefresh(session);
   };
@@ -268,16 +468,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!renewed) throw new Error('network_error');
     await storage.setItem(SESSION_KEY, JSON.stringify(renewed));
     setToken(renewed.accessToken);
-    setUser(parseUser(renewed.idToken));
+    await applySessionUser(renewed.accessToken, renewed.idToken, 'biometric_refresh');
     setAuthenticated(true);
     scheduleRefresh(renewed);
   };
 
   const logout = async (): Promise<void> => {
     await storage.deleteItem(SESSION_KEY);
+    await writeActiveBranchId(null);
     setAuthenticated(false);
     setToken(null);
     setUser(null);
+    setActiveBranchScope(null);
+    setBranchScopeError(null);
   };
 
   const enrollBiometric = async (): Promise<void> => {
@@ -285,9 +488,58 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setBiometricEnrolled(true);
   };
 
+  const retryBranchScope = async (): Promise<void> => {
+    if (isBypass) {
+      setBranchScopeError(null);
+      setActiveBranchScope(BYPASS_BRANCH_SCOPE);
+      return;
+    }
+
+    const raw = await storage.getItem(SESSION_KEY);
+    if (!raw) {
+      setBranchScopeError('merchant_branch_access_missing');
+      setActiveBranchScope(null);
+      return;
+    }
+
+    const stored = JSON.parse(raw) as StoredSession;
+    await applySessionUser(stored.accessToken, stored.idToken, 'manual_retry');
+  };
+
+  const selectActiveBranch = async (branchId: string): Promise<void> => {
+    if (!user) return;
+    if (!user.branchMemberships.some((membership) => membership.branchId === branchId)) {
+      setBranchScopeError('merchant_branch_access_denied');
+      observability.warn('merchant_branch_scope_selection_failed', {
+        branchId,
+        reason: 'branch_not_authorized',
+      });
+      return;
+    }
+
+    await writeActiveBranchId(branchId);
+    const nextProfile = {
+      ...user,
+      activeBranchId: branchId,
+    };
+    const nextScope = buildBranchScope(nextProfile.branchMemberships, branchId);
+    setUser({
+      ...nextProfile,
+      activeBranchId: nextScope.activeBranchId,
+    });
+    setActiveBranchScope(nextScope.activeBranchScope);
+    setBranchScopeError(nextScope.errorKey);
+    observability.info('merchant_branch_scope_selection_succeeded', {
+      branchId,
+      merchantId: nextScope.activeBranchScope?.merchantId ?? null,
+    });
+  };
+
   return (
     <AuthContext.Provider value={{
-      initialized, authenticated, token, user, isBiometricAvailable, biometricEnrolled,
+      initialized, authenticated, token, user, activeBranchScope, branchScopeError,
+      isBiometricAvailable, biometricEnrolled,
+      retryBranchScope, selectActiveBranch,
       login, loginWithBiometric, logout, enrollBiometric,
     }}>
       {children}

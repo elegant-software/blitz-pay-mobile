@@ -1,15 +1,14 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { useAuth } from '../lib/auth';
 import { useLanguage } from '../lib/LanguageContext';
 import { colors, spacing, radius, shadow } from '../lib/theme';
 import type { RootStackNav } from '../types';
-import { resolveCurrentCoordinates } from '../lib/location';
-import { resolveNearbyMerchantScope, type MerchantScope } from '../lib/merchantProducts';
 import { useMerchantOrders } from '../features/orders/hooks/useMerchantOrders';
 import type { MerchantOrderFilter, MerchantOrderStatus } from '../features/orders/types/order';
 
@@ -44,32 +43,12 @@ function formatDate(iso: string) {
 
 export default function OrdersScreen() {
   const { t } = useLanguage();
+  const { activeBranchScope, branchScopeError, retryBranchScope } = useAuth();
   const navigation = useNavigation<RootStackNav>();
   const insets = useSafeAreaInsets();
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<MerchantOrderFilter>('ALL');
-  const [merchantScope, setMerchantScope] = useState<MerchantScope | null>(null);
-  const [scopeError, setScopeError] = useState<string | null>(null);
-  const { orders, loading, error, reload } = useMerchantOrders(merchantScope?.branchId ?? null, activeFilter);
-
-  useEffect(() => {
-    let active = true;
-    void resolveCurrentCoordinates()
-      .then(resolveNearbyMerchantScope)
-      .then((scope) => {
-        if (!active) return;
-        setMerchantScope(scope);
-        setScopeError(null);
-      })
-      .catch((err: unknown) => {
-        if (!active) return;
-        setMerchantScope(null);
-        setScopeError(err instanceof Error ? err.message : 'merchant_products_branch_missing');
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
+  const { orders, loading, error, reload } = useMerchantOrders(activeBranchScope?.branchId ?? null, activeFilter);
 
   const filtered = useMemo(
     () =>
@@ -89,8 +68,8 @@ export default function OrdersScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>{t('orders_today_title')}</Text>
         <Text style={styles.subtitle}>
-          {merchantScope?.branchName
-            ? `${t('merchant_branch_scope')}: ${merchantScope.branchName}`
+          {activeBranchScope?.branchId
+            ? `${t('merchant_branch_scope_authorized')}: ${activeBranchScope.branchName ?? activeBranchScope.branchId}`
             : t('orders_today_subtitle')}
         </Text>
         <View style={styles.searchBar}>
@@ -130,12 +109,15 @@ export default function OrdersScreen() {
             <ActivityIndicator size="large" color={colors.primary} />
             <Text style={styles.emptyText}>{t('merchant_orders_loading')}</Text>
           </View>
-        ) : scopeError || error ? (
+        ) : branchScopeError || error ? (
           <View style={styles.empty}>
             <Ionicons name="alert-circle-outline" size={48} color={colors.error} />
             <Text style={styles.emptyTitle}>{t('merchant_orders_error_title')}</Text>
-            <Text style={styles.emptyText}>{t((scopeError ?? error ?? 'merchant_orders_error_body') as Parameters<typeof t>[0])}</Text>
-            <TouchableOpacity style={styles.retryBtn} onPress={() => void reload()}>
+            <Text style={styles.emptyText}>{t((branchScopeError ?? error ?? 'merchant_orders_error_body') as Parameters<typeof t>[0])}</Text>
+            <TouchableOpacity
+              style={styles.retryBtn}
+              onPress={() => void (branchScopeError ? retryBranchScope() : reload())}
+            >
               <Text style={styles.retryBtnText}>{t('retry')}</Text>
             </TouchableOpacity>
           </View>
