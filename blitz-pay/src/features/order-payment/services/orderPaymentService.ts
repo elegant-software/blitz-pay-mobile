@@ -4,19 +4,25 @@ import { observability } from '../../../lib/observability';
 import type { StripeParams } from '../../../services/stripe';
 import type { BraintreeCheckoutRequest, BraintreeCheckoutResponse } from '../../../types/braintree';
 import type {
+  AddOrderItemInput,
   CreateOrderInput,
+  ManualSettlementInput,
   OrderPaymentIntentContext,
-  RecentOrderSummary,
   OrderStatus,
   OrderSummary,
+  OverrideOrderLinePriceInput,
+  RecentOrderSummary,
+  UpdateOrderLineQuantityInput,
 } from '../types/orderPayment';
 
 interface RawOrderItemResponse {
+  lineId?: string;
   productId?: string;
   name?: string;
   quantity?: number;
   unitPriceMinor?: number;
   lineTotalMinor?: number;
+  priceSource?: string | null;
 }
 
 interface RawOrderResponse {
@@ -27,13 +33,19 @@ interface RawOrderResponse {
   branchName?: string | null;
   merchantLogoUrl?: string | null;
   status?: string;
+  checkoutIntent?: string | null;
+  paymentSource?: string | null;
   currency?: string;
   totalAmountMinor?: number;
   items?: RawOrderItemResponse[];
   createdAt?: string;
+  updatedAt?: string;
+  paymentRetryAllowed?: boolean | null;
   lastPaymentRequestId?: string | null;
   lastPaymentProvider?: string | null;
   paidAt?: string | null;
+  manualSettlementNote?: string | null;
+  lastUpdatedBy?: string | null;
   orderNumber?: string;
 }
 
@@ -50,6 +62,7 @@ function normalizeOrderStatus(status: unknown): OrderStatus {
   if (
     status === 'PENDING_PAYMENT' ||
     status === 'CREATED' ||
+    status === 'AWAITING_PAYMENT' ||
     status === 'PAYMENT_IN_PROGRESS' ||
     status === 'PAYMENT_INITIATED' ||
     status === 'PAID' ||
@@ -57,7 +70,7 @@ function normalizeOrderStatus(status: unknown): OrderStatus {
     status === 'FAILED' ||
     status === 'CANCELLED'
   ) {
-    if (status === 'CREATED') return 'PENDING_PAYMENT';
+    if (status === 'CREATED' || status === 'AWAITING_PAYMENT') return 'PENDING_PAYMENT';
     if (status === 'PAYMENT_INITIATED') return 'PAYMENT_IN_PROGRESS';
     if (status === 'FAILED') return 'PAYMENT_FAILED';
     return status;
@@ -65,39 +78,84 @@ function normalizeOrderStatus(status: unknown): OrderStatus {
   return 'PENDING_PAYMENT';
 }
 
+function normalizeCheckoutIntent(intent: unknown): 'PAY_NOW' | 'PAY_LATER' {
+  return intent === 'PAY_LATER' ? 'PAY_LATER' : 'PAY_NOW';
+}
+
+function normalizePaymentSource(source: unknown): 'APP_PAYMENT' | 'MANUAL_SETTLEMENT' | undefined {
+  if (source === 'MANUAL_SETTLEMENT') return 'MANUAL_SETTLEMENT';
+  if (source === 'APP_PAYMENT') return 'APP_PAYMENT';
+  return undefined;
+}
+
+function normalizePriceSource(source: unknown): 'CATALOG' | 'MERCHANT_OVERRIDE' {
+  return source === 'MERCHANT_OVERRIDE' ? 'MERCHANT_OVERRIDE' : 'CATALOG';
+}
+
+function normalizeBanner(raw: RawOrderResponse): OrderSummary['banner'] {
+  if (raw.lastUpdatedBy === 'MERCHANT') {
+    return {
+      actor: 'MERCHANT',
+      messageKey: 'order_updated_by_merchant',
+      updatedAt: raw.updatedAt ?? raw.createdAt ?? new Date().toISOString(),
+      visibleScope: 'ORDER_DETAIL_ONLY',
+    };
+  }
+  if (raw.lastUpdatedBy === 'SHOPPER' || raw.lastUpdatedBy === 'CUSTOMER') {
+    return {
+      actor: 'SHOPPER',
+      messageKey: 'order_updated_by_shopper',
+      updatedAt: raw.updatedAt ?? raw.createdAt ?? new Date().toISOString(),
+      visibleScope: 'ORDER_DETAIL_ONLY',
+    };
+  }
+  return undefined;
+}
+
 function parseOrder(payload: RawOrderResponse): OrderSummary {
   if (!payload.orderId || !payload.merchantId || !payload.currency) {
     throw new Error('order_invalid_response');
   }
 
+  const status = normalizeOrderStatus(payload.status);
   return {
     orderId: payload.orderId,
     merchantId: payload.merchantId,
+    merchantName: payload.merchantName ?? undefined,
     branchId: payload.branchId ?? undefined,
-    status: normalizeOrderStatus(payload.status),
+    branchName: payload.branchName ?? undefined,
+    merchantLogoUrl: payload.merchantLogoUrl ?? undefined,
+    checkoutIntent: normalizeCheckoutIntent(payload.checkoutIntent),
+    status,
+    paymentSource: normalizePaymentSource(payload.paymentSource),
     currency: payload.currency,
     totalAmountMinor: payload.totalAmountMinor ?? 0,
-    items: (payload.items ?? []).map((item) => ({
+    items: (payload.items ?? []).map((item, index) => ({
+      lineId: item.lineId ?? `${payload.orderId}-${item.productId ?? 'line'}-${index}`,
       productId: item.productId ?? '',
       name: item.name ?? '',
       quantity: item.quantity ?? 0,
       unitPriceMinor: item.unitPriceMinor ?? 0,
       lineTotalMinor: item.lineTotalMinor ?? 0,
+      priceSource: normalizePriceSource(item.priceSource),
     })),
     createdAt: payload.createdAt ?? new Date().toISOString(),
+    updatedAt: payload.updatedAt ?? payload.createdAt ?? new Date().toISOString(),
+    paymentRetryAllowed:
+      typeof payload.paymentRetryAllowed === 'boolean'
+        ? payload.paymentRetryAllowed
+        : status === 'PENDING_PAYMENT' || status === 'PAYMENT_FAILED',
     lastPaymentRequestId: payload.lastPaymentRequestId ?? undefined,
     lastPaymentProvider: payload.lastPaymentProvider ?? undefined,
     paidAt: payload.paidAt ?? undefined,
+    manualSettlementNote: payload.manualSettlementNote ?? undefined,
+    banner: normalizeBanner(payload),
   };
 }
 
 function parseRecentOrder(payload: RawOrderResponse): RecentOrderSummary {
-  const order = parseOrder(payload);
   return {
-    ...order,
-    merchantName: payload.merchantName ?? undefined,
-    branchName: payload.branchName ?? undefined,
-    merchantLogoUrl: payload.merchantLogoUrl ?? undefined,
+    ...parseOrder(payload),
   };
 }
 
@@ -120,10 +178,72 @@ async function readError(response: Response): Promise<string> {
   return `HTTP ${response.status}`;
 }
 
+async function mutateOrder(
+  orderId: string,
+  path: string,
+  method: 'POST' | 'PATCH' | 'DELETE',
+  body?: object,
+): Promise<OrderSummary> {
+  const response = await authedFetch(path, {
+    method,
+    headers: {
+      Accept: 'application/json',
+      ...(body ? { 'Content-Type': 'application/json' } : {}),
+    },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+
+  if (!response.ok) {
+    throw new Error(await readError(response));
+  }
+
+  const payload = (await response.json()) as RawOrderResponse;
+  const order = parseOrder(payload);
+  observability.info('order_mutation_succeeded', {
+    orderId,
+    path,
+    status: order.status,
+    itemCount: order.items.length,
+  });
+  return order;
+}
+
 export async function createOrder(input: CreateOrderInput): Promise<OrderSummary> {
-  observability.info('order_create_started', {
+  const requestBody = {
+    branchId: input.branchId,
+    orderType: input.orderType,
+    usesDeferredPayment: input.checkoutIntent === 'PAY_LATER',
+    items: input.items.map((item) => ({
+      lineId: item.lineId,
+      productId: item.productId,
+      quantity: item.quantity,
+      unitPriceMinor: item.unitPriceMinor,
+    })),
     paymentMethod: input.paymentMethod,
+  };
+
+  observability.info('order_create_started', {
+    checkoutIntent: input.checkoutIntent,
+    branchId: input.branchId,
+    orderType: input.orderType,
+    paymentMethod: input.paymentMethod ?? null,
     itemCount: input.items.length,
+  });
+  observability.info('order_create_request_payload', {
+    checkoutIntent: input.checkoutIntent,
+    branchId: requestBody.branchId,
+    orderType: requestBody.orderType,
+    usesDeferredPayment: requestBody.usesDeferredPayment,
+    paymentMethod: requestBody.paymentMethod ?? null,
+    itemCount: requestBody.items.length,
+    itemsJson: JSON.stringify(
+      requestBody.items.map((item) => ({
+        lineId: item.lineId ?? null,
+        productId: item.productId,
+        quantity: item.quantity,
+        unitPriceMinor: item.unitPriceMinor ?? null,
+      })),
+    ),
   });
 
   const response = await authedFetch('/v1/orders', {
@@ -132,19 +252,23 @@ export async function createOrder(input: CreateOrderInput): Promise<OrderSummary
       'Content-Type': 'application/json',
       Accept: 'application/json',
     },
-    body: JSON.stringify({
-      items: input.items.map((item) => ({
-        productId: item.productId,
-        quantity: item.quantity,
-      })),
-      paymentMethod: input.paymentMethod,
-    }),
+    body: JSON.stringify(requestBody),
   });
 
   if (!response.ok) {
     const message = await readError(response);
+    observability.error('order_create_response_failed', {
+      checkoutIntent: input.checkoutIntent,
+      paymentMethod: input.paymentMethod ?? null,
+      status: response.status,
+      message,
+      usesDeferredPayment: requestBody.usesDeferredPayment,
+      itemCount: requestBody.items.length,
+      requestBodyJson: JSON.stringify(requestBody),
+    });
     observability.warn('order_create_failed', {
-      paymentMethod: input.paymentMethod,
+      checkoutIntent: input.checkoutIntent,
+      paymentMethod: input.paymentMethod ?? null,
       status: response.status,
       message,
     });
@@ -152,6 +276,16 @@ export async function createOrder(input: CreateOrderInput): Promise<OrderSummary
   }
 
   const payload = (await response.json()) as RawOrderResponse;
+  observability.info('order_create_response_payload', {
+    orderId: payload.orderId ?? null,
+    merchantId: payload.merchantId ?? null,
+    branchId: payload.branchId ?? null,
+    status: payload.status ?? null,
+    checkoutIntent: payload.checkoutIntent ?? null,
+    paymentSource: payload.paymentSource ?? null,
+    hasPaymentRequestId: Boolean(payload.lastPaymentRequestId),
+    itemCount: payload.items?.length ?? 0,
+  });
   const order = parseOrder(payload);
 
   observability.info('order_create_succeeded', {
@@ -159,6 +293,7 @@ export async function createOrder(input: CreateOrderInput): Promise<OrderSummary
     merchantId: order.merchantId,
     branchId: order.branchId ?? null,
     status: order.status,
+    checkoutIntent: order.checkoutIntent,
     lastPaymentRequestId: order.lastPaymentRequestId ?? null,
   });
 
@@ -183,6 +318,8 @@ export async function fetchOrder(orderId: string): Promise<OrderSummary> {
   observability.info('order_fetch_succeeded', {
     orderId: order.orderId,
     status: order.status,
+    checkoutIntent: order.checkoutIntent,
+    paymentSource: order.paymentSource ?? null,
     lastPaymentRequestId: order.lastPaymentRequestId ?? null,
   });
   return order;
@@ -211,23 +348,74 @@ export async function fetchRecentOrders(): Promise<RecentOrderSummary[]> {
   const payload = (await response.json()) as RawOrderListResponse | RawOrderResponse[];
   const rows = Array.isArray(payload) ? payload : payload.orders ?? [];
   const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
-  observability.info('recent_orders_fetch_payload', {
-    shape: Array.isArray(payload) ? 'array' : 'object',
-    rowCount: rows.length,
-    sampleOrderIds: rows.slice(0, 5).map((row) => row.orderId ?? 'missing').join(','),
-    sampleStatuses: rows.slice(0, 5).map((row) => String(row.status ?? 'missing')).join(','),
-    sampleCreatedAt: rows.slice(0, 3).map((row) => row.createdAt ?? 'missing').join(','),
-  });
   const orders = rows
     .map(parseRecentOrder)
     .filter((order) => new Date(order.createdAt).getTime() >= cutoff)
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
 
   observability.info('recent_orders_fetch_succeeded', {
     count: orders.length,
     filteredOut: Math.max(0, rows.length - orders.length),
   });
   return orders;
+}
+
+export async function addOrderItem(orderId: string, input: AddOrderItemInput): Promise<OrderSummary> {
+  observability.info('order_add_item_started', { orderId, productId: input.productId, quantity: input.quantity });
+  return mutateOrder(orderId, `/v1/orders/${encodeURIComponent(orderId)}/items`, 'POST', input);
+}
+
+export async function updateOrderLineQuantity(
+  orderId: string,
+  input: UpdateOrderLineQuantityInput,
+): Promise<OrderSummary> {
+  observability.info('order_update_line_quantity_started', { orderId, lineId: input.lineId, quantity: input.quantity });
+  return mutateOrder(orderId, `/v1/orders/${encodeURIComponent(orderId)}/items/${encodeURIComponent(input.lineId)}`, 'PATCH', {
+    quantity: input.quantity,
+  });
+}
+
+export async function removeOrderLine(orderId: string, lineId: string): Promise<OrderSummary> {
+  observability.info('order_remove_line_started', { orderId, lineId });
+  return mutateOrder(
+    orderId,
+    `/v1/orders/${encodeURIComponent(orderId)}/items/${encodeURIComponent(lineId)}`,
+    'DELETE',
+  );
+}
+
+export async function cancelOrder(orderId: string): Promise<OrderSummary> {
+  observability.info('order_cancel_started', { orderId });
+  return mutateOrder(orderId, `/v1/orders/${encodeURIComponent(orderId)}/cancel`, 'POST');
+}
+
+export async function overrideOrderLinePrice(
+  orderId: string,
+  input: OverrideOrderLinePriceInput,
+): Promise<OrderSummary> {
+  observability.info('order_override_price_started', {
+    orderId,
+    lineId: input.lineId,
+    unitPriceMinor: input.unitPriceMinor,
+  });
+  return mutateOrder(
+    orderId,
+    `/v1/orders/${encodeURIComponent(orderId)}/items/${encodeURIComponent(input.lineId)}/price`,
+    'POST',
+    {
+      unitPriceMinor: input.unitPriceMinor,
+    },
+  );
+}
+
+export async function markOrderManuallyPaid(
+  orderId: string,
+  input: ManualSettlementInput,
+): Promise<OrderSummary> {
+  observability.info('order_manual_settlement_started', { orderId, hasNote: Boolean(input.note?.trim()) });
+  return mutateOrder(orderId, `/v1/orders/${encodeURIComponent(orderId)}/manual-settlement`, 'POST', {
+    note: input.note?.trim() || undefined,
+  });
 }
 
 export async function createStripeIntentForOrder(

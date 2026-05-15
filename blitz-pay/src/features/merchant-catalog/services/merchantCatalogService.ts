@@ -20,7 +20,15 @@ type BranchResponse = {
 
 type MerchantDetailsResponse = {
   logoUrl?: string;
+  delayedPaymentEnabled?: boolean;
+  deferredPaymentEnabled?: boolean;
+  offerings?: string[];
 };
+
+export interface MerchantDetails {
+  logoUrl?: string;
+  delayedPaymentEnabled?: boolean;
+}
 
 type ProductResponse = {
   productId?: string;
@@ -100,14 +108,25 @@ export async function fetchMerchantBranches(merchantId: string): Promise<Merchan
     }));
 }
 
-export async function fetchMerchantLogoUrl(merchantId: string): Promise<string | undefined> {
+export async function fetchMerchantDetails(merchantId: string): Promise<MerchantDetails> {
   try {
     const details = await fetchMerchantCommerceJson<MerchantDetailsResponse>(`/merchants/${merchantId}`);
-    return details.logoUrl ?? undefined;
+    return {
+      logoUrl: details.logoUrl ?? undefined,
+      delayedPaymentEnabled:
+        typeof details.delayedPaymentEnabled === 'boolean'
+          ? details.delayedPaymentEnabled
+          : typeof details.deferredPaymentEnabled === 'boolean'
+            ? details.deferredPaymentEnabled
+            : Array.isArray(details.offerings)
+              ? details.offerings.includes('DEFERRED_PAYMENT')
+              : undefined,
+    };
   } catch {
-    return undefined;
+    return {};
   }
 }
+
 
 export function resolveMerchantBranch(
   branches: MerchantBranch[],

@@ -4,7 +4,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import {
   fetchActiveProducts,
   fetchMerchantBranches,
-  fetchMerchantLogoUrl,
+  fetchMerchantDetails,
   resolveMerchantBranch,
 } from '../services/merchantCatalogService';
 import type { ActiveProduct, MerchantBranch } from '../types/catalog';
@@ -45,9 +45,9 @@ export function useMerchantCatalog(params: {
 
     setState((current) => ({ ...current, loading: true, errorKey: null }));
     try {
-      const [branches, merchantLogoUrl] = await Promise.all([
+      const [branches, merchantDetails] = await Promise.all([
         fetchMerchantBranches(merchantId),
-        fetchMerchantLogoUrl(merchantId),
+        fetchMerchantDetails(merchantId),
       ]);
       let coords: { latitude: number; longitude: number } | undefined;
       try {
@@ -68,24 +68,28 @@ export function useMerchantCatalog(params: {
           loading: false,
           errorKey: 'merchant_branch_unavailable',
           branch: null,
-          merchantLogoUrl,
+          merchantLogoUrl: merchantDetails.logoUrl,
           products: [],
         });
         return;
       }
 
       const products = await fetchActiveProducts(merchantId, branch.branchId);
+      const branchWithMerchantPolicy = {
+        ...branch,
+        delayedPaymentEnabled: merchantDetails.delayedPaymentEnabled,
+      };
       setBasketMerchantContext({
         merchantId,
         merchantName: merchantName ?? 'Merchant',
-        branchId: branch.branchId,
-        branchName: branch.name,
+        branchId: branchWithMerchantPolicy.branchId,
+        branchName: branchWithMerchantPolicy.name,
       });
       setState({
         loading: false,
         errorKey: null,
-        branch,
-        merchantLogoUrl,
+        branch: branchWithMerchantPolicy,
+        merchantLogoUrl: merchantDetails.logoUrl,
         products,
       });
     } catch {

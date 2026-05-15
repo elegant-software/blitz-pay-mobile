@@ -19,7 +19,7 @@ import { config } from '../lib/config';
 import { colors, spacing, radius } from '../lib/theme';
 import type { RootStackNav, RootStackParamList } from '../types';
 import { useOrderPayment } from '../features/order-payment/hooks/useOrderPayment';
-import type { CheckoutPaymentMethod } from '../features/order-payment/types/orderPayment';
+import type { CheckoutIntent, CheckoutPaymentMethod } from '../features/order-payment/types/orderPayment';
 import { isMethodAvailable } from '../features/order-payment/types/orderPayment';
 
 function resolveImageUri(uri?: string): string | undefined {
@@ -65,7 +65,11 @@ export default function CheckoutScreen() {
   const basketItemCount = route.params?.basketItemCount ?? route.params?.basketItems?.length ?? 0;
   const basketItems = route.params?.basketItems ?? [];
   const invoiceId = route.params?.invoiceId;
+  const delayedPaymentEnabled = route.params?.delayedPaymentEnabled ?? false;
 
+  const [selectedIntent, setSelectedIntent] = useState<CheckoutIntent>(
+    delayedPaymentEnabled ? 'PAY_LATER' : 'PAY_NOW',
+  );
   const [selectedMethod, setSelectedMethod] = useState<CheckoutPaymentMethod | null>(null);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState('');
@@ -101,6 +105,7 @@ export default function CheckoutScreen() {
 
     observability.info('checkout_confirm_started', {
       method: selectedMethod ?? null,
+      checkoutIntent: selectedIntent,
       amount,
       merchantName,
       merchantId: merchantId ?? null,
@@ -125,6 +130,7 @@ export default function CheckoutScreen() {
         basketItems,
         invoiceId,
         user,
+        selectedIntent,
         selectedMethod,
         availableChannels: activePaymentChannels,
         navigation,
@@ -132,6 +138,7 @@ export default function CheckoutScreen() {
 
       observability.info('checkout_confirm_succeeded', {
         method: selectedMethod ?? null,
+        checkoutIntent: selectedIntent,
         amount,
         merchantId: merchantId ?? null,
         branchId: branchId ?? null,
@@ -162,6 +169,7 @@ export default function CheckoutScreen() {
           basketSummary: basketSummary ?? null,
           invoiceId: invoiceId ?? null,
           reasonKey: key,
+          checkoutIntent: selectedIntent,
           message: rawMessage,
         },
         err instanceof Error ? err : undefined,
@@ -253,14 +261,50 @@ export default function CheckoutScreen() {
         </View>
 
         <View style={styles.section}>
+          {delayedPaymentEnabled ? (
+            <>
+              <Text style={styles.sectionTitle}>{t('checkout_timing_title')}</Text>
+              <Text style={styles.sectionSubtitle}>{t('checkout_timing_subtitle')}</Text>
+              <View style={styles.intentGrid}>
+                <TouchableOpacity
+                  style={[styles.intentCard, selectedIntent === 'PAY_LATER' && styles.intentCardSelected]}
+                  onPress={() => setSelectedIntent('PAY_LATER')}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="time-outline" size={18} color={colors.onSurface} />
+                  <Text style={styles.intentTitle}>{t('checkout_intent_pay_later')}</Text>
+                  <Text style={styles.intentBody}>{t('checkout_intent_pay_later_hint')}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.intentCard, selectedIntent === 'PAY_NOW' && styles.intentCardSelected]}
+                  onPress={() => setSelectedIntent('PAY_NOW')}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="flash-outline" size={18} color={colors.onSurface} />
+                  <Text style={styles.intentTitle}>{t('checkout_intent_pay_now')}</Text>
+                  <Text style={styles.intentBody}>{t('checkout_intent_pay_now_hint')}</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          ) : null}
+        </View>
+
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t('payment_method')}</Text>
-          {methods.length === 0 ? (
+          {selectedIntent === 'PAY_LATER' ? (
+            <View style={styles.infoBox}>
+              <Ionicons name="wallet-outline" size={16} color={colors.primary} />
+              <Text style={styles.infoText}>{t('checkout_intent_pay_later_hint')}</Text>
+            </View>
+          ) : methods.length === 0 ? (
             <View style={styles.errorBox}>
               <Ionicons name="alert-circle-outline" size={16} color={colors.error} />
               <Text style={styles.errorText}>{t('payment_option_unavailable')}</Text>
             </View>
           ) : null}
-          {methods.map((method) => (
+          {selectedIntent === 'PAY_LATER'
+            ? null
+            : methods.map((method) => (
             <TouchableOpacity
               key={method.key}
               style={[styles.methodRow, selectedMethod === method.key && styles.methodRowSelected]}
@@ -284,7 +328,7 @@ export default function CheckoutScreen() {
                 {selectedMethod === method.key && <View style={styles.radioDot} />}
               </View>
             </TouchableOpacity>
-          ))}
+            ))}
         </View>
 
         {error ? (
@@ -308,9 +352,12 @@ export default function CheckoutScreen() {
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 12 }]}>
         <Text style={styles.authorizedBy}>{t('authorized_by')}</Text>
         <TouchableOpacity
-          style={[styles.confirmBtn, processing && styles.confirmBtnDisabled]}
+          style={[
+            styles.confirmBtn,
+            (processing || (selectedIntent === 'PAY_NOW' && !selectedMethod)) && styles.confirmBtnDisabled,
+          ]}
           onPress={handleConfirm}
-          disabled={processing}
+          disabled={processing || (selectedIntent === 'PAY_NOW' && !selectedMethod)}
           activeOpacity={0.85}
         >
           {processing ? (
@@ -319,7 +366,9 @@ export default function CheckoutScreen() {
             <>
               <Ionicons name="flash" size={18} color={colors.black} />
               <Text style={styles.confirmBtnText}>
-                {(selectedMethod === 'bank' ? t('pay_with_truelayer') : t('confirm_payment'))} · €{amount.toFixed(2)}
+                {selectedIntent === 'PAY_LATER'
+                  ? `${t('checkout_intent_pay_later')} · €${amount.toFixed(2)}`
+                  : `${selectedMethod === 'bank' ? t('pay_with_truelayer') : t('confirm_payment')} · €${amount.toFixed(2)}`}
               </Text>
             </>
           )}
@@ -417,6 +466,21 @@ const styles = StyleSheet.create({
   },
   section: { paddingHorizontal: spacing.md, marginBottom: spacing.md },
   sectionTitle: { fontSize: 15, fontWeight: '700', color: colors.onSurface, marginBottom: spacing.sm },
+  sectionSubtitle: { fontSize: 13, color: colors.gray600, marginBottom: spacing.sm },
+  intentGrid: { gap: spacing.sm },
+  intentCard: {
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.gray200,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+  },
+  intentCardSelected: {
+    borderColor: colors.primary,
+    backgroundColor: `${colors.primary}10`,
+  },
+  intentTitle: { marginTop: spacing.xs, fontSize: 15, fontWeight: '700', color: colors.onSurface },
+  intentBody: { marginTop: 4, fontSize: 13, color: colors.gray600 },
   methodRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -493,6 +557,15 @@ const styles = StyleSheet.create({
     color: colors.error,
     lineHeight: 18,
   },
+  infoBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radius.xl,
+    backgroundColor: `${colors.primary}10`,
+  },
+  infoText: { flex: 1, fontSize: 13, color: colors.onSurface, lineHeight: 18 },
   bottomBar: {
     padding: spacing.md,
     backgroundColor: colors.background,

@@ -10,6 +10,7 @@ export interface MerchantBranch {
   longitude?: number;
   distanceMeters?: number;
   activePaymentChannels: PaymentChannel[];
+  delayedPaymentEnabled?: boolean;
   imageUrl?: string;
 }
 
