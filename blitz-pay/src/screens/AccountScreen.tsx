@@ -127,9 +127,7 @@ export default function AccountScreen() {
           label: t('geofence_enabled'),
           onPress: needsSettingsForBackground ? openSettings : undefined,
           showArrow: needsSettingsForBackground,
-          right: needsSettingsForBackground ? (
-            <Text style={{ fontSize: 12, color: colors.primary }}>Open Settings</Text>
-          ) : (
+          right: (
             <Switch
               value={isMonitoring}
               onValueChange={handleGeofenceToggle}

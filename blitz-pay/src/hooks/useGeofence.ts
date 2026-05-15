@@ -25,6 +25,13 @@ export function useGeofence() {
 
   useEffect(() => {
     (async () => {
+      try {
+        const background = await Location.getBackgroundPermissionsAsync();
+        setPermissionStatus(background.status);
+      } catch {
+        // ignore permission lookup failures during boot
+      }
+
       const raw = await storage.getItem(CONFIG_KEY);
       if (raw) {
         const saved = JSON.parse(raw) as GeofenceConfig;
@@ -78,6 +85,7 @@ export function useGeofence() {
         return 'background_denied';
       }
       if (msg === 'foreground_permission_denied') {
+        setPermissionStatus(Location.PermissionStatus.DENIED);
         return 'foreground_denied';
       }
       return 'error';
