@@ -151,10 +151,14 @@ export function AuthProvider({ children, onSessionExpired }: AuthProviderProps) 
   const initStarted = useRef(false);
 
   const clearSessionState = React.useCallback(async () => {
-    await storage.deleteItem(SESSION_KEY);
     setAuthenticated(false);
     setToken(null);
     setUser(null);
+    try {
+      await storage.deleteItem(SESSION_KEY);
+    } catch {
+      // non-fatal; in-memory auth state is already cleared
+    }
     onSessionExpired?.();
   }, [onSessionExpired]);
 
