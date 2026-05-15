@@ -51,6 +51,9 @@ Three similar lines beat a premature abstraction. No framework-ish helpers, feat
 ### IX. App Targeting Must Follow Product Intent
 Changes must be applied to the product that matches the business domain named in the request. Merchant-facing features, fixes, and catalog/admin workflows belong in `blitz-pay-merchant/`. Consumer-facing discovery, checkout, payment, and shopper flows belong in `blitz-pay/`. If the target app is ambiguous, stop and confirm before editing code.
 
+### X. Payment Method Visibility Must Follow Merchant Capability
+Whenever `blitz-pay/` shows payment-method selection or payment-method labels for a merchant checkout or order-payment flow, the UI MUST only show payment methods that are allowed for that merchant context. Do not render disabled placeholders or generic methods that the merchant does not support. Merchant capability is the source of truth for shopper-visible payment methods.
+
 ## Security & Compliance Requirements
 
 - Tokens: access token in `sessionStorage` (web) / `expo-secure-store` (mobile). Never in plain `localStorage`, never in a log line, never in a query string.
