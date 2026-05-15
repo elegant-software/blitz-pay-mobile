@@ -13,9 +13,10 @@ import { useMerchantOrders } from '../features/orders/hooks/useMerchantOrders';
 import type { MerchantOrderFilter, MerchantOrderStatus } from '../features/orders/types/order';
 
 const STATUS_COLORS: Record<MerchantOrderStatus, string> = {
-  pending: colors.warning,
-  processing: colors.primary,
-  completed: colors.success,
+  awaiting_payment: colors.warning,
+  payment_in_progress: colors.primary,
+  payment_failed: colors.error,
+  paid: colors.success,
   cancelled: colors.error,
 };
 
@@ -56,7 +57,7 @@ export default function OrdersScreen() {
         if (!search) return true;
         const q = search.toLowerCase();
         return (
-          order.orderNumber.toLowerCase().includes(q) ||
+          order.orderId.toLowerCase().includes(q) ||
           (order.customerName ?? '').toLowerCase().includes(q)
         );
       }),
@@ -136,12 +137,12 @@ export default function OrdersScreen() {
           >
             <View style={styles.orderTop}>
               <View>
-                <Text style={styles.orderNum}>{t('order_number')}{order.orderNumber}</Text>
+                <Text style={styles.orderNum}>{t('order_number')}{order.orderId}</Text>
                 <Text style={styles.orderDate}>{formatDate(order.createdAt)}</Text>
               </View>
               <View style={[styles.statusPill, { backgroundColor: `${STATUS_COLORS[order.status]}15` }]}>
                 <Text style={[styles.statusText, { color: STATUS_COLORS[order.status] }]}>
-                  {t(`status_${order.status}` as Parameters<typeof t>[0])}
+                  {t(`merchant_status_${order.status}` as Parameters<typeof t>[0])}
                 </Text>
               </View>
             </View>

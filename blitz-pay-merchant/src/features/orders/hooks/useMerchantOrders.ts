@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import { fetchMerchantOrders } from '../services/orderService';
 import type { MerchantOrderFilter, MerchantOrderSummary } from '../types/order';
 
@@ -22,8 +23,10 @@ export function useMerchantOrders(branchId: string | null, filter: MerchantOrder
         filter === 'ALL'
           ? allOrders
           : allOrders.filter((order) => {
-              if (filter === 'PROCESSING') return order.status === 'pending' || order.status === 'processing';
-              if (filter === 'COMPLETED') return order.status === 'completed';
+              if (filter === 'PROCESSING') {
+                return order.status === 'awaiting_payment' || order.status === 'payment_in_progress' || order.status === 'payment_failed';
+              }
+              if (filter === 'COMPLETED') return order.status === 'paid';
               return order.status === 'cancelled';
             }),
       );
@@ -37,6 +40,19 @@ export function useMerchantOrders(branchId: string | null, filter: MerchantOrder
   useEffect(() => {
     void reload();
   }, [reload]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void reload();
+      const interval = setInterval(() => {
+        void reload();
+      }, 5000);
+
+      return () => {
+        clearInterval(interval);
+      };
+    }, [reload]),
+  );
 
   return { orders, loading, error, reload };
 }
