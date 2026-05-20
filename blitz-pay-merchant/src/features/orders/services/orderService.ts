@@ -143,7 +143,18 @@ async function mutateOrder(
   });
 
   if (!response.ok) {
-    throw new Error(await readError(response));
+    const reason = await readError(response);
+    observability.error('merchant_order_mutation_failed', {
+      orderId,
+      path,
+      method,
+      status: response.status,
+      reason,
+    });
+    if (path.endsWith('/manual-settlement') && response.status === 404) {
+      throw new Error('merchant_manual_settlement_unavailable');
+    }
+    throw new Error('merchant_order_mutation_failed');
   }
 
   const payload = (await response.json()) as RawOrder;
@@ -295,8 +306,16 @@ export async function markMerchantOrderManuallyPaid(
   orderId: string,
   input: MerchantManualSettlementInput,
 ): Promise<MerchantOrderDetail> {
-  observability.info('merchant_order_manual_settlement_started', { orderId, hasNote: Boolean(input.note?.trim()) });
-  return mutateOrder(orderId, `/v1/orders/${encodeURIComponent(orderId)}/manual-settlement`, 'POST', {
-    note: input.note?.trim() || undefined,
+  const path = `/v1/merchant/orders/${encodeURIComponent(orderId)}/settle`;
+  const trimmedNote = input.note?.trim();
+  observability.info('merchant_order_manual_settlement_started', {
+    orderId,
+    path,
+    method: 'POST',
+    hasNote: Boolean(trimmedNote),
+    noteLength: trimmedNote?.length ?? 0,
+  });
+  return mutateOrder(orderId, path, 'POST', {
+    note: trimmedNote || undefined,
   });
 }

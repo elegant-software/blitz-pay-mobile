@@ -31,7 +31,7 @@ export default function OrderDetailScreen() {
   const navigation = useNavigation();
   const route = useRoute<RouteProps>();
   const insets = useSafeAreaInsets();
-  const { order, loading, error, mutating, cancelOrder, markManuallyPaid } = useMerchantOrderDetail(
+  const { order, loading, error, mutationError, mutating, cancelOrder, markManuallyPaid } = useMerchantOrderDetail(
     route.params.orderId,
     activeBranchScope,
   );
@@ -100,6 +100,12 @@ export default function OrderDetailScreen() {
               <View style={styles.banner}>
                 <Ionicons name="refresh-outline" size={16} color={colors.primary} />
                 <Text style={styles.bannerText}>{t(order.banner.messageKey)}</Text>
+              </View>
+            ) : null}
+            {mutationError ? (
+              <View style={styles.errorBanner}>
+                <Ionicons name="alert-circle-outline" size={16} color={colors.error} />
+                <Text style={styles.errorBannerText}>{t(mutationError as Parameters<typeof t>[0])}</Text>
               </View>
             ) : null}
           </View>
@@ -180,6 +186,16 @@ const styles = StyleSheet.create({
     backgroundColor: `${colors.primary}10`,
   },
   bannerText: { flex: 1, fontSize: 13, color: colors.onSurface },
+  errorBanner: {
+    marginTop: spacing.md,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    alignItems: 'center',
+    borderRadius: radius.lg,
+    padding: spacing.sm,
+    backgroundColor: `${colors.error}10`,
+  },
+  errorBannerText: { flex: 1, fontSize: 13, color: colors.onSurface },
   section: { paddingHorizontal: spacing.md },
   sectionTitle: { fontSize: 17, fontWeight: '700', color: colors.onSurface, marginBottom: spacing.sm },
   itemsCard: {

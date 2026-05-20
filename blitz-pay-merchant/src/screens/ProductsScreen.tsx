@@ -1,18 +1,14 @@
-import React, { useCallback, useState } from 'react';
+import React from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../lib/auth';
 import { useLanguage } from '../lib/LanguageContext';
-import { observability } from '../lib/observability';
 import { colors, spacing, radius, shadow } from '../lib/theme';
-import {
-  fetchBranchProducts,
-  MerchantProductError,
-} from '../lib/merchantProducts';
+import { useMerchantProducts } from '../features/products/hooks/useMerchantProducts';
 import type { RootStackNav, Product } from '../types';
 
 function formatCurrency(amount: number) {
@@ -42,42 +38,7 @@ export default function ProductsScreen() {
   const { activeBranchScope, branchScopeError, retryBranchScope } = useAuth();
   const navigation = useNavigation<RootStackNav>();
   const insets = useSafeAreaInsets();
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [errorKey, setErrorKey] = useState<string | null>(null);
-
-  const loadProducts = useCallback(async () => {
-    if (!activeBranchScope) {
-      setProducts([]);
-      setErrorKey(branchScopeError ?? 'merchant_products_branch_missing');
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-    setErrorKey(null);
-
-    try {
-      const branchProducts = await fetchBranchProducts(activeBranchScope.merchantId, activeBranchScope.branchId);
-      setProducts(branchProducts);
-      setLoading(false);
-    } catch (error) {
-      observability.warn('merchant_products_branch_resolution_failed', {
-        merchantId: activeBranchScope.merchantId,
-        branchId: activeBranchScope.branchId,
-        reason: error instanceof Error ? error.message : 'unknown_error',
-      });
-      setProducts([]);
-      setErrorKey(error instanceof MerchantProductError ? error.key : 'merchant_products_load_failed');
-      setLoading(false);
-    }
-  }, [activeBranchScope, branchScopeError]);
-
-  useFocusEffect(
-    useCallback(() => {
-      void loadProducts();
-    }, [loadProducts]),
-  );
+  const { products, loading, refreshing, errorKey, reload } = useMerchantProducts(activeBranchScope, branchScopeError);
 
   const groups = groupByCategory(products, t('product_uncategorized'));
 
@@ -86,12 +47,15 @@ export default function ProductsScreen() {
       <View style={styles.header}>
         <View>
           <Text style={styles.title}>{t('products')}</Text>
-          <Text style={styles.subtitle}>
-            {activeBranchScope?.branchId
-              ? `${t('merchant_branch_scope_authorized')}: ${activeBranchScope.branchName ?? activeBranchScope.branchId}`
-              : t('merchant_branch_scope_pending')}
-          </Text>
+          {activeBranchScope?.merchantName || activeBranchScope?.branchName ? (
+            <Text style={styles.subtitle}>
+              {[activeBranchScope.merchantName, activeBranchScope.branchName].filter(Boolean).join(' · ')}
+            </Text>
+          ) : (
+            <Text style={styles.subtitle}>{t('merchant_branch_scope_pending')}</Text>
+          )}
         </View>
+        {refreshing ? <ActivityIndicator color={colors.primary} style={styles.refreshIndicator} /> : null}
         <TouchableOpacity
           style={[styles.addBtn, !activeBranchScope?.branchId && styles.addBtnDisabled]}
           onPress={() => activeBranchScope?.branchId && navigation.navigate('ProductEdit', { mode: 'create' })}
@@ -117,7 +81,7 @@ export default function ProductsScreen() {
             <Text style={styles.stateTitle}>{t(errorKey as Parameters<typeof t>[0])}</Text>
             <TouchableOpacity
               style={styles.retryBtn}
-              onPress={() => void (branchScopeError ? retryBranchScope() : loadProducts())}
+              onPress={() => void (branchScopeError ? retryBranchScope() : reload())}
             >
               <Text style={styles.retryBtnText}>{t('retry')}</Text>
             </TouchableOpacity>
@@ -174,6 +138,7 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 24, fontWeight: '800', color: colors.onSurface },
   subtitle: { marginTop: 2, fontSize: 12, color: colors.gray600 },
+  refreshIndicator: { marginLeft: 'auto', marginRight: spacing.sm },
   addBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     backgroundColor: colors.primary, borderRadius: radius.full,

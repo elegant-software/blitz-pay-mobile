@@ -4,6 +4,10 @@ import type { Product } from '../types';
 
 const API_VERSION = 'v1';
 
+type MerchantDetailResponse = {
+  legalBusinessName?: string;
+};
+
 type MerchantBranchResponse = {
   id?: string;
   merchantId?: string;
@@ -225,6 +229,19 @@ export async function fetchMerchantBranches(merchantId: string): Promise<Merchan
       latitude: ensureNumber(branch.latitude),
       longitude: ensureNumber(branch.longitude),
     }));
+}
+
+export async function fetchMerchantName(merchantId: string): Promise<string | null> {
+  try {
+    const response = await requestJson<MerchantDetailResponse>(
+      `/merchants/${merchantId}`,
+      { method: 'GET' },
+      { event: 'fetch_merchant_name', merchantId, failureKey: 'merchant_products_load_failed' },
+    );
+    return response.legalBusinessName ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export function resolveMerchantBranch(
