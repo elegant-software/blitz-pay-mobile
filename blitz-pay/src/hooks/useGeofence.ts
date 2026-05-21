@@ -4,7 +4,7 @@ import * as TaskManager from 'expo-task-manager';
 import { Linking } from 'react-native';
 import { storage } from '../lib/storage';
 import { startGeofencing, stopGeofencing, startPolling, stopPolling } from '../services/geofence';
-import { GEOFENCE_POLL_TASK } from '../lib/geofenceConstants';
+import { GEOFENCE_TASK, GEOFENCE_POLL_TASK } from '../lib/geofenceConstants';
 import type { GeofenceConfig } from '../types/geofence';
 
 const CONFIG_KEY = 'geofence_config';
@@ -57,8 +57,12 @@ export function useGeofence() {
           }
         }
       }
-      // Sync isPolling with actual task state in case of stale config
-      const polling = await TaskManager.isTaskRegisteredAsync(GEOFENCE_POLL_TASK);
+      // Sync both flags with actual task state in case of stale config
+      const [monitoring, polling] = await Promise.all([
+        Location.hasStartedGeofencingAsync(GEOFENCE_TASK),
+        TaskManager.isTaskRegisteredAsync(GEOFENCE_POLL_TASK),
+      ]);
+      setIsMonitoring(monitoring);
       setIsPolling(polling);
     })();
   }, []);
