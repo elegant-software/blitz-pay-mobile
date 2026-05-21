@@ -3,20 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { useFocusEffect } from '@react-navigation/native';
 import { fetchMerchantOrders } from '../services/orderService';
 import { QUERY_KEYS, STALE_TIMES } from '../../../lib/queryClient';
-import type { MerchantOrderFilter, MerchantOrderSummary } from '../types/order';
 
-function applyFilter(orders: MerchantOrderSummary[], filter: MerchantOrderFilter): MerchantOrderSummary[] {
-  if (filter === 'ALL') return orders;
-  return orders.filter((order) => {
-    if (filter === 'PROCESSING') {
-      return order.status === 'awaiting_payment' || order.status === 'payment_in_progress' || order.status === 'payment_failed';
-    }
-    if (filter === 'COMPLETED') return order.status === 'paid';
-    return order.status === 'cancelled';
-  });
-}
-
-export function useMerchantOrders(branchId: string | null, filter: MerchantOrderFilter) {
+export function useMerchantOrders(branchId: string | null) {
   const { data, isLoading, error, refetch, isStale } = useQuery({
     queryKey: QUERY_KEYS.ordersList(branchId),
     queryFn: () => fetchMerchantOrders(branchId!),
@@ -37,7 +25,7 @@ export function useMerchantOrders(branchId: string | null, filter: MerchantOrder
       : null;
 
   return {
-    orders: applyFilter(data ?? [], filter),
+    orders: data ?? [],
     loading: isLoading,
     error: errorKey,
     reload: refetch,

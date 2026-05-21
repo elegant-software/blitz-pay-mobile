@@ -24,7 +24,6 @@ export interface MerchantOrderSummary {
   orderId: string;
   merchantId: string;
   branchId?: string;
-  customerName?: string;
   amountMinor: number;
   currency: string;
   status: MerchantOrderStatus;
@@ -32,6 +31,7 @@ export interface MerchantOrderSummary {
   paymentSource?: MerchantPaymentSource;
   createdAt: string;
   updatedAt: string;
+  itemCount?: number;
 }
 
 export interface MerchantOrderDetail extends MerchantOrderSummary {

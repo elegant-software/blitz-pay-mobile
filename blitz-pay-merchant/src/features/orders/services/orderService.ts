@@ -26,8 +26,6 @@ interface RawOrder {
   orderId?: string;
   merchantId?: string;
   branchId?: string | null;
-  customerDisplayName?: string | null;
-  customerName?: string | null;
   totalAmountMinor?: number;
   currency?: string;
   status?: string;
@@ -76,11 +74,12 @@ function parseSummary(raw: RawOrder): MerchantOrderSummary {
     throw new Error('merchant_orders_invalid_response');
   }
 
+  const itemCount = raw.items?.reduce((sum, item) => sum + Math.max(0, item.quantity ?? 0), 0);
+
   return {
     orderId: raw.orderId,
     merchantId: raw.merchantId,
     branchId: raw.branchId ?? undefined,
-    customerName: raw.customerDisplayName ?? raw.customerName ?? undefined,
     amountMinor: raw.totalAmountMinor ?? 0,
     currency: raw.currency,
     status: mapStatus(raw.status),
@@ -88,6 +87,7 @@ function parseSummary(raw: RawOrder): MerchantOrderSummary {
     paymentSource: mapPaymentSource(raw.paymentSource),
     createdAt: raw.createdAt,
     updatedAt: raw.updatedAt ?? raw.createdAt,
+    itemCount: itemCount && itemCount > 0 ? itemCount : undefined,
   };
 }
 
@@ -151,7 +151,7 @@ async function mutateOrder(
       status: response.status,
       reason,
     });
-    if (path.endsWith('/manual-settlement') && response.status === 404) {
+    if (path.endsWith('/settle') && response.status === 404) {
       throw new Error('merchant_manual_settlement_unavailable');
     }
     throw new Error('merchant_order_mutation_failed');

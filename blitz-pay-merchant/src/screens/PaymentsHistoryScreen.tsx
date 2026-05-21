@@ -24,10 +24,10 @@ const STATUS_COLORS: Record<PaymentRecord['status'], string> = {
 };
 
 const MOCK_PAYMENTS: PaymentRecord[] = [
-  { id: 'p1', orderId: '2', amount: 245.0, currency: 'EUR', method: 'bank_transfer', status: 'succeeded', createdAt: new Date(Date.now() - 3600000).toISOString(), customerName: 'Thomas Weber' },
-  { id: 'p2', orderId: '4', amount: 312.0, currency: 'EUR', method: 'card', status: 'succeeded', createdAt: new Date(Date.now() - 86400000).toISOString(), customerName: 'Marco Rossi' },
-  { id: 'p3', amount: 45.0, currency: 'EUR', method: 'qr', status: 'succeeded', createdAt: new Date(Date.now() - 172800000).toISOString(), customerName: 'Walk-in Customer' },
-  { id: 'p4', orderId: '5', amount: 78.0, currency: 'EUR', method: 'card', status: 'refunded', createdAt: new Date(Date.now() - 259200000).toISOString(), customerName: 'Julia Braun' },
+  { id: 'p1', orderId: '2', amount: 245.0, currency: 'EUR', method: 'bank_transfer', status: 'succeeded', createdAt: new Date(Date.now() - 3600000).toISOString() },
+  { id: 'p2', orderId: '4', amount: 312.0, currency: 'EUR', method: 'card', status: 'succeeded', createdAt: new Date(Date.now() - 86400000).toISOString() },
+  { id: 'p3', amount: 45.0, currency: 'EUR', method: 'qr', status: 'succeeded', createdAt: new Date(Date.now() - 172800000).toISOString() },
+  { id: 'p4', orderId: '5', amount: 78.0, currency: 'EUR', method: 'card', status: 'refunded', createdAt: new Date(Date.now() - 259200000).toISOString() },
 ];
 
 function formatCurrency(amount: number, currency = 'EUR') {
@@ -68,7 +68,7 @@ export default function PaymentsHistoryScreen() {
               <Ionicons name={METHOD_ICONS[payment.method]} size={20} color={STATUS_COLORS[payment.status]} />
             </View>
             <View style={styles.paymentInfo}>
-              <Text style={styles.paymentCustomer}>{payment.customerName ?? '—'}</Text>
+              <Text style={styles.paymentOrderId}>{payment.orderId ? `Order #${payment.orderId}` : payment.id.toUpperCase()}</Text>
               <Text style={styles.paymentDate}>{formatDate(payment.createdAt)}</Text>
               <Text style={styles.paymentMethod}>via {payment.method.replace('_', ' ')}</Text>
             </View>
@@ -111,7 +111,7 @@ const styles = StyleSheet.create({
   },
   methodIcon: { width: 44, height: 44, borderRadius: radius.md, justifyContent: 'center', alignItems: 'center' },
   paymentInfo: { flex: 1 },
-  paymentCustomer: { fontSize: 15, fontWeight: '600', color: colors.onSurface },
+  paymentOrderId: { fontSize: 15, fontWeight: '600', color: colors.onSurface },
   paymentDate: { fontSize: 12, color: colors.gray500, marginTop: 1 },
   paymentMethod: { fontSize: 11, color: colors.gray400, marginTop: 1, textTransform: 'capitalize' },
   paymentRight: { alignItems: 'flex-end', gap: 4 },

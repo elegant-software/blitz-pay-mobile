@@ -10,7 +10,6 @@ export type RootStackParamList = {
     orderNumber?: string;
     amount?: number;
     currency?: string;
-    customerName?: string;
     status?: OrderStatus;
   };
   ProductEdit: {
@@ -37,7 +36,6 @@ export type OrderStatus = 'pending' | 'processing' | 'completed' | 'cancelled' |
 export interface Order {
   id: string;
   orderNumber: string;
-  customerName: string;
   amount: number;
   currency: string;
   status: OrderStatus;
@@ -73,7 +71,6 @@ export interface PaymentRecord {
   method: 'bank_transfer' | 'card' | 'paypal' | 'qr';
   status: 'succeeded' | 'pending' | 'failed' | 'refunded';
   createdAt: string;
-  customerName?: string;
 }
 
 export type RootStackNav = NativeStackNavigationProp<RootStackParamList>;

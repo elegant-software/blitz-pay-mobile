@@ -9,6 +9,7 @@ import { useLanguage } from '../lib/LanguageContext';
 import { useAuth } from '../lib/auth';
 import { colors, spacing, radius, shadow } from '../lib/theme';
 import type { RootStackParamList } from '../types';
+import { getMerchantOrderStatusIcon, getMerchantOrderStatusLabelKey } from '../features/orders/orderPresentation';
 import { useMerchantOrderDetail } from '../features/orders/hooks/useMerchantOrderDetail';
 
 type RouteProps = RouteProp<RootStackParamList, 'OrderDetail'>;
@@ -66,18 +67,19 @@ export default function OrderDetailScreen() {
                 <Text style={styles.orderId}>ID: {order.orderId}</Text>
               </View>
               <View style={[styles.statusPill, { backgroundColor: `${STATUS_COLORS[order.status]}15` }]}>
+                <Ionicons
+                  name={getMerchantOrderStatusIcon(order.status) as React.ComponentProps<typeof Ionicons>['name']}
+                  size={14}
+                  color={STATUS_COLORS[order.status]}
+                />
                 <Text style={[styles.statusText, { color: STATUS_COLORS[order.status] }]}>
-                  {t(`merchant_status_${order.status}` as Parameters<typeof t>[0])}
+                  {t(getMerchantOrderStatusLabelKey(order.status))}
                 </Text>
               </View>
             </View>
 
             <View style={styles.divider} />
 
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>{t('customer')}</Text>
-              <Text style={styles.detailValue}>{order.customerName ?? t('customer_unknown')}</Text>
-            </View>
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>{t('order_total')}</Text>
               <Text style={[styles.detailValue, styles.amountText]}>
@@ -86,7 +88,11 @@ export default function OrderDetailScreen() {
             </View>
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>{t('merchant_checkout_intent_label')}</Text>
-              <Text style={styles.detailValue}>{order.checkoutIntent}</Text>
+              <Text style={styles.detailValue}>
+                {order.checkoutIntent === 'PAY_LATER'
+                  ? t('merchant_order_queue_checkout_pay_later')
+                  : t('merchant_order_queue_checkout_pay_now')}
+              </Text>
             </View>
             {order.paymentSource ? (
               <View style={styles.detailRow}>
@@ -169,7 +175,7 @@ const styles = StyleSheet.create({
   summaryTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   orderNum: { fontSize: 18, fontWeight: '700', color: colors.onSurface },
   orderId: { fontSize: 12, color: colors.gray500, marginTop: 2 },
-  statusPill: { borderRadius: radius.full, paddingHorizontal: 12, paddingVertical: 4 },
+  statusPill: { borderRadius: radius.full, paddingHorizontal: 12, paddingVertical: 4, flexDirection: 'row', alignItems: 'center', gap: 6 },
   statusText: { fontSize: 13, fontWeight: '600' },
   divider: { height: 1, backgroundColor: colors.gray200, marginVertical: spacing.md },
   detailRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.sm },
