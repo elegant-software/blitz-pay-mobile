@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 import { storage } from './storage';
 import { config } from './config';
 import { observability } from './observability';
+import { fetchMerchantBranches, fetchMerchantName } from './merchantProducts';
 
 const LocalAuthentication = Platform.OS !== 'web'
   ? require('expo-local-authentication')
@@ -25,6 +26,7 @@ export interface ActiveBranchScope {
   merchantId: string;
   branchId: string;
   branchName: string | null;
+  merchantName: string | null;
   source: 'branch_membership';
   status: 'resolved';
 }
@@ -158,6 +160,7 @@ function buildBranchScope(
       merchantId: selectedMembership.merchantId,
       branchId: selectedMembership.branchId,
       branchName: null,
+      merchantName: null,
       source: 'branch_membership',
       status: 'resolved',
     },
@@ -253,6 +256,7 @@ const BYPASS_BRANCH_SCOPE: ActiveBranchScope = {
   merchantId: 'dev-bypass-merchant',
   branchId: 'branch_demo',
   branchName: 'Demo Branch',
+  merchantName: 'Demo Merchant',
   source: 'branch_membership',
   status: 'resolved',
 };
@@ -317,6 +321,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(parsed.profile);
     setActiveBranchScope(parsed.activeBranchScope);
     setBranchScopeError(parsed.errorKey);
+
+    if (parsed.activeBranchScope) {
+      const { merchantId, branchId } = parsed.activeBranchScope;
+      void (async () => {
+        const [branches, merchantName] = await Promise.all([
+          fetchMerchantBranches(merchantId).catch(() => []),
+          fetchMerchantName(merchantId),
+        ]);
+        const branchName = branches.find((b) => b.branchId === branchId)?.name ?? null;
+        setActiveBranchScope((prev) =>
+          prev ? { ...prev, branchName, merchantName } : prev,
+        );
+      })();
+    }
 
     if (parsed.profile?.activeBranchId) {
       await writeActiveBranchId(parsed.profile.activeBranchId);
@@ -529,6 +547,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     setActiveBranchScope(nextScope.activeBranchScope);
     setBranchScopeError(nextScope.errorKey);
+
+    if (nextScope.activeBranchScope) {
+      const { merchantId, branchId: activeBranchId } = nextScope.activeBranchScope;
+      void (async () => {
+        const [branches, merchantName] = await Promise.all([
+          fetchMerchantBranches(merchantId).catch(() => []),
+          fetchMerchantName(merchantId),
+        ]);
+        const branchName = branches.find((b) => b.branchId === activeBranchId)?.name ?? null;
+        setActiveBranchScope((prev) =>
+          prev ? { ...prev, branchName, merchantName } : prev,
+        );
+      })();
+    }
+
     observability.info('merchant_branch_scope_selection_succeeded', {
       branchId,
       merchantId: nextScope.activeBranchScope?.merchantId ?? null,

@@ -189,6 +189,7 @@ function createState(
   });
   return {
     paymentRequestId,
+
     startedAt,
     resolved: false,
     pollController: null,

@@ -1,42 +1,33 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useFocusEffect } from '@react-navigation/native';
 import { fetchMerchantOrders } from '../services/orderService';
-import type { MerchantOrderFilter, MerchantOrderSummary } from '../types/order';
+import { QUERY_KEYS, STALE_TIMES } from '../../../lib/queryClient';
 
-export function useMerchantOrders(branchId: string | null, filter: MerchantOrderFilter) {
-  const [orders, setOrders] = useState<MerchantOrderSummary[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+export function useMerchantOrders(branchId: string | null) {
+  const { data, isLoading, error, refetch, isStale } = useQuery({
+    queryKey: QUERY_KEYS.ordersList(branchId),
+    queryFn: () => fetchMerchantOrders(branchId!),
+    enabled: !!branchId,
+    staleTime: STALE_TIMES.ORDERS_LIST,
+  });
 
-  const reload = useCallback(async () => {
-    if (!branchId) {
-      setOrders([]);
-      setError('merchant_branch_access_missing');
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    try {
-      const allOrders = await fetchMerchantOrders(branchId);
-      setOrders(
-        filter === 'ALL'
-          ? allOrders
-          : allOrders.filter((order) => {
-              if (filter === 'PROCESSING') return order.status === 'pending' || order.status === 'processing';
-              if (filter === 'COMPLETED') return order.status === 'completed';
-              return order.status === 'cancelled';
-            }),
-      );
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'merchant_orders_load_failed');
-    } finally {
-      setLoading(false);
-    }
-  }, [branchId, filter]);
+  useFocusEffect(
+    useCallback(() => {
+      if (isStale) void refetch();
+    }, [refetch, isStale]),
+  );
 
-  useEffect(() => {
-    void reload();
-  }, [reload]);
+  const errorKey = !branchId
+    ? 'merchant_branch_access_missing'
+    : error
+      ? (error instanceof Error ? error.message : 'merchant_orders_load_failed')
+      : null;
 
-  return { orders, loading, error, reload };
+  return {
+    orders: data ?? [],
+    loading: isLoading,
+    error: errorKey,
+    reload: refetch,
+  };
 }

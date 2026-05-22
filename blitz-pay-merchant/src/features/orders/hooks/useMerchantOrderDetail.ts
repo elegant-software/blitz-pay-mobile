@@ -1,41 +1,147 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useFocusEffect } from '@react-navigation/native';
 import type { ActiveBranchScope } from '../../../lib/auth';
-import { fetchMerchantOrderDetail } from '../services/orderService';
+import { observability } from '../../../lib/observability';
+import { QUERY_KEYS, STALE_TIMES } from '../../../lib/queryClient';
+import {
+  addMerchantOrderItem,
+  cancelMerchantOrder,
+  fetchMerchantOrderDetail,
+  markMerchantOrderManuallyPaid,
+  overrideMerchantOrderLinePrice,
+  removeMerchantOrderLine,
+  updateMerchantOrderLineQuantity,
+} from '../services/orderService';
 import type { MerchantOrderDetail } from '../types/order';
 
+function isEditableStatus(status: MerchantOrderDetail['status']) {
+  return status === 'awaiting_payment' || status === 'payment_failed';
+}
+
 export function useMerchantOrderDetail(orderId: string, activeBranchScope: ActiveBranchScope | null) {
-  const [order, setOrder] = useState<MerchantOrderDetail | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const [mutating, setMutating] = useState(false);
+  const [mutationError, setMutationError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let active = true;
-    if (!activeBranchScope) {
-      setOrder(null);
-      setError('merchant_branch_access_missing');
-      setLoading(false);
-      return () => {
-        active = false;
-      };
-    }
+  const { data: order, isLoading, error, refetch, isStale } = useQuery({
+    queryKey: QUERY_KEYS.orderDetail(orderId),
+    queryFn: () => fetchMerchantOrderDetail(orderId, activeBranchScope!),
+    enabled: !!activeBranchScope,
+    staleTime: STALE_TIMES.ORDER_DETAIL,
+  });
 
-    setLoading(true);
-    setError(null);
-    void fetchMerchantOrderDetail(orderId, activeBranchScope)
-      .then((nextOrder) => {
-        if (active) setOrder(nextOrder);
-      })
-      .catch((err) => {
-        if (active) setError(err instanceof Error ? err.message : 'merchant_order_detail_load_failed');
-      })
-      .finally(() => {
-        if (active) setLoading(false);
+  useFocusEffect(
+    useCallback(() => {
+      if (isStale) void refetch();
+    }, [refetch, isStale]),
+  );
+
+  const runMutation = useCallback(
+    async (action: () => Promise<MerchantOrderDetail>, eventName: string): Promise<void> => {
+      if (!order || !isEditableStatus(order.status)) {
+        observability.warn('merchant_order_edit_blocked', {
+          orderId,
+          status: order?.status ?? null,
+          eventName,
+        });
+        throw new Error('merchant_order_edit_blocked');
+      }
+
+      setMutating(true);
+      setMutationError(null);
+      observability.info('merchant_order_mutation_started', {
+        orderId,
+        eventName,
+        merchantId: activeBranchScope?.merchantId ?? null,
+        branchId: activeBranchScope?.branchId ?? null,
+        orderStatus: order.status,
+        checkoutIntent: order.checkoutIntent,
+        paymentSource: order.paymentSource ?? null,
+        itemCount: order.items.length,
       });
+      try {
+        const nextOrder = await action();
+        // Update detail cache directly from the mutation response
+        queryClient.setQueryData(QUERY_KEYS.orderDetail(orderId), nextOrder);
+        // Invalidate list so status changes are reflected there too
+        void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ordersList(activeBranchScope?.branchId ?? null) });
+        observability.info('merchant_order_mutation_applied', {
+          orderId: nextOrder.orderId,
+          eventName,
+          merchantId: activeBranchScope?.merchantId ?? null,
+          branchId: activeBranchScope?.branchId ?? null,
+          previousStatus: order.status,
+          status: nextOrder.status,
+          checkoutIntent: nextOrder.checkoutIntent,
+          paymentSource: nextOrder.paymentSource ?? null,
+          itemCount: nextOrder.items.length,
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'merchant_order_mutation_failed';
+        setMutationError(message);
+        observability.error('merchant_order_mutation_ui_failed', {
+          orderId,
+          eventName,
+          merchantId: activeBranchScope?.merchantId ?? null,
+          branchId: activeBranchScope?.branchId ?? null,
+          orderStatus: order.status,
+          checkoutIntent: order.checkoutIntent,
+          paymentSource: order.paymentSource ?? null,
+          itemCount: order.items.length,
+          reason: message,
+        });
+      } finally {
+        setMutating(false);
+      }
+    },
+    [order, orderId, queryClient, activeBranchScope],
+  );
 
-    return () => {
-      active = false;
-    };
-  }, [activeBranchScope, orderId]);
+  const loadError = !activeBranchScope
+    ? 'merchant_branch_access_missing'
+    : error
+      ? (error instanceof Error ? error.message : 'merchant_order_detail_load_failed')
+      : null;
 
-  return { order, loading, error };
+  return {
+    order: order ?? null,
+    loading: isLoading,
+    mutating,
+    error: loadError,
+    mutationError,
+    reload: refetch,
+    addItem: (productId: string, quantity: number) =>
+      runMutation(() => addMerchantOrderItem(orderId, { productId, quantity }), 'merchant_add_item'),
+    updateLineQuantity: (lineId: string, quantity: number) =>
+      runMutation(
+        () => updateMerchantOrderLineQuantity(orderId, { lineId, quantity }),
+        'merchant_update_line_quantity',
+      ),
+    removeLine: (lineId: string) =>
+      runMutation(() => removeMerchantOrderLine(orderId, lineId), 'merchant_remove_line'),
+    overrideLinePrice: (lineId: string, unitPriceMinor: number) =>
+      runMutation(
+        () => overrideMerchantOrderLinePrice(orderId, { lineId, unitPriceMinor }),
+        'merchant_override_line_price',
+      ),
+    cancelOrder: () => runMutation(() => cancelMerchantOrder(orderId), 'merchant_cancel_order'),
+    markManuallyPaid: (note?: string) => {
+      const trimmedNote = note?.trim();
+      observability.info('merchant_manual_settlement_requested', {
+        orderId,
+        merchantId: activeBranchScope?.merchantId ?? null,
+        branchId: activeBranchScope?.branchId ?? null,
+        orderStatus: order?.status ?? null,
+        checkoutIntent: order?.checkoutIntent ?? null,
+        paymentSource: order?.paymentSource ?? null,
+        hasNote: Boolean(trimmedNote),
+        noteLength: trimmedNote?.length ?? 0,
+      });
+      return runMutation(
+        () => markMerchantOrderManuallyPaid(orderId, { note: trimmedNote }),
+        'merchant_manual_settlement',
+      );
+    },
+  };
 }

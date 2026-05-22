@@ -2,7 +2,11 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { BasketCheckoutItemSummary } from './features/basket/types/basket';
 import type { PaymentChannel } from './features/merchant-catalog/types/catalog';
-import type { CheckoutPaymentMethod } from './features/order-payment/types/orderPayment';
+import type {
+  CheckoutIntent,
+  CheckoutPaymentMethod,
+  PaymentSource,
+} from './features/order-payment/types/orderPayment';
 
 export type RootStackParamList = {
   Login: undefined;
@@ -22,6 +26,7 @@ export type RootStackParamList = {
     branchName?: string;
     merchantLogoUrl?: string;
     activePaymentChannels?: PaymentChannel[];
+    delayedPaymentEnabled?: boolean;
     basketSummary?: string;
     basketItemCount?: number;
     basketItems?: BasketCheckoutItemSummary[];
@@ -52,6 +57,8 @@ export type RootStackParamList = {
     branchName?: string;
     merchantLogoUrl?: string;
     paymentProvider?: string;
+    paymentSource?: PaymentSource;
+    checkoutIntent?: CheckoutIntent;
     reason?: string;
   };
   PaymentPending: {
@@ -89,6 +96,7 @@ export type RootStackParamList = {
     merchantLogoUrl?: string;
     availableChannels?: PaymentChannel[];
     preferredMethod?: CheckoutPaymentMethod;
+    checkoutIntent?: CheckoutIntent;
   };
 };
 

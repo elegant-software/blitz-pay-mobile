@@ -76,6 +76,18 @@ export async function authedFetch(path: string, init: AuthedFetchInit = {}): Pro
   const url = joinUrl(baseUrl, path);
   const shouldDebugOrders = path.startsWith('/v1/orders');
   const session = await readSession();
+  const requiresAuth = path.startsWith('/v1/');
+
+  if (requiresAuth && !session?.accessToken) {
+    observability.warn('authed_fetch_missing_session', {
+      path,
+      url,
+      method: (rest.method ?? 'GET').toUpperCase(),
+      hadRefreshToken: Boolean(session?.refreshToken),
+    });
+    notifySessionExpired();
+    throw new Error('session_expired');
+  }
 
   const doFetch = async (token: string | null): Promise<Response> => {
     const mergedHeaders = new Headers(headers as HeadersInit | undefined);

@@ -6,16 +6,19 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
+import * as Haptics from 'expo-haptics';
 import { useLanguage } from '../lib/LanguageContext';
 import { useAuth } from '../lib/auth';
 import { colors, spacing, radius, shadow } from '../lib/theme';
-import { fetchOrder } from '../features/order-payment/services/orderPaymentService';
 import { useOrderPayment } from '../features/order-payment/hooks/useOrderPayment';
+import { orderPaymentStore } from '../features/order-payment/store/orderPaymentStore';
 import {
+  isMethodAvailable,
   isOrderResumable,
   type CheckoutPaymentMethod,
   type OrderPaymentChannel,
@@ -47,20 +50,22 @@ export default function OrderDetailScreen() {
   const navigation = useNavigation<RootStackNav>();
   const route = useRoute<RouteProp<RootStackParamList, 'OrderDetail'>>();
   const insets = useSafeAreaInsets();
-  const { resumeOrderPayment } = useOrderPayment();
+  const { resumeOrderPayment, refreshOrder, cancelOrder } = useOrderPayment();
   const [order, setOrder] = useState<OrderSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [selectedMethod, setSelectedMethod] = useState<CheckoutPaymentMethod | null>(
     route.params.preferredMethod ?? null,
   );
   const [submitting, setSubmitting] = useState(false);
+  const session = orderPaymentStore.getSession(route.params.orderId);
 
   useEffect(() => {
     let active = true;
     setLoading(true);
     setError(null);
-    void fetchOrder(route.params.orderId)
+    void refreshOrder(route.params.orderId)
       .then((nextOrder) => {
         if (!active) return;
         setOrder(nextOrder);
@@ -76,25 +81,41 @@ export default function OrderDetailScreen() {
     return () => {
       active = false;
     };
-  }, [route.params.orderId]);
+  }, [refreshOrder, route.params.orderId]);
 
   const canResume = Boolean(order && isOrderResumable(order.status));
   const availableChannels = useMemo<OrderPaymentChannel[]>(
-    () => route.params.availableChannels ?? ['TRUELAYER', 'STRIPE', 'PAYPAL'],
-    [route.params.availableChannels],
+    () => route.params.availableChannels ?? session?.availableChannels ?? (session?.selectedChannel ? [session.selectedChannel] : []),
+    [route.params.availableChannels, session?.availableChannels, session?.selectedChannel],
   );
+  const availableMethods = useMemo(
+    () => METHODS.filter((method) => isMethodAvailable(method.key, availableChannels)),
+    [availableChannels],
+  );
+  const effectiveSelectedMethod = selectedMethod ?? (availableMethods.length === 1 ? availableMethods[0].key : null);
+
+  useEffect(() => {
+    if (availableMethods.length === 1 && selectedMethod !== availableMethods[0].key) {
+      setSelectedMethod(availableMethods[0].key);
+      return;
+    }
+    if (selectedMethod && !isMethodAvailable(selectedMethod, availableChannels)) {
+      setSelectedMethod(null);
+    }
+  }, [availableChannels, availableMethods, selectedMethod]);
 
   const onResume = async () => {
-    if (!order || !selectedMethod) return;
+    if (!order || !effectiveSelectedMethod) return;
     setSubmitting(true);
     setError(null);
+    setNotice(null);
     try {
       await resumeOrderPayment({
         order,
         merchantName: route.params.merchantName ?? t('merchant_mode'),
         branchName: route.params.branchName,
         merchantLogoUrl: route.params.merchantLogoUrl,
-        selectedMethod,
+        selectedMethod: effectiveSelectedMethod,
         availableChannels,
         navigation,
         token,
@@ -105,6 +126,39 @@ export default function OrderDetailScreen() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const onCancelOrder = () => {
+    if (!order) return;
+    Alert.alert(
+      t('order_cancel_confirm_title'),
+      t('order_cancel_confirm_body'),
+      [
+        { text: t('cancel'), style: 'cancel' },
+        {
+          text: t('order_cancel_confirm_action'),
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              setSubmitting(true);
+              setError(null);
+              setNotice(null);
+              try {
+                const nextOrder = await cancelOrder(order.orderId);
+                setOrder(nextOrder);
+                setNotice(t('order_cancelled_notice'));
+                await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              } catch (err) {
+                setError(err instanceof Error ? err.message : 'unknown_error');
+                await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+              } finally {
+                setSubmitting(false);
+              }
+            })();
+          },
+        },
+      ],
+    );
   };
 
   return (
@@ -134,8 +188,10 @@ export default function OrderDetailScreen() {
             <View style={styles.summaryHeader}>
               <View style={styles.summaryText}>
                 <Text style={styles.summaryTitle}>{t('order_reference_label', { orderId: order.orderId })}</Text>
-                <Text style={styles.summaryMeta}>{route.params.merchantName ?? t('merchant_mode')}</Text>
-                {route.params.branchName ? <Text style={styles.summaryMeta}>{route.params.branchName}</Text> : null}
+                <Text style={styles.summaryMeta}>{order.merchantName ?? route.params.merchantName ?? t('merchant_mode')}</Text>
+                {order.branchName ?? route.params.branchName ? (
+                  <Text style={styles.summaryMeta}>{order.branchName ?? route.params.branchName}</Text>
+                ) : null}
               </View>
               <View style={[styles.statusBadge, { backgroundColor: `${STATUS_COLORS[order.status]}18` }]}>
                 <Text style={[styles.statusText, { color: STATUS_COLORS[order.status] }]}>
@@ -144,15 +200,33 @@ export default function OrderDetailScreen() {
               </View>
             </View>
             <Text style={styles.amountText}>{formatAmount(order.totalAmountMinor, order.currency)}</Text>
+            <Text style={styles.summaryMeta}>{`${t('order_checkout_intent_label')}: ${order.checkoutIntent}`}</Text>
+            {order.paymentSource ? (
+              <Text style={styles.summaryMeta}>
+                {`${t('order_payment_source_label')}: ${t(`payment_source_${order.paymentSource}` as never)}`}
+              </Text>
+            ) : null}
+            {order.banner ? (
+              <View style={styles.banner}>
+                <Ionicons name="refresh-outline" size={16} color={colors.primary} />
+                <View style={styles.bannerTextWrap}>
+                  <Text style={styles.bannerTitle}>{t('order_updated_banner_title')}</Text>
+                  <Text style={styles.bannerText}>{t(order.banner.messageKey as never)}</Text>
+                </View>
+              </View>
+            ) : null}
           </View>
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>{t('order_items_title')}</Text>
             {order.items.map((item) => (
-              <View key={`${order.orderId}-${item.productId}`} style={styles.itemRow}>
+              <View key={item.lineId} style={styles.itemRow}>
                 <View style={styles.itemText}>
                   <Text style={styles.itemName}>{item.quantity}× {item.name}</Text>
-                  <Text style={styles.itemMeta}>{formatAmount(item.unitPriceMinor, order.currency)}</Text>
+                  <Text style={styles.itemMeta}>
+                    {formatAmount(item.unitPriceMinor, order.currency)}
+                    {item.priceSource === 'MERCHANT_OVERRIDE' ? ` · ${t('order_line_price_override')}` : ''}
+                  </Text>
                 </View>
                 <Text style={styles.itemTotal}>{formatAmount(item.lineTotalMinor, order.currency)}</Text>
               </View>
@@ -163,10 +237,15 @@ export default function OrderDetailScreen() {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>{t('resume_payment')}</Text>
               <Text style={styles.sectionSubtitle}>{t('order_resume_select_method')}</Text>
-              {METHODS.map((method) => (
+              {availableMethods.length === 0 ? (
+                <View style={styles.errorBox}>
+                  <Text style={styles.errorText}>{t('payment_option_unavailable')}</Text>
+                </View>
+              ) : null}
+              {availableMethods.map((method) => (
                 <TouchableOpacity
                   key={method.key}
-                  style={[styles.methodCard, selectedMethod === method.key && styles.methodCardSelected]}
+                  style={[styles.methodCard, effectiveSelectedMethod === method.key && styles.methodCardSelected]}
                   onPress={() => setSelectedMethod(method.key)}
                 >
                   <Ionicons name={method.icon} size={18} color={colors.onSurface} />
@@ -186,14 +265,33 @@ export default function OrderDetailScreen() {
               <Text style={styles.errorText}>{t(error as never)}</Text>
             </View>
           ) : null}
+
+          {notice ? (
+            <View style={styles.noticeBox}>
+              <Ionicons name="checkmark-circle-outline" size={16} color={colors.success} />
+              <Text style={styles.noticeText}>{notice}</Text>
+            </View>
+          ) : null}
+
+          {order.status === 'PENDING_PAYMENT' ? (
+            <View style={styles.section}>
+              <TouchableOpacity
+                style={[styles.cancelButton, submitting && styles.cancelButtonDisabled]}
+                disabled={submitting}
+                onPress={onCancelOrder}
+              >
+                <Text style={styles.cancelButtonText}>{t('order_cancel')}</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
         </ScrollView>
       )}
 
       {canResume ? (
         <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
           <TouchableOpacity
-            style={[styles.resumeButton, (!selectedMethod || submitting) && styles.resumeButtonDisabled]}
-            disabled={!selectedMethod || submitting}
+            style={[styles.resumeButton, (!effectiveSelectedMethod || submitting) && styles.resumeButtonDisabled]}
+            disabled={!effectiveSelectedMethod || submitting}
             onPress={() => void onResume()}
           >
             <Text style={styles.resumeButtonText}>
@@ -239,6 +337,18 @@ const styles = StyleSheet.create({
   itemName: { fontSize: 14, fontWeight: '600', color: colors.onSurface },
   itemMeta: { marginTop: 4, fontSize: 12, color: colors.gray600 },
   itemTotal: { fontSize: 14, fontWeight: '700', color: colors.onSurface },
+  banner: {
+    marginTop: spacing.md,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    alignItems: 'center',
+    borderRadius: radius.lg,
+    padding: spacing.sm,
+    backgroundColor: `${colors.primary}10`,
+  },
+  bannerTextWrap: { flex: 1 },
+  bannerTitle: { fontSize: 12, fontWeight: '700', color: colors.onSurface },
+  bannerText: { marginTop: 2, fontSize: 12, color: colors.gray600 },
   methodCard: {
     marginTop: spacing.sm,
     flexDirection: 'row',
@@ -258,6 +368,26 @@ const styles = StyleSheet.create({
     padding: spacing.md,
   },
   errorText: { color: colors.error, fontSize: 13, fontWeight: '600' },
+  noticeBox: {
+    marginTop: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: `${colors.success}12`,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+  },
+  noticeText: { flex: 1, color: colors.success, fontSize: 13, fontWeight: '600' },
+  cancelButton: {
+    borderRadius: radius.full,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.gray300,
+  },
+  cancelButtonDisabled: { opacity: 0.6 },
+  cancelButtonText: { fontSize: 14, fontWeight: '700', color: colors.onSurface },
   footer: {
     position: 'absolute',
     left: 0,

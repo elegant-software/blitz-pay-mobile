@@ -9,14 +9,16 @@ import { useLanguage } from '../lib/LanguageContext';
 import { useAuth } from '../lib/auth';
 import { colors, spacing, radius, shadow } from '../lib/theme';
 import type { RootStackParamList } from '../types';
+import { getMerchantOrderStatusIcon, getMerchantOrderStatusLabelKey } from '../features/orders/orderPresentation';
 import { useMerchantOrderDetail } from '../features/orders/hooks/useMerchantOrderDetail';
 
 type RouteProps = RouteProp<RootStackParamList, 'OrderDetail'>;
 
 const STATUS_COLORS = {
-  pending: colors.warning,
-  processing: colors.primary,
-  completed: colors.success,
+  awaiting_payment: colors.warning,
+  payment_in_progress: colors.primary,
+  payment_failed: colors.error,
+  paid: colors.success,
   cancelled: colors.error,
 } as const;
 
@@ -30,7 +32,10 @@ export default function OrderDetailScreen() {
   const navigation = useNavigation();
   const route = useRoute<RouteProps>();
   const insets = useSafeAreaInsets();
-  const { order, loading, error } = useMerchantOrderDetail(route.params.orderId, activeBranchScope);
+  const { order, loading, error, mutationError, mutating, cancelOrder, markManuallyPaid } = useMerchantOrderDetail(
+    route.params.orderId,
+    activeBranchScope,
+  );
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -58,12 +63,17 @@ export default function OrderDetailScreen() {
           <View style={[styles.summaryCard, shadow.md]}>
             <View style={styles.summaryTop}>
               <View>
-                <Text style={styles.orderNum}>{t('order_number')}{order.orderNumber}</Text>
+                <Text style={styles.orderNum}>{t('order_number')}{order.orderId}</Text>
                 <Text style={styles.orderId}>ID: {order.orderId}</Text>
               </View>
               <View style={[styles.statusPill, { backgroundColor: `${STATUS_COLORS[order.status]}15` }]}>
+                <Ionicons
+                  name={getMerchantOrderStatusIcon(order.status) as React.ComponentProps<typeof Ionicons>['name']}
+                  size={14}
+                  color={STATUS_COLORS[order.status]}
+                />
                 <Text style={[styles.statusText, { color: STATUS_COLORS[order.status] }]}>
-                  {t(`status_${order.status}` as Parameters<typeof t>[0])}
+                  {t(getMerchantOrderStatusLabelKey(order.status))}
                 </Text>
               </View>
             </View>
@@ -71,15 +81,39 @@ export default function OrderDetailScreen() {
             <View style={styles.divider} />
 
             <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>{t('customer')}</Text>
-              <Text style={styles.detailValue}>{order.customerName ?? t('customer_unknown')}</Text>
-            </View>
-            <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>{t('order_total')}</Text>
               <Text style={[styles.detailValue, styles.amountText]}>
                 {formatCurrency(order.amountMinor, order.currency)}
               </Text>
             </View>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>{t('merchant_checkout_intent_label')}</Text>
+              <Text style={styles.detailValue}>
+                {order.checkoutIntent === 'PAY_LATER'
+                  ? t('merchant_order_queue_checkout_pay_later')
+                  : t('merchant_order_queue_checkout_pay_now')}
+              </Text>
+            </View>
+            {order.paymentSource ? (
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>{t('merchant_payment_source_label')}</Text>
+                <Text style={styles.detailValue}>
+                  {t(`merchant_payment_source_${order.paymentSource}` as Parameters<typeof t>[0])}
+                </Text>
+              </View>
+            ) : null}
+            {order.banner ? (
+              <View style={styles.banner}>
+                <Ionicons name="refresh-outline" size={16} color={colors.primary} />
+                <Text style={styles.bannerText}>{t(order.banner.messageKey)}</Text>
+              </View>
+            ) : null}
+            {mutationError ? (
+              <View style={styles.errorBanner}>
+                <Ionicons name="alert-circle-outline" size={16} color={colors.error} />
+                <Text style={styles.errorBannerText}>{t(mutationError as Parameters<typeof t>[0])}</Text>
+              </View>
+            ) : null}
           </View>
 
           <View style={styles.section}>
@@ -89,10 +123,15 @@ export default function OrderDetailScreen() {
                 <Text style={styles.emptyItemsText}>{t('merchant_order_items_empty')}</Text>
               ) : (
                 order.items.map((item) => (
-                  <View key={`${order.orderId}-${item.productId}`} style={styles.itemRow}>
+                  <View key={item.lineId} style={styles.itemRow}>
                     <View style={styles.itemText}>
                       <Text style={styles.itemName}>{item.quantity}× {item.name}</Text>
-                      <Text style={styles.itemMeta}>{formatCurrency(item.unitPriceMinor, order.currency)}</Text>
+                      <Text style={styles.itemMeta}>
+                        {formatCurrency(item.unitPriceMinor, order.currency)}
+                        {item.priceSource === 'MERCHANT_OVERRIDE'
+                          ? ` · ${t('merchant_order_line_price_override')}`
+                          : ''}
+                      </Text>
                     </View>
                     <Text style={styles.itemTotal}>{formatCurrency(item.lineTotalMinor, order.currency)}</Text>
                   </View>
@@ -100,6 +139,17 @@ export default function OrderDetailScreen() {
               )}
             </View>
           </View>
+
+          {(order.status === 'awaiting_payment' || order.status === 'payment_failed') ? (
+            <View style={styles.actions}>
+              <TouchableOpacity style={styles.secondaryAction} disabled={mutating} onPress={() => void cancelOrder()}>
+                <Text style={styles.secondaryActionText}>{t('cancel_order')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.primaryAction} disabled={mutating} onPress={() => void markManuallyPaid()}>
+                <Text style={styles.primaryActionText}>{t('merchant_mark_manual_paid')}</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
         </ScrollView>
       )}
     </View>
@@ -125,13 +175,33 @@ const styles = StyleSheet.create({
   summaryTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   orderNum: { fontSize: 18, fontWeight: '700', color: colors.onSurface },
   orderId: { fontSize: 12, color: colors.gray500, marginTop: 2 },
-  statusPill: { borderRadius: radius.full, paddingHorizontal: 12, paddingVertical: 4 },
+  statusPill: { borderRadius: radius.full, paddingHorizontal: 12, paddingVertical: 4, flexDirection: 'row', alignItems: 'center', gap: 6 },
   statusText: { fontSize: 13, fontWeight: '600' },
   divider: { height: 1, backgroundColor: colors.gray200, marginVertical: spacing.md },
   detailRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.sm },
   detailLabel: { fontSize: 14, color: colors.gray600 },
   detailValue: { fontSize: 14, fontWeight: '600', color: colors.onSurface },
   amountText: { fontSize: 18, fontWeight: '800' },
+  banner: {
+    marginTop: spacing.md,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    alignItems: 'center',
+    borderRadius: radius.lg,
+    padding: spacing.sm,
+    backgroundColor: `${colors.primary}10`,
+  },
+  bannerText: { flex: 1, fontSize: 13, color: colors.onSurface },
+  errorBanner: {
+    marginTop: spacing.md,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    alignItems: 'center',
+    borderRadius: radius.lg,
+    padding: spacing.sm,
+    backgroundColor: `${colors.error}10`,
+  },
+  errorBannerText: { flex: 1, fontSize: 13, color: colors.onSurface },
   section: { paddingHorizontal: spacing.md },
   sectionTitle: { fontSize: 17, fontWeight: '700', color: colors.onSurface, marginBottom: spacing.sm },
   itemsCard: {
@@ -144,4 +214,21 @@ const styles = StyleSheet.create({
   itemMeta: { marginTop: 4, fontSize: 12, color: colors.gray600 },
   itemTotal: { fontSize: 14, fontWeight: '700', color: colors.onSurface },
   emptyItemsText: { fontSize: 13, color: colors.gray500 },
+  actions: { paddingHorizontal: spacing.md, paddingTop: spacing.md, gap: spacing.sm },
+  secondaryAction: {
+    borderRadius: radius.full,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.gray300,
+  },
+  secondaryActionText: { fontSize: 14, fontWeight: '700', color: colors.onSurface },
+  primaryAction: {
+    borderRadius: radius.full,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+  },
+  primaryActionText: { fontSize: 14, fontWeight: '700', color: colors.black },
 });

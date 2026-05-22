@@ -39,6 +39,12 @@ When touching `mobile/src/lib/truelayer.ts`, `mobile/src/screens/CheckoutScreen.
 - Every new UI string lands in **both** `de` and `en` of the relevant `translations.ts`.
 - Default language is German. No inline English in JSX.
 
+## Payment Method Visibility
+
+- In `blitz-pay/`, whenever a shopper sees payment methods for merchant checkout or order payment, show only the methods allowed for that merchant context.
+- Do not render unsupported payment methods as disabled placeholders or generic defaults.
+- Merchant capability is the source of truth for shopper-visible payment method options.
+
 ## Tooling Conventions
 
 - Use dedicated tools (Read/Edit/Write/Glob/Grep) over shelling out to `cat`/`grep`/`find`.
@@ -69,6 +75,8 @@ Ask the user. Pausing to confirm costs a message; an unwanted destructive action
 - Backend order/payment APIs; `expo-secure-store` for auth session and in-flight payment persistence; in-memory feature stores for checkout and order session state (011-order-payment-orchestration)
 - TypeScript 5.3, React 19.2, React Native 0.83.6, Expo SDK 55 + Expo Secure Store, React Navigation 6, existing auth provider in `src/lib/auth.tsx`, existing observability helper, existing merchant orders and product service modules (012-branch-membership-access)
 - Expo Secure Store for session persistence; controlled in-memory state for authenticated user and active authorized branch scope (012-branch-membership-access)
+- TypeScript 5.3, React 19.2, React Native 0.83.6, Expo SDK 55 + Expo, React Navigation 6, `expo-secure-store`, existing `authedFetch` wrappers, existing TrueLayer / Stripe / Braintree integrations, existing observability helpers, existing order-payment and merchant-orders feature modules (013-pay-later-order-collaboration)
+- Backend order/payment APIs; `expo-secure-store` for auth session and in-flight payment persistence; controlled in-memory feature stores for basket, order session, and merchant order detail state (013-pay-later-order-collaboration)
 
 ## Recent Changes
 - 008-nearby-merchant-checkout: Added TypeScript 5.3, React 19.2, React Native 0.83.4, Expo SDK 55 + React Navigation 6, Expo Location, Expo Task Manager, Expo Secure Store, existing TrueLayer/Stripe/Braintree payment integrations

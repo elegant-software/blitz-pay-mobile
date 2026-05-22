@@ -4,6 +4,11 @@ import type { PaymentChannel as MerchantPaymentChannel } from '../../merchant-ca
 export type CheckoutPaymentMethod = 'bank' | 'card' | 'paypal';
 export type OrderPaymentChannel = MerchantPaymentChannel;
 export type CreateOrderPaymentMethod = 'TRUELAYER' | 'STRIPE' | 'BRAINTREE';
+export type OrderType = 'PRE_ORDER' | 'WALK_IN_ORDERING';
+export type CheckoutIntent = 'PAY_NOW' | 'PAY_LATER';
+export type PaymentSource = 'APP_PAYMENT' | 'MANUAL_SETTLEMENT';
+export type OrderPriceSource = 'CATALOG' | 'MERCHANT_OVERRIDE';
+export type OrderUpdateActor = 'MERCHANT' | 'SHOPPER';
 export type OrderStatus =
   | 'PENDING_PAYMENT'
   | 'PAYMENT_IN_PROGRESS'
@@ -12,13 +17,37 @@ export type OrderStatus =
   | 'CANCELLED';
 
 export interface CreateOrderItemInput {
+  lineId?: string;
+  productId: string;
+  quantity: number;
+  unitPriceMinor?: number;
+}
+
+export interface CreateOrderInput {
+  branchId: string;
+  orderType: OrderType;
+  checkoutIntent: CheckoutIntent;
+  paymentMethod?: CreateOrderPaymentMethod;
+  items: CreateOrderItemInput[];
+}
+
+export interface AddOrderItemInput {
   productId: string;
   quantity: number;
 }
 
-export interface CreateOrderInput {
-  paymentMethod: CreateOrderPaymentMethod;
-  items: CreateOrderItemInput[];
+export interface UpdateOrderLineQuantityInput {
+  lineId: string;
+  quantity: number;
+}
+
+export interface OverrideOrderLinePriceInput {
+  lineId: string;
+  unitPriceMinor: number;
+}
+
+export interface ManualSettlementInput {
+  note?: string;
 }
 
 export interface OrderPaymentIntentContext {
@@ -29,31 +58,47 @@ export interface OrderPaymentIntentContext {
 }
 
 export interface OrderItemSummary {
+  lineId: string;
   productId: string;
   name: string;
   quantity: number;
   unitPriceMinor: number;
   lineTotalMinor: number;
+  priceSource: OrderPriceSource;
+}
+
+export interface OrderUpdateBanner {
+  actor: OrderUpdateActor;
+  messageKey: 'order_updated_by_merchant' | 'order_updated_by_shopper';
+  updatedAt: string;
+  visibleScope: 'ORDER_DETAIL_ONLY';
 }
 
 export interface OrderSummary {
   orderId: string;
   merchantId: string;
   branchId?: string;
+  merchantName?: string;
+  branchName?: string;
+  merchantLogoUrl?: string;
+  checkoutIntent: CheckoutIntent;
   status: OrderStatus;
+  paymentSource?: PaymentSource;
   currency: string;
   totalAmountMinor: number;
   items: OrderItemSummary[];
   createdAt: string;
+  updatedAt: string;
+  paymentRetryAllowed: boolean;
   lastPaymentRequestId?: string;
   lastPaymentProvider?: string;
   paidAt?: string;
+  manualSettlementNote?: string;
+  banner?: OrderUpdateBanner;
 }
 
 export interface RecentOrderSummary extends OrderSummary {
-  merchantName?: string;
-  branchName?: string;
-  merchantLogoUrl?: string;
+  preferredMethod?: CheckoutPaymentMethod;
 }
 
 export interface OrderPaymentSession {
@@ -62,16 +107,22 @@ export interface OrderPaymentSession {
   merchantName: string;
   branchId?: string;
   branchName?: string;
+  checkoutIntent: CheckoutIntent;
+  availableChannels: OrderPaymentChannel[];
   amount: number;
   currency: string;
   basketSummary?: string;
   basketItemCount: number;
   basketItems: BasketCheckoutItemSummary[];
-  selectedMethod: CheckoutPaymentMethod;
-  selectedChannel: OrderPaymentChannel;
+  selectedMethod?: CheckoutPaymentMethod;
+  selectedChannel?: OrderPaymentChannel;
   orderStatus: OrderStatus;
+  paymentSource?: PaymentSource;
+  banner?: OrderUpdateBanner;
+  updatedAt?: string;
   paymentRequestId?: string;
   paymentProvider?: string;
+  retryPreferredMethod?: CheckoutPaymentMethod;
 }
 
 export interface ResumeOrderPaymentArgs {
@@ -119,6 +170,10 @@ export function isOrderStatusTerminal(status: OrderStatus): boolean {
 }
 
 export function isOrderResumable(status: OrderStatus): boolean {
+  return status === 'PENDING_PAYMENT' || status === 'PAYMENT_FAILED';
+}
+
+export function isOrderEditable(status: OrderStatus): boolean {
   return status === 'PENDING_PAYMENT' || status === 'PAYMENT_FAILED';
 }
 

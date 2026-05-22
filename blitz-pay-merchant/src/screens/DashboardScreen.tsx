@@ -21,9 +21,9 @@ const MOCK_STATS = {
 };
 
 const MOCK_RECENT_ORDERS: Order[] = [
-  { id: '1', orderNumber: '1042', customerName: 'Anna Müller', amount: 89.9, currency: 'EUR', status: 'pending', createdAt: new Date().toISOString(), items: [] },
-  { id: '2', orderNumber: '1041', customerName: 'Thomas Weber', amount: 245.0, currency: 'EUR', status: 'completed', createdAt: new Date(Date.now() - 3600000).toISOString(), items: [] },
-  { id: '3', orderNumber: '1040', customerName: 'Sarah Klein', amount: 55.5, currency: 'EUR', status: 'processing', createdAt: new Date(Date.now() - 7200000).toISOString(), items: [] },
+  { id: '1', orderNumber: '1042', amount: 89.9, currency: 'EUR', status: 'pending', createdAt: new Date().toISOString(), items: [] },
+  { id: '2', orderNumber: '1041', amount: 245.0, currency: 'EUR', status: 'completed', createdAt: new Date(Date.now() - 3600000).toISOString(), items: [] },
+  { id: '3', orderNumber: '1040', amount: 55.5, currency: 'EUR', status: 'processing', createdAt: new Date(Date.now() - 7200000).toISOString(), items: [] },
 ];
 
 const STATUS_COLORS: Record<OrderStatus, string> = {
@@ -119,14 +119,12 @@ export default function DashboardScreen() {
                 orderNumber: order.orderNumber,
                 amount: order.amount,
                 currency: order.currency,
-                customerName: order.customerName,
                 status: order.status,
               })}
               activeOpacity={0.7}
             >
               <View style={styles.orderLeft}>
                 <Text style={styles.orderNum}>{t('order_number')}{order.orderNumber}</Text>
-                <Text style={styles.orderCustomer}>{order.customerName}</Text>
               </View>
               <View style={styles.orderRight}>
                 <Text style={styles.orderAmount}>{formatCurrency(order.amount, order.currency)}</Text>
@@ -192,7 +190,6 @@ const styles = StyleSheet.create({
   },
   orderLeft: { flex: 1 },
   orderNum: { fontSize: 15, fontWeight: '700', color: colors.onSurface },
-  orderCustomer: { fontSize: 13, color: colors.gray600, marginTop: 2 },
   orderRight: { alignItems: 'flex-end', gap: 4 },
   orderAmount: { fontSize: 15, fontWeight: '700', color: colors.onSurface },
   statusPill: { borderRadius: radius.full, paddingHorizontal: 8, paddingVertical: 2 },

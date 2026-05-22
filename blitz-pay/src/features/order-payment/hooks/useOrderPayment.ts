@@ -6,18 +6,29 @@ import { createTrueLayerPayment, runTrueLayerSdk } from '../../../lib/truelayer'
 import { useBraintreePayPal } from '../../../hooks/useBraintreePayPal';
 import { useStripePayment } from '../../../hooks/useStripePayment';
 import type { RootStackNav } from '../../../types';
-import { createOrder, createStripeIntentForOrder, fetchOrder } from '../services/orderPaymentService';
+import {
+  addOrderItem,
+  cancelOrder,
+  createOrder,
+  createStripeIntentForOrder,
+  fetchOrder,
+  removeOrderLine,
+  updateOrderLineQuantity,
+} from '../services/orderPaymentService';
 import { orderPaymentStore } from '../store/orderPaymentStore';
 import {
   isMethodAvailable,
+  isOrderEditable,
   isOrderResumable,
-  mapMethodToOrderPaymentMethod,
   mapMethodToChannel,
+  mapMethodToOrderPaymentMethod,
   mapOrderStatusToPaymentResult,
+  type CheckoutIntent,
   type CheckoutPaymentMethod,
   type OrderPaymentChannel,
-  type ResumeOrderPaymentArgs,
   type OrderPaymentSession,
+  type OrderSummary,
+  type ResumeOrderPaymentArgs,
 } from '../types/orderPayment';
 
 interface ConfirmCheckoutArgs {
@@ -46,93 +57,88 @@ interface ConfirmCheckoutArgs {
     email?: string;
     name?: string;
   } | null;
+  selectedIntent: CheckoutIntent;
   selectedMethod: CheckoutPaymentMethod | null;
   availableChannels: OrderPaymentChannel[];
   navigation: RootStackNav;
 }
 
-function canReuseSession(
-  session: OrderPaymentSession | undefined,
-  args: ConfirmCheckoutArgs,
-  method: CheckoutPaymentMethod,
-): session is OrderPaymentSession {
-  if (!session) return false;
-  return (
-    session.merchantId === args.merchantId &&
-    session.branchId === args.branchId &&
-    session.amount === args.amount &&
-    session.selectedMethod === method &&
-    session.basketItemCount === args.basketItemCount &&
-    session.orderStatus !== 'PAID' &&
-    session.orderStatus !== 'CANCELLED'
-  );
+function toSession(args: ConfirmCheckoutArgs, order: OrderSummary): OrderPaymentSession {
+  return {
+    orderId: order.orderId,
+    merchantId: args.merchantId ?? order.merchantId,
+    merchantName: args.merchantName,
+    branchId: args.branchId ?? order.branchId,
+    branchName: args.branchName,
+    checkoutIntent: order.checkoutIntent,
+    availableChannels: args.availableChannels,
+    amount: args.amount,
+    currency: order.currency,
+    basketSummary: args.basketSummary,
+    basketItemCount: args.basketItemCount,
+    basketItems: args.basketItems,
+    selectedMethod: args.selectedMethod ?? undefined,
+    selectedChannel: args.selectedMethod ? mapMethodToChannel(args.selectedMethod) : undefined,
+    orderStatus: order.status,
+    paymentSource: order.paymentSource,
+    banner: order.banner,
+    updatedAt: order.updatedAt,
+    paymentRequestId: order.lastPaymentRequestId,
+    paymentProvider: order.lastPaymentProvider,
+    retryPreferredMethod: args.selectedMethod ?? undefined,
+  };
+}
+
+function toResumeSession(args: ResumeOrderPaymentArgs): OrderPaymentSession {
+  return {
+    orderId: args.order.orderId,
+    merchantId: args.order.merchantId,
+    merchantName: args.merchantName,
+    branchId: args.order.branchId,
+    branchName: args.branchName,
+    checkoutIntent: args.order.checkoutIntent,
+    availableChannels: args.availableChannels,
+    amount: args.order.totalAmountMinor / 100,
+    currency: args.order.currency,
+    basketSummary: args.order.items.map((item) => `${item.quantity}x ${item.name}`).join(', '),
+    basketItemCount: args.order.items.reduce((total, item) => total + item.quantity, 0),
+    basketItems: args.order.items.map((item) => ({
+      productId: item.productId,
+      merchantId: args.order.merchantId,
+      branchId: args.order.branchId ?? '',
+      productName: item.name,
+      quantity: item.quantity,
+      unitPrice: item.unitPriceMinor / 100,
+      lineTotal: item.lineTotalMinor / 100,
+    })),
+    selectedMethod: args.selectedMethod,
+    selectedChannel: mapMethodToChannel(args.selectedMethod),
+    orderStatus: args.order.status,
+    paymentSource: args.order.paymentSource,
+    banner: args.order.banner,
+    updatedAt: args.order.updatedAt,
+    paymentRequestId: args.order.lastPaymentRequestId,
+    paymentProvider: args.order.lastPaymentProvider,
+    retryPreferredMethod: args.selectedMethod,
+  };
 }
 
 export function useOrderPayment() {
   const { initializePayment, openPaymentSheet } = useStripePayment();
   const { presentPayPal } = useBraintreePayPal();
 
-  const confirmCheckout = useCallback(
-    async (args: ConfirmCheckoutArgs): Promise<void> => {
-      if (!args.selectedMethod) {
-        throw new Error('payment_option_required');
-      }
-      if (!args.merchantId) {
-        throw new Error('merchant_unavailable');
-      }
-      if (!isMethodAvailable(args.selectedMethod, args.availableChannels)) {
-        throw new Error('payment_option_unavailable');
-      }
-
+  const startPayment = useCallback(
+    async (
+      session: OrderPaymentSession,
+      args: Omit<ConfirmCheckoutArgs, 'selectedIntent'> & { selectedMethod: CheckoutPaymentMethod },
+    ): Promise<void> => {
       const selectedChannel = mapMethodToChannel(args.selectedMethod);
-      let session = orderPaymentStore.getActiveSession();
-
-      if (!canReuseSession(session, args, args.selectedMethod)) {
-        const order = await createOrder({
-          paymentMethod: mapMethodToOrderPaymentMethod(args.selectedMethod),
-          items: args.basketItems.map((item) => ({
-            productId: item.productId,
-            quantity: item.quantity,
-          })),
-        });
-
-        session = {
-          orderId: order.orderId,
-          merchantId: args.merchantId,
-          merchantName: args.merchantName,
-          branchId: args.branchId,
-          branchName: args.branchName,
-          amount: args.amount,
-          currency: order.currency,
-          basketSummary: args.basketSummary,
-          basketItemCount: args.basketItemCount,
-          basketItems: args.basketItems,
-          selectedMethod: args.selectedMethod,
-          selectedChannel,
-          orderStatus: order.status,
-          paymentRequestId: order.lastPaymentRequestId,
-          paymentProvider: order.lastPaymentProvider,
-        };
-        orderPaymentStore.saveSession(session);
-        observability.info('order_payment_session_created', {
-          orderId: order.orderId,
-          merchantId: order.merchantId,
-          branchId: order.branchId ?? null,
-          orderStatus: order.status,
-          shopperUserId: args.user?.id ?? null,
-          shopperEmailHint: args.user?.email ? args.user.email.slice(0, 80) : null,
-          paymentMethod: args.selectedMethod,
-          paymentChannel: selectedChannel,
-        });
-      }
-
-      const orderLinkedPaymentRequestId = session.paymentRequestId;
-
       observability.info('order_payment_handoff_started', {
         orderId: session.orderId,
-        paymentChannel: session.selectedChannel,
+        paymentChannel: selectedChannel,
         merchantId: session.merchantId,
         branchId: session.branchId ?? null,
+        checkoutIntent: session.checkoutIntent,
       });
 
       if (args.selectedMethod === 'bank') {
@@ -141,16 +147,19 @@ export function useOrderPayment() {
           amount: args.amount,
           merchantName: args.merchantName,
           orderId: session.orderId,
-          merchantId: args.merchantId,
-          branchId: args.branchId,
-          itemSummary: args.basketSummary,
-          itemCount: args.basketItemCount,
+          merchantId: session.merchantId,
+          branchId: session.branchId,
+          itemSummary: session.basketSummary,
+          itemCount: session.basketItemCount,
           invoiceId: args.invoiceId,
           currency: session.currency,
           user: args.user,
         });
 
         orderPaymentStore.patchSession(session.orderId, {
+          availableChannels: args.availableChannels,
+          selectedMethod: args.selectedMethod,
+          selectedChannel,
           paymentRequestId: context.paymentRequestId,
           paymentProvider: 'TRUELAYER',
           orderStatus: 'PAYMENT_IN_PROGRESS',
@@ -158,7 +167,6 @@ export function useOrderPayment() {
 
         void registerDeviceForPayment(session.orderId);
         void paymentResultTracker.start(context.paymentRequestId);
-
         args.navigation.replace('PaymentProcessing', {
           paymentRequestId: context.paymentRequestId,
           orderId: session.orderId,
@@ -169,7 +177,6 @@ export function useOrderPayment() {
           merchantLogoUrl: args.merchantLogoUrl,
           invoiceId: args.invoiceId,
         });
-
         void runTrueLayerSdk(context).catch((err: unknown) => {
           const key = err instanceof Error ? err.message : 'truelayer_reason_unknown';
           if (key === 'truelayer_cancelled') {
@@ -188,11 +195,14 @@ export function useOrderPayment() {
       if (args.selectedMethod === 'card') {
         const stripeParams = await createStripeIntentForOrder({
           orderId: session.orderId,
-          merchantId: args.merchantId,
-          branchId: args.branchId,
-          productId: args.basketItems[0]?.productId,
+          merchantId: session.merchantId,
+          branchId: session.branchId,
+          productId: session.basketItems[0]?.productId,
         });
         orderPaymentStore.patchSession(session.orderId, {
+          availableChannels: args.availableChannels,
+          selectedMethod: args.selectedMethod,
+          selectedChannel,
           paymentRequestId: stripeParams.paymentRequestId,
           paymentProvider: 'STRIPE',
           orderStatus: 'PAYMENT_IN_PROGRESS',
@@ -201,23 +211,20 @@ export function useOrderPayment() {
         await initializePayment(stripeParams);
         const result = await openPaymentSheet();
         const refreshed = await fetchOrder(session.orderId).catch(() => null);
-
         if (refreshed) {
           orderPaymentStore.patchSession(session.orderId, {
             orderStatus: refreshed.status,
             paymentRequestId: refreshed.lastPaymentRequestId,
             paymentProvider: refreshed.lastPaymentProvider,
+            paymentSource: refreshed.paymentSource,
+            updatedAt: refreshed.updatedAt,
           });
         }
 
-        if (result.status === 'failed') {
-          throw new Error(result.error ?? 'payment_failed');
-        }
+        if (result.status === 'failed') throw new Error(result.error ?? 'payment_failed');
         if (result.status === 'canceled') {
-          const cancelledPaymentRequestId =
-            refreshed?.lastPaymentRequestId ?? stripeParams.paymentRequestId ?? session.paymentRequestId ?? session.orderId;
           args.navigation.replace('PaymentResult', {
-            paymentRequestId: cancelledPaymentRequestId,
+            paymentRequestId: refreshed?.lastPaymentRequestId ?? stripeParams.paymentRequestId,
             orderId: session.orderId,
             status: 'cancelled',
             amount: args.amount,
@@ -225,16 +232,15 @@ export function useOrderPayment() {
             merchantName: args.merchantName,
             branchName: args.branchName,
             merchantLogoUrl: args.merchantLogoUrl,
+            checkoutIntent: session.checkoutIntent,
+            paymentSource: refreshed?.paymentSource,
           });
           return;
         }
 
-        const paymentRequestId =
-          refreshed?.lastPaymentRequestId ?? stripeParams.paymentRequestId ?? session.paymentRequestId;
+        const paymentRequestId = refreshed?.lastPaymentRequestId ?? stripeParams.paymentRequestId;
         if (paymentRequestId && refreshed && refreshed.status !== 'PAID' && refreshed.status !== 'CANCELLED') {
-          if (!paymentResultTracker.isTracking(paymentRequestId)) {
-            void paymentResultTracker.start(paymentRequestId);
-          }
+          if (!paymentResultTracker.isTracking(paymentRequestId)) void paymentResultTracker.start(paymentRequestId);
           args.navigation.replace('PaymentProcessing', {
             paymentRequestId,
             orderId: session.orderId,
@@ -247,11 +253,9 @@ export function useOrderPayment() {
           return;
         }
 
-        const resultStatus = refreshed
-          ? mapOrderStatusToPaymentResult(refreshed.status)
-          : 'succeeded';
+        const resultStatus = refreshed ? mapOrderStatusToPaymentResult(refreshed.status) : 'succeeded';
         args.navigation.replace('PaymentResult', {
-          paymentRequestId: paymentRequestId ?? session.orderId,
+          paymentRequestId,
           orderId: session.orderId,
           status: resultStatus === 'processing' || resultStatus === 'pending' ? 'succeeded' : resultStatus,
           amount: args.amount,
@@ -259,46 +263,48 @@ export function useOrderPayment() {
           merchantName: args.merchantName,
           branchName: args.branchName,
           merchantLogoUrl: args.merchantLogoUrl,
+          checkoutIntent: session.checkoutIntent,
+          paymentSource: refreshed?.paymentSource,
         });
         return;
       }
 
       void registerDeviceForPayment(session.orderId);
       const result = await presentPayPal({
-        paymentRequestId: orderLinkedPaymentRequestId ?? undefined,
+        paymentRequestId: session.paymentRequestId,
         amount: args.amount,
         currency: session.currency,
         invoiceId: args.invoiceId,
         orderId: session.orderId,
-        merchantId: args.merchantId,
-        branchId: args.branchId,
-        productId: args.basketItems[0]?.productId,
+        merchantId: session.merchantId,
+        branchId: session.branchId,
+        productId: session.basketItems[0]?.productId,
       });
       if (result.paymentRequestId) {
         orderPaymentStore.patchSession(session.orderId, {
+          availableChannels: args.availableChannels,
+          selectedMethod: args.selectedMethod,
+          selectedChannel,
           paymentRequestId: result.paymentRequestId,
           paymentProvider: 'BRAINTREE',
           orderStatus: 'PAYMENT_IN_PROGRESS',
         });
       }
       const refreshed = await fetchOrder(session.orderId).catch(() => null);
-
       if (refreshed) {
         orderPaymentStore.patchSession(session.orderId, {
           orderStatus: refreshed.status,
           paymentRequestId: refreshed.lastPaymentRequestId,
           paymentProvider: refreshed.lastPaymentProvider,
+          paymentSource: refreshed.paymentSource,
+          updatedAt: refreshed.updatedAt,
         });
       }
-
-      const trackedPaymentRequestId =
-        refreshed?.lastPaymentRequestId ?? result.paymentRequestId ?? session.paymentRequestId ?? orderLinkedPaymentRequestId;
-      if (trackedPaymentRequestId && refreshed && refreshed.status !== 'PAID' && refreshed.status !== 'CANCELLED') {
-        if (!paymentResultTracker.isTracking(trackedPaymentRequestId)) {
-          void paymentResultTracker.start(trackedPaymentRequestId);
-        }
+      const paymentRequestId = refreshed?.lastPaymentRequestId ?? result.paymentRequestId ?? session.paymentRequestId;
+      if (paymentRequestId && refreshed && refreshed.status !== 'PAID' && refreshed.status !== 'CANCELLED') {
+        if (!paymentResultTracker.isTracking(paymentRequestId)) void paymentResultTracker.start(paymentRequestId);
         args.navigation.replace('PaymentProcessing', {
-          paymentRequestId: trackedPaymentRequestId,
+          paymentRequestId,
           orderId: session.orderId,
           amount: args.amount,
           currency: session.currency,
@@ -308,7 +314,6 @@ export function useOrderPayment() {
         });
         return;
       }
-
       const resultStatus =
         result.status === 'failed'
           ? 'failed'
@@ -317,9 +322,8 @@ export function useOrderPayment() {
             : refreshed
               ? mapOrderStatusToPaymentResult(refreshed.status)
               : 'succeeded';
-
       args.navigation.replace('PaymentResult', {
-        paymentRequestId: trackedPaymentRequestId ?? session.orderId,
+        paymentRequestId: paymentRequestId ?? session.orderId,
         orderId: session.orderId,
         status: resultStatus === 'processing' || resultStatus === 'pending' ? 'succeeded' : resultStatus,
         amount: args.amount,
@@ -327,10 +331,95 @@ export function useOrderPayment() {
         merchantName: args.merchantName,
         branchName: args.branchName,
         merchantLogoUrl: args.merchantLogoUrl,
+        checkoutIntent: session.checkoutIntent,
+        paymentSource: refreshed?.paymentSource,
         reason: result.status === 'failed' ? result.error : undefined,
       });
     },
     [initializePayment, openPaymentSheet, presentPayPal],
+  );
+
+  const confirmCheckout = useCallback(
+    async (args: ConfirmCheckoutArgs): Promise<void> => {
+      if (!args.merchantId) throw new Error('merchant_unavailable');
+      if (!args.branchId) throw new Error('merchant_branch_unavailable');
+      if (args.selectedIntent === 'PAY_NOW' && !args.selectedMethod) {
+        throw new Error('payment_option_required');
+      }
+      if (args.selectedIntent === 'PAY_NOW' && args.selectedMethod && !isMethodAvailable(args.selectedMethod, args.availableChannels)) {
+        throw new Error('payment_option_unavailable');
+      }
+
+      observability.info('checkout_intent_selected', {
+        checkoutIntent: args.selectedIntent,
+        paymentMethod: args.selectedMethod ?? null,
+        merchantId: args.merchantId,
+        branchId: args.branchId ?? null,
+        basketItemCount: args.basketItemCount,
+      });
+      observability.info('checkout_order_create_requested', {
+        checkoutIntent: args.selectedIntent,
+        paymentMethod: args.selectedMethod ? mapMethodToOrderPaymentMethod(args.selectedMethod) : null,
+        usesDeferredPayment: args.selectedIntent === 'PAY_LATER',
+        merchantId: args.merchantId,
+        branchId: args.branchId ?? null,
+        basketItemsJson: JSON.stringify(
+          args.basketItems.map((item) => ({
+            productId: item.productId,
+            quantity: item.quantity,
+            unitPriceMinor: Math.round(item.unitPrice * 100),
+          })),
+        ),
+      });
+
+      const order = await createOrder({
+        branchId: args.branchId,
+        orderType: 'PRE_ORDER',
+        checkoutIntent: args.selectedIntent,
+        paymentMethod: args.selectedMethod ? mapMethodToOrderPaymentMethod(args.selectedMethod) : undefined,
+        items: args.basketItems.map((item) => ({
+          productId: item.productId,
+          quantity: item.quantity,
+          unitPriceMinor: Math.round(item.unitPrice * 100),
+        })),
+      });
+
+      const session = toSession(args, order);
+      orderPaymentStore.saveSession(session);
+      orderPaymentStore.upsertRecentOrder({
+        ...order,
+        merchantName: args.merchantName,
+        branchName: args.branchName,
+        merchantLogoUrl: args.merchantLogoUrl,
+        preferredMethod: args.selectedMethod ?? undefined,
+      });
+
+      observability.info('order_payment_session_created', {
+        orderId: order.orderId,
+        merchantId: order.merchantId,
+        branchId: order.branchId ?? null,
+        orderStatus: order.status,
+        checkoutIntent: order.checkoutIntent,
+      });
+
+      if (args.selectedIntent === 'PAY_LATER') {
+        args.navigation.replace('OrderDetail', {
+          orderId: order.orderId,
+          merchantName: args.merchantName,
+          branchName: args.branchName,
+          merchantLogoUrl: args.merchantLogoUrl,
+          availableChannels: args.availableChannels,
+          checkoutIntent: order.checkoutIntent,
+        });
+        return;
+      }
+
+      await startPayment(session, {
+        ...args,
+        selectedMethod: args.selectedMethod!,
+      });
+    },
+    [startPayment],
   );
 
   const resumeOrderPayment = useCallback(
@@ -342,38 +431,11 @@ export function useOrderPayment() {
         throw new Error('order_not_payable');
       }
 
-      const selectedChannel = mapMethodToChannel(args.selectedMethod);
-      const amount = args.order.totalAmountMinor / 100;
-      const session: OrderPaymentSession = {
-        orderId: args.order.orderId,
-        merchantId: args.order.merchantId,
-        merchantName: args.merchantName,
-        branchId: args.order.branchId,
-        branchName: args.branchName,
-        amount,
-        currency: args.order.currency,
-        basketSummary: args.order.items.map((item) => `${item.quantity}x ${item.name}`).join(', '),
-        basketItemCount: args.order.items.reduce((total, item) => total + item.quantity, 0),
-        basketItems: args.order.items.map((item) => ({
-          productId: item.productId,
-          merchantId: args.order.merchantId,
-          branchId: args.order.branchId ?? '',
-          productName: item.name,
-          quantity: item.quantity,
-          unitPrice: item.unitPriceMinor / 100,
-          lineTotal: item.lineTotalMinor / 100,
-        })),
-        selectedMethod: args.selectedMethod,
-        selectedChannel,
-        orderStatus: args.order.status,
-        paymentRequestId: args.order.lastPaymentRequestId,
-        paymentProvider: args.order.lastPaymentProvider,
-      };
+      const session = toResumeSession(args);
       orderPaymentStore.saveSession(session);
-
-      return confirmCheckout({
+      await startPayment(session, {
         token: args.token,
-        amount,
+        amount: session.amount,
         merchantName: args.merchantName,
         merchantId: args.order.merchantId,
         branchId: args.order.branchId,
@@ -389,11 +451,74 @@ export function useOrderPayment() {
         navigation: args.navigation,
       });
     },
-    [confirmCheckout],
+    [startPayment],
+  );
+
+  const refreshOrder = useCallback(async (orderId: string): Promise<OrderSummary> => {
+    const order = await fetchOrder(orderId);
+    const session = orderPaymentStore.getSession(orderId);
+    if (session) {
+      orderPaymentStore.patchSession(orderId, {
+        orderStatus: order.status,
+        paymentSource: order.paymentSource,
+        banner: order.banner,
+        updatedAt: order.updatedAt,
+        paymentRequestId: order.lastPaymentRequestId,
+        paymentProvider: order.lastPaymentProvider,
+        checkoutIntent: order.checkoutIntent,
+      });
+    }
+    orderPaymentStore.upsertRecentOrder({
+      ...order,
+      merchantName: order.merchantName,
+      branchName: order.branchName,
+      merchantLogoUrl: order.merchantLogoUrl,
+      preferredMethod: session?.selectedMethod ?? session?.retryPreferredMethod,
+    });
+    return order;
+  }, []);
+
+  const mutateEditableOrder = useCallback(
+    async (orderId: string, action: () => Promise<OrderSummary>): Promise<OrderSummary> => {
+      const current = await refreshOrder(orderId);
+      if (!isOrderEditable(current.status)) {
+        observability.warn('order_edit_blocked', { orderId, status: current.status });
+        throw new Error('order_not_payable');
+      }
+      const nextOrder = await action();
+      const session = orderPaymentStore.getSession(orderId);
+      if (session) {
+        orderPaymentStore.patchSession(orderId, {
+          orderStatus: nextOrder.status,
+          paymentSource: nextOrder.paymentSource,
+          banner: nextOrder.banner,
+          updatedAt: nextOrder.updatedAt,
+          paymentRequestId: nextOrder.lastPaymentRequestId,
+          paymentProvider: nextOrder.lastPaymentProvider,
+        });
+      }
+      orderPaymentStore.upsertRecentOrder({
+        ...nextOrder,
+        merchantName: nextOrder.merchantName,
+        branchName: nextOrder.branchName,
+        merchantLogoUrl: nextOrder.merchantLogoUrl,
+        preferredMethod: session?.selectedMethod ?? session?.retryPreferredMethod,
+      });
+      return nextOrder;
+    },
+    [refreshOrder],
   );
 
   return {
     confirmCheckout,
     resumeOrderPayment,
+    refreshOrder,
+    addItemToOrder: (orderId: string, productId: string, quantity: number) =>
+      mutateEditableOrder(orderId, () => addOrderItem(orderId, { productId, quantity })),
+    updateOrderItemQuantity: (orderId: string, lineId: string, quantity: number) =>
+      mutateEditableOrder(orderId, () => updateOrderLineQuantity(orderId, { lineId, quantity })),
+    removeOrderItem: (orderId: string, lineId: string) =>
+      mutateEditableOrder(orderId, () => removeOrderLine(orderId, lineId)),
+    cancelOrder: (orderId: string) => mutateEditableOrder(orderId, () => cancelOrder(orderId)),
   };
 }

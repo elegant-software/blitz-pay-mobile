@@ -1,114 +1,83 @@
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 import * as Location from 'expo-location';
+import { useQuery } from '@tanstack/react-query';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   fetchActiveProducts,
   fetchMerchantBranches,
-  fetchMerchantLogoUrl,
+  fetchMerchantDetails,
   resolveMerchantBranch,
 } from '../services/merchantCatalogService';
 import type { ActiveProduct, MerchantBranch } from '../types/catalog';
 import { setBasketMerchantContext } from '../../basket/store/basketStore';
+import { QUERY_KEYS, STALE_TIMES } from '../../../lib/queryClient';
 
-type MerchantCatalogState = {
-  loading: boolean;
-  errorKey: string | null;
-  branch: MerchantBranch | null;
+type CatalogResult = {
+  branch: MerchantBranch;
   merchantLogoUrl?: string;
   products: ActiveProduct[];
 };
 
-export function useMerchantCatalog(params: {
-  merchantId?: string;
-  merchantName?: string;
-}) {
-  const { merchantId, merchantName } = params;
-  const [state, setState] = useState<MerchantCatalogState>({
-    loading: true,
-    errorKey: null,
-    branch: null,
-    merchantLogoUrl: undefined,
-    products: [],
+async function loadCatalog(merchantId: string, merchantName: string): Promise<CatalogResult> {
+  const [branches, merchantDetails] = await Promise.all([
+    fetchMerchantBranches(merchantId),
+    fetchMerchantDetails(merchantId),
+  ]);
+
+  let coords: { latitude: number; longitude: number } | undefined;
+  try {
+    const lastKnown = await Location.getLastKnownPositionAsync({});
+    if (lastKnown) coords = { latitude: lastKnown.coords.latitude, longitude: lastKnown.coords.longitude };
+  } catch {
+    coords = undefined;
+  }
+
+  const branch = resolveMerchantBranch(branches, coords);
+  if (!branch) throw new Error('merchant_branch_unavailable');
+
+  const products = await fetchActiveProducts(merchantId, branch.branchId);
+  const branchWithPolicy = { ...branch, delayedPaymentEnabled: merchantDetails.delayedPaymentEnabled };
+
+  setBasketMerchantContext({
+    merchantId,
+    merchantName,
+    branchId: branchWithPolicy.branchId,
+    branchName: branchWithPolicy.name,
   });
 
-  const loadCatalog = useCallback(async () => {
-    if (!merchantId) {
-      setState({
-        loading: false,
-        errorKey: 'merchant_unavailable',
-        branch: null,
-        merchantLogoUrl: undefined,
-        products: [],
-      });
-      return;
-    }
+  return { branch: branchWithPolicy, merchantLogoUrl: merchantDetails.logoUrl, products };
+}
 
-    setState((current) => ({ ...current, loading: true, errorKey: null }));
-    try {
-      const [branches, merchantLogoUrl] = await Promise.all([
-        fetchMerchantBranches(merchantId),
-        fetchMerchantLogoUrl(merchantId),
-      ]);
-      let coords: { latitude: number; longitude: number } | undefined;
-      try {
-        const lastKnown = await Location.getLastKnownPositionAsync({});
-        if (lastKnown) {
-          coords = {
-            latitude: lastKnown.coords.latitude,
-            longitude: lastKnown.coords.longitude,
-          };
-        }
-      } catch {
-        coords = undefined;
-      }
+export function useMerchantCatalog(params: { merchantId?: string; merchantName?: string }) {
+  const { merchantId, merchantName = 'Merchant' } = params;
 
-      const branch = resolveMerchantBranch(branches, coords);
-      if (!branch) {
-        setState({
-          loading: false,
-          errorKey: 'merchant_branch_unavailable',
-          branch: null,
-          merchantLogoUrl,
-          products: [],
-        });
-        return;
-      }
+  const { data, isLoading, error, refetch, isStale } = useQuery({
+    queryKey: QUERY_KEYS.catalog(merchantId!),
+    queryFn: () => loadCatalog(merchantId!, merchantName),
+    enabled: !!merchantId,
+    staleTime: STALE_TIMES.PRODUCTS,
+  });
 
-      const products = await fetchActiveProducts(merchantId, branch.branchId);
-      setBasketMerchantContext({
-        merchantId,
-        merchantName: merchantName ?? 'Merchant',
-        branchId: branch.branchId,
-        branchName: branch.name,
-      });
-      setState({
-        loading: false,
-        errorKey: null,
-        branch,
-        merchantLogoUrl,
-        products,
-      });
-    } catch {
-      setState({
-        loading: false,
-        errorKey: 'merchant_catalog_load_failed',
-        branch: null,
-        merchantLogoUrl: undefined,
-        products: [],
-      });
-    }
-  }, [merchantId, merchantName]);
+  useFocusEffect(
+    useCallback(() => {
+      if (isStale) void refetch();
+    }, [refetch, isStale]),
+  );
 
-  useFocusEffect(useCallback(() => {
-    void loadCatalog();
-  }, [loadCatalog]));
+  const errorKey = !merchantId
+    ? 'merchant_unavailable'
+    : error
+      ? (error instanceof Error && error.message === 'merchant_branch_unavailable'
+        ? 'merchant_branch_unavailable'
+        : 'merchant_catalog_load_failed')
+      : null;
 
   return {
-    loading: state.loading,
-    errorKey: state.errorKey,
-    branch: state.branch,
-    merchantLogoUrl: state.merchantLogoUrl,
-    products: state.products,
-    retry: loadCatalog,
+    loading: isLoading,
+    errorKey,
+    branch: data?.branch ?? null,
+    merchantLogoUrl: data?.merchantLogoUrl,
+    products: data?.products ?? [],
+    retry: refetch,
   };
 }

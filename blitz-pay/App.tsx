@@ -8,6 +8,8 @@ import { StatusBar } from 'expo-status-bar';
 import * as ExpoSplashScreen from 'expo-splash-screen';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
+import { queryClient, productsPersister } from './src/lib/queryClient';
 import { AuthProvider, useAuth } from './src/lib/auth';
 import { LanguageProvider } from './src/lib/LanguageContext';
 import { StripeProvider } from '@stripe/stripe-react-native';
@@ -70,6 +72,15 @@ export default function App() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <ErrorBoundary>
+          <PersistQueryClientProvider
+            client={queryClient}
+            persistOptions={{
+              persister: productsPersister,
+              dehydrateOptions: {
+                shouldDehydrateQuery: (query) => query.queryKey[0] === 'catalog',
+              },
+            }}
+          >
           <LanguageProvider>
             <StripeProvider
               publishableKey={config.stripePublishableKey}
@@ -96,6 +107,7 @@ export default function App() {
               </>
             </StripeProvider>
           </LanguageProvider>
+          </PersistQueryClientProvider>
         </ErrorBoundary>
       </SafeAreaProvider>
     </GestureHandlerRootView>

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet,
   KeyboardAvoidingView, Platform, ActivityIndicator, Image, Alert, Switch, Modal, FlatList,
@@ -10,6 +11,7 @@ import { useNavigation, useRoute, type RouteProp } from '@react-navigation/nativ
 import { useAuth } from '../lib/auth';
 import { useLanguage } from '../lib/LanguageContext';
 import { observability } from '../lib/observability';
+import { QUERY_KEYS } from '../lib/queryClient';
 import { colors, spacing, radius, shadow } from '../lib/theme';
 import {
   createMerchantProduct,
@@ -44,6 +46,7 @@ type CategoryOption = {
 export default function ProductEditScreen() {
   const { t } = useLanguage();
   const navigation = useNavigation();
+  const queryClient = useQueryClient();
   const route = useRoute<RouteProps>();
   const insets = useSafeAreaInsets();
   const isEdit = route.params.mode === 'edit';
@@ -192,10 +195,27 @@ export default function ProductEditScreen() {
       };
 
       if (isEdit && route.params.productId) {
-        await updateMerchantProduct(activeBranchScope.merchantId, route.params.productId, input);
+        const product = await updateMerchantProduct(activeBranchScope.merchantId, route.params.productId, input);
+        queryClient.setQueryData<Product[]>(
+          QUERY_KEYS.products(activeBranchScope.merchantId, activeBranchScope.branchId),
+          (current) => current
+            ? current
+                .map((entry) => (entry.id === product.id ? product : entry))
+                .sort((a, b) => a.name.localeCompare(b.name))
+            : [product],
+        );
       } else {
-        await createMerchantProduct(activeBranchScope.merchantId, input);
+        const product = await createMerchantProduct(activeBranchScope.merchantId, input);
+        queryClient.setQueryData<Product[]>(
+          QUERY_KEYS.products(activeBranchScope.merchantId, activeBranchScope.branchId),
+          (current) => current
+            ? [...current.filter((entry) => entry.id !== product.id), product].sort((a, b) => a.name.localeCompare(b.name))
+            : [product],
+        );
       }
+      void queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.products(activeBranchScope.merchantId, activeBranchScope.branchId),
+      });
       navigation.goBack();
     } catch (error) {
       setErrorKey(error instanceof MerchantProductError ? error.key : 'merchant_product_save_failed');

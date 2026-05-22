@@ -140,12 +140,21 @@ export async function startGeofencing(): Promise<void> {
     notifyOnExit: r.notifyOnExit,
   }));
 
-  await Location.startGeofencingAsync(GEOFENCE_TASK, regions);
+  // Stop first to avoid "already started" errors on some Expo/OS versions
+  if (await Location.hasStartedGeofencingAsync(GEOFENCE_TASK)) {
+    await Location.stopGeofencingAsync(GEOFENCE_TASK);
+  }
 
-  // Verify the task actually started; fall back to polling if not
-  const started = await Location.hasStartedGeofencingAsync(GEOFENCE_TASK);
-  if (!started) {
-    console.warn('[geofence] startGeofencingAsync failed — falling back to polling');
+  try {
+    await Location.startGeofencingAsync(GEOFENCE_TASK, regions);
+
+    const started = await Location.hasStartedGeofencingAsync(GEOFENCE_TASK);
+    if (!started) {
+      console.warn('[geofence] startGeofencingAsync returned but task not registered — falling back to polling');
+      await startPolling();
+    }
+  } catch (err: unknown) {
+    console.warn('[geofence] startGeofencingAsync threw — falling back to polling:', err);
     await startPolling();
   }
 }

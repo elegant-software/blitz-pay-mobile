@@ -20,11 +20,22 @@ _Avoid_: Nearby branch, detected branch, location scope
 The canonical access-control group path `/merchants/merchant_<merchantId>/branch_<branchId>` carried in the access token and used to derive Branch Membership.
 _Avoid_: Role, branch claim, geofence
 
+**Merchant Action Queue**:
+The default merchant order-screen view that prioritises orders needing operational follow-up ahead of in-progress, completed, and cancelled orders.
+_Avoid_: Flat history, customer list, generic recent orders
+
+**Shopper Identity Withholding**:
+The privacy rule that the merchant portal UI must not expose shopper personal identity anywhere in the merchant app.
+_Avoid_: Customer name display, shopper profile visibility, identity lookup from orders
+
 ## Relationships
 
 - A **Merchant User** has zero or more **Branch Memberships**
 - A **Branch Membership** authorizes access to exactly one **Merchant Branch**
 - A **Branch Group** encodes exactly one **Branch Membership**
+- A **Merchant Action Queue** belongs to exactly one **Merchant Branch**
+- A **Merchant Action Queue** prioritises orders needing merchant action over reference/history states
+- **Shopper Identity Withholding** applies across the entire merchant portal UI within one **Merchant Branch**
 
 ## Example dialogue
 

@@ -25,7 +25,8 @@ function isSession(value: unknown): value is OrderPaymentSession {
     value !== null &&
     typeof (value as OrderPaymentSession).orderId === 'string' &&
     typeof (value as OrderPaymentSession).merchantId === 'string' &&
-    typeof (value as OrderPaymentSession).merchantName === 'string'
+    typeof (value as OrderPaymentSession).merchantName === 'string' &&
+    typeof (value as OrderPaymentSession).checkoutIntent === 'string'
   );
 }
 
@@ -96,6 +97,32 @@ function getSession(orderId: string): OrderPaymentSession | undefined {
   return state.sessions[orderId];
 }
 
+function removeSession(orderId: string) {
+  if (!state.sessions[orderId]) return;
+  const nextSessions = { ...state.sessions };
+  delete nextSessions[orderId];
+  replaceState({
+    activeOrderId: state.activeOrderId === orderId ? undefined : state.activeOrderId,
+    sessions: nextSessions,
+    recentOrders: state.recentOrders,
+  });
+}
+
+function setActiveOrder(orderId: string | undefined) {
+  replaceState({
+    ...state,
+    activeOrderId: orderId && state.sessions[orderId] ? orderId : undefined,
+  });
+}
+
+function upsertRecentOrder(order: RecentOrderSummary) {
+  const next = [order, ...state.recentOrders.filter((entry) => entry.orderId !== order.orderId)].slice(0, 50);
+  replaceState({
+    ...state,
+    recentOrders: next,
+  });
+}
+
 function setRecentOrders(recentOrders: RecentOrderSummary[]) {
   replaceState({
     ...state,
@@ -121,5 +148,8 @@ export const orderPaymentStore = {
   getSession,
   saveSession,
   patchSession,
+  removeSession,
+  setActiveOrder,
   setRecentOrders,
+  upsertRecentOrder,
 };

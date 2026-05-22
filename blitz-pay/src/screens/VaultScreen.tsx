@@ -48,6 +48,12 @@ function preferredMethodFor(order: RecentOrderSummary): CheckoutPaymentMethod | 
   return session?.selectedMethod;
 }
 
+function availableChannelsFor(order: RecentOrderSummary) {
+  const session = orderPaymentStore.getSession(order.orderId);
+  if (session?.availableChannels?.length) return session.availableChannels;
+  return session?.selectedChannel ? [session.selectedChannel] : undefined;
+}
+
 export default function VaultScreen() {
   const { t } = useLanguage();
   const insets = useSafeAreaInsets();
@@ -115,13 +121,14 @@ export default function VaultScreen() {
                 style={[styles.orderCard, shadow.sm]}
                 activeOpacity={0.85}
                 onPress={() =>
-                  navigation.navigate('OrderDetail', {
-                    orderId: order.orderId,
-                    merchantName: order.merchantName,
-                    branchName: order.branchName,
-                    merchantLogoUrl: order.merchantLogoUrl,
-                    preferredMethod: preferredMethodFor(order),
-                  })}
+                    navigation.navigate('OrderDetail', {
+                      orderId: order.orderId,
+                      merchantName: order.merchantName,
+                      branchName: order.branchName,
+                      merchantLogoUrl: order.merchantLogoUrl,
+                      availableChannels: availableChannelsFor(order),
+                      preferredMethod: preferredMethodFor(order),
+                    })}
               >
                 <View style={styles.orderHeaderRow}>
                   <View style={styles.orderHeaderText}>

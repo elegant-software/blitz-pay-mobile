@@ -182,6 +182,7 @@ export default function MerchantScreen() {
         branchName: checkoutContext.branchName,
         merchantLogoUrl: visibleLogoUrl,
         activePaymentChannels: branch?.activePaymentChannels ?? [],
+        delayedPaymentEnabled: branch?.delayedPaymentEnabled ?? false,
         basketSummary: checkoutContext.itemSummary,
         basketItemCount: checkoutContext.itemCount,
         basketItems: checkoutContext.basketItems,
@@ -240,7 +241,7 @@ export default function MerchantScreen() {
           <View style={styles.stateCard}>
             <Ionicons name="alert-circle-outline" size={24} color={colors.secondary} />
             <Text style={styles.stateTitle}>{t(errorKey as Parameters<typeof t>[0])}</Text>
-            <TouchableOpacity style={styles.retryAction} onPress={retry}>
+            <TouchableOpacity style={styles.retryAction} onPress={() => void retry()}>
               <Text style={styles.retryActionText}>{t('retry')}</Text>
             </TouchableOpacity>
           </View>

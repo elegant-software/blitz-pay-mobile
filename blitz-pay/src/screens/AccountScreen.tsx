@@ -39,6 +39,20 @@ export default function AccountScreen() {
           { text: 'Open Settings', onPress: openSettings },
         ],
       );
+    } else if (result === 'foreground_denied') {
+      Alert.alert(
+        'Location Permission Required',
+        'Please allow location access so BlitzPay can detect nearby merchants.',
+        [
+          { text: 'Not Now', style: 'cancel' },
+          { text: 'Open Settings', onPress: openSettings },
+        ],
+      );
+    } else if (result === 'error') {
+      Alert.alert(
+        'Could Not Enable',
+        'Nearby merchant alerts could not be started. Please try again.',
+      );
     }
   };
 
@@ -127,9 +141,7 @@ export default function AccountScreen() {
           label: t('geofence_enabled'),
           onPress: needsSettingsForBackground ? openSettings : undefined,
           showArrow: needsSettingsForBackground,
-          right: needsSettingsForBackground ? (
-            <Text style={{ fontSize: 12, color: colors.primary }}>Open Settings</Text>
-          ) : (
+          right: (
             <Switch
               value={isMonitoring}
               onValueChange={handleGeofenceToggle}
