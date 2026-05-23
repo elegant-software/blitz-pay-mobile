@@ -54,6 +54,10 @@ function availableChannelsFor(order: RecentOrderSummary) {
   return session?.selectedChannel ? [session.selectedChannel] : undefined;
 }
 
+function formatMerchantLabel(order: RecentOrderSummary): string | null {
+  return order.merchantName ?? order.branchName ?? null;
+}
+
 export default function VaultScreen() {
   const { t } = useLanguage();
   const insets = useSafeAreaInsets();
@@ -115,6 +119,7 @@ export default function VaultScreen() {
           {orders.map((order) => {
             const resumable = isOrderResumable(order.status);
             const color = ORDER_STATUS_COLORS[order.status];
+            const merchantLabel = formatMerchantLabel(order);
             return (
               <TouchableOpacity
                 key={order.orderId}
@@ -133,10 +138,12 @@ export default function VaultScreen() {
                 <View style={styles.orderHeaderRow}>
                   <View style={styles.orderHeaderText}>
                     <Text style={styles.orderIdLabel}>{t('order_reference_label', { orderId: order.orderId })}</Text>
-                    <Text style={styles.orderMeta}>
-                      {order.merchantName ?? t('merchant_mode')}
-                      {order.branchName ? ` · ${order.branchName}` : ''}
-                    </Text>
+                    {merchantLabel ? (
+                      <Text style={styles.orderMeta}>
+                        {merchantLabel}
+                        {order.merchantName && order.branchName ? ` · ${order.branchName}` : ''}
+                      </Text>
+                    ) : null}
                     <Text style={styles.orderMeta}>{formatDate(order.createdAt)}</Text>
                   </View>
                   <View style={[styles.statusBadge, { backgroundColor: `${color}18` }]}>
