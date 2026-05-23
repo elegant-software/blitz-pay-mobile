@@ -424,3 +424,45 @@ _Avoid_: Order state, payment method timing
 - merchant cancellation path was ambiguous — resolved: unpaid orders may also be ended by **Merchant Cancellation**
 - concurrent shopper activity versus merchant cancellation was ambiguous — resolved: **Merchant Cancellation** immediately removes shopper payment actions
 - merchant unpaid-state semantics were ambiguous after failed payment — resolved: use **Payment Failed** distinct from **Awaiting Payment**
+
+## Consumer Discovery
+
+This context also covers how the shopper-facing BlitzPay app talks about merchant discovery and branch selection. It keeps live branch appearances distinct from generic nearby merchant discovery.
+
+### Language
+
+**Merchant Branch**:
+The concrete branch a shopper can browse and check out against.
+_Avoid_: Store, outlet, merchant location
+
+**Nearby Merchant**:
+A merchant returned for a shopper's position because it has at least one active branch location within the search radius.
+_Avoid_: Live branch, appearance, happening now item
+
+**Appearance**:
+A time-bounded live presence of a mobile Merchant Branch that is happening now or scheduled for later.
+_Avoid_: Nearby merchant, event, branch location
+
+**Active Appearance**:
+An Appearance whose time window is active now, optionally filtered by shopper proximity.
+_Avoid_: Nearby merchant, open branch
+
+**Appearance Branch Selection**:
+The rule that a shopper who enters through an Active Appearance is scoped to that Appearance's Merchant Branch, even if another branch of the same merchant is nearer.
+_Avoid_: Nearest branch fallback
+
+### Relationships
+
+- A **Nearby Merchant** has one or more **Merchant Branches**
+- An **Appearance** belongs to exactly one **Merchant Branch**
+- An **Active Appearance** is one currently active **Appearance**
+- **Appearance Branch Selection** chooses exactly one **Merchant Branch** from the tapped **Active Appearance**
+
+### Flagged ambiguities
+
+- "Happening now" means **Active Appearances**, not generic **Nearby Merchants**
+
+### Example dialogue
+
+> **Dev:** "The shopper tapped a happening-now card for Branch B, but Branch A is slightly nearer. Which branch should open?"
+> **Domain expert:** "Branch B. A happening-now card is an Active Appearance, so Appearance Branch Selection wins over nearest-branch fallback."

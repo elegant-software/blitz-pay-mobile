@@ -53,12 +53,17 @@ export default function LoginScreen() {
 
   return (
     <LinearGradient colors={['#000000', '#0A0A1E', '#0D0D2B']} style={styles.gradient}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
+        style={styles.flex}
+      >
         <ScrollView
           contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 40, paddingBottom: insets.bottom + 32 }]}
           keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
-          <View style={styles.center}>
+          <View style={styles.content}>
             <View style={styles.logoSection}>
               <View style={styles.logoRing}>
                 <View style={styles.logoCore}>
@@ -155,7 +160,7 @@ const styles = StyleSheet.create({
   gradient: { flex: 1 },
   flex: { flex: 1 },
   scroll: { flexGrow: 1, paddingHorizontal: spacing.md },
-  center: { flex: 1, justifyContent: 'center' },
+  content: { width: '100%' },
   logoSection: { alignItems: 'center', marginBottom: 40 },
   logoRing: {
     width: 80, height: 80, borderRadius: 40,
