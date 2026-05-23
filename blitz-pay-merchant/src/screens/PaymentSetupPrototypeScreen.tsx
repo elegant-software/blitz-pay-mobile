@@ -19,6 +19,7 @@ import type { RootStackNav, RootStackParamList } from '../types';
 
 type VariantKey = 'A' | 'B' | 'C';
 type PrototypeStatus = 'not_connected' | 'pending_requirements' | 'restricted' | 'enabled' | 'load_error';
+type ApiAction = 'start_onboarding' | 'refresh_onboarding';
 
 const VARIANTS: VariantKey[] = ['A', 'B', 'C'];
 
@@ -64,6 +65,11 @@ function getBadgeColor(status: PrototypeStatus) {
   if (status === 'load_error') return colors.error;
   if (status === 'not_connected') return colors.gray600;
   return colors.warning;
+}
+
+function getApiAction(status: PrototypeStatus): ApiAction {
+  if (status === 'pending_requirements' || status === 'restricted') return 'refresh_onboarding';
+  return 'start_onboarding';
 }
 
 function VariantSwitcher({
@@ -269,6 +275,7 @@ export default function PaymentSetupPrototypeScreen() {
   const [opening, setOpening] = useState(false);
   const [errorText, setErrorText] = useState<string | null>(null);
   const [successText, setSuccessText] = useState<string | null>(null);
+  const [lastApiAction, setLastApiAction] = useState<ApiAction>('start_onboarding');
 
   useEffect(() => {
     const queryVariant = readVariantFromUrl();
@@ -288,12 +295,14 @@ export default function PaymentSetupPrototypeScreen() {
     setOpening(false);
     setErrorText(null);
     setSuccessText(null);
+    setLastApiAction(getApiAction(nextStatus ?? status));
   }
 
   function handlePrimaryAction() {
     setOpening(true);
     setErrorText(null);
     setSuccessText(null);
+    setLastApiAction(getApiAction(status));
     setTimeout(() => {
       setOpening(false);
       if (status === 'enabled') {
@@ -307,6 +316,7 @@ export default function PaymentSetupPrototypeScreen() {
   function simulateOpenError() {
     setOpening(false);
     setSuccessText(null);
+    setLastApiAction(getApiAction(status));
     setErrorText(t('payment_setup_open_failed'));
   }
 
@@ -317,11 +327,24 @@ export default function PaymentSetupPrototypeScreen() {
     setSuccessText(t('payment_setup_connected_flash'));
   }
 
+  function simulateRefreshUrl() {
+    setOpening(false);
+    setLastApiAction('refresh_onboarding');
+    setSuccessText(t('payment_setup_api_refresh_hint'));
+    setErrorText(null);
+  }
+
   const statusLabel = t(getStatusKey(status));
   const requirementKey = getRequirementKey(status);
   const ctaLabel = t(getCtaKey(status));
   const note = t('payment_setup_note');
   const body = requirementKey ? t(requirementKey) : t('payment_setup_provider_stripe_body');
+  const apiActionLabel = lastApiAction === 'start_onboarding'
+    ? t('payment_setup_api_start')
+    : t('payment_setup_api_refresh');
+  const apiActionHint = lastApiAction === 'start_onboarding'
+    ? t('payment_setup_api_start_hint')
+    : t('payment_setup_api_refresh_hint');
 
   const variantLabel =
     variant === 'A'
@@ -368,6 +391,27 @@ export default function PaymentSetupPrototypeScreen() {
           </View>
         </View>
 
+        <View style={[styles.apiCard, shadow.sm]}>
+          <Text style={styles.statePanelTitle}>{t('payment_setup_api_title')}</Text>
+          <View style={styles.apiEndpointRow}>
+            <Text style={styles.apiEndpointLabel}>{t('payment_setup_api_start')}</Text>
+            <Text style={styles.apiEndpointHint}>{t('payment_setup_api_start_hint')}</Text>
+          </View>
+          <View style={styles.apiEndpointRow}>
+            <Text style={styles.apiEndpointLabel}>{t('payment_setup_api_refresh')}</Text>
+            <Text style={styles.apiEndpointHint}>{t('payment_setup_api_refresh_hint')}</Text>
+          </View>
+          <View style={styles.apiGapBox}>
+            <Ionicons name="alert-circle-outline" size={16} color={colors.warning} />
+            <Text style={styles.apiGapText}>{t('payment_setup_api_gap')}</Text>
+          </View>
+          <View style={[styles.summaryRow, { paddingTop: spacing.sm }]}>
+            <Text style={styles.summaryKey}>{t('payment_setup_summary_api_call')}</Text>
+            <Text style={styles.summaryValue}>{apiActionLabel}</Text>
+          </View>
+          <Text style={styles.apiCurrentHint}>{apiActionHint}</Text>
+        </View>
+
         <View style={styles.controlsCard}>
           <Text style={styles.controlsTitle}>{t('payment_setup_controls_title')}</Text>
           <Text style={styles.controlsLabel}>{t('payment_setup_controls_status')}</Text>
@@ -385,6 +429,9 @@ export default function PaymentSetupPrototypeScreen() {
             </TouchableOpacity>
             <TouchableOpacity style={styles.actionButton} onPress={simulateReturnEnabled}>
               <Text style={styles.actionButtonText}>{t('payment_setup_simulate_return')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionButton} onPress={simulateRefreshUrl}>
+              <Text style={styles.actionButtonText}>{t('payment_setup_simulate_refresh_url')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.actionButton} onPress={() => resetFeedback('not_connected')}>
               <Text style={styles.actionButtonText}>{t('payment_setup_simulate_reset')}</Text>
@@ -449,10 +496,34 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     marginBottom: spacing.md,
   },
+  apiCard: {
+    backgroundColor: colors.white,
+    borderRadius: radius.xl,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
   statePanelTitle: { fontSize: 13, fontWeight: '700', color: colors.onSurface, marginBottom: 8 },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md, paddingVertical: 4 },
   summaryKey: { fontSize: 12, color: colors.gray600 },
   summaryValue: { flex: 1, textAlign: 'right', fontSize: 12, fontWeight: '600', color: colors.onSurface },
+  apiEndpointRow: {
+    paddingVertical: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.gray200,
+  },
+  apiEndpointLabel: { fontSize: 12, fontWeight: '700', color: colors.onSurface },
+  apiEndpointHint: { fontSize: 12, lineHeight: 18, color: colors.gray700, marginTop: 4 },
+  apiGapBox: {
+    marginTop: spacing.sm,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    alignItems: 'flex-start',
+    backgroundColor: `${colors.warning}12`,
+    borderRadius: radius.lg,
+    padding: spacing.sm,
+  },
+  apiGapText: { flex: 1, fontSize: 12, lineHeight: 18, color: colors.gray800 },
+  apiCurrentHint: { fontSize: 12, lineHeight: 18, color: colors.gray700, marginTop: 4 },
   controlsCard: {
     backgroundColor: '#F8F7FF',
     borderRadius: radius.xl,
