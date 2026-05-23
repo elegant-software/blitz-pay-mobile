@@ -134,12 +134,18 @@ export default function MerchantScreen() {
   const insets = useSafeAreaInsets();
   const merchantName = route.params?.merchantName ?? 'Merchant';
   const merchantId = route.params?.merchantId;
+  const preferredBranchId = route.params?.branchId;
+  const preferredBranchName = route.params?.branchName;
   const initialMerchantLogoUrl = route.params?.merchantLogoUrl;
   const merchantDistance = route.params?.distanceMeters;
-  const { loading, errorKey, branch, merchantLogoUrl, products, retry } = useMerchantCatalog({ merchantId, merchantName });
+  const { loading, errorKey, branch, merchantLogoUrl, products, retry } = useMerchantCatalog({
+    merchantId,
+    merchantName,
+    preferredBranchId,
+  });
   const { itemCount, subtotal, quantityByProductId, setMerchantContext, setProductQuantity, buildCheckoutContext } = useBasket();
   const [basketError, setBasketError] = useState<string | null>(null);
-  const visibleBranchName = branch?.name ?? merchantName;
+  const visibleBranchName = branch?.name ?? preferredBranchName ?? merchantName;
   const visibleLogoUrl = branch?.imageUrl ?? merchantLogoUrl ?? initialMerchantLogoUrl;
 
   // Group products: categorized first (sorted alphabetically), uncategorized at the end

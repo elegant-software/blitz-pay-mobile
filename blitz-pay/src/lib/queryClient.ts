@@ -8,7 +8,7 @@ export const STALE_TIMES = {
 } as const;
 
 export const QUERY_KEYS = {
-  catalog: (merchantId: string) => ['catalog', merchantId] as const,
+  catalog: (merchantId: string, preferredBranchId?: string) => ['catalog', merchantId, preferredBranchId ?? null] as const,
 };
 
 export const queryClient = new QueryClient({

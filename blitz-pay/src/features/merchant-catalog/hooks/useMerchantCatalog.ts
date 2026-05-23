@@ -18,7 +18,11 @@ type CatalogResult = {
   products: ActiveProduct[];
 };
 
-async function loadCatalog(merchantId: string, merchantName: string): Promise<CatalogResult> {
+async function loadCatalog(
+  merchantId: string,
+  merchantName: string,
+  preferredBranchId?: string,
+): Promise<CatalogResult> {
   const [branches, merchantDetails] = await Promise.all([
     fetchMerchantBranches(merchantId),
     fetchMerchantDetails(merchantId),
@@ -32,7 +36,9 @@ async function loadCatalog(merchantId: string, merchantName: string): Promise<Ca
     coords = undefined;
   }
 
-  const branch = resolveMerchantBranch(branches, coords);
+  const branch =
+    branches.find((value) => value.branchId === preferredBranchId)
+    ?? resolveMerchantBranch(branches, coords);
   if (!branch) throw new Error('merchant_branch_unavailable');
 
   const products = await fetchActiveProducts(merchantId, branch.branchId);
@@ -48,12 +54,16 @@ async function loadCatalog(merchantId: string, merchantName: string): Promise<Ca
   return { branch: branchWithPolicy, merchantLogoUrl: merchantDetails.logoUrl, products };
 }
 
-export function useMerchantCatalog(params: { merchantId?: string; merchantName?: string }) {
-  const { merchantId, merchantName = 'Merchant' } = params;
+export function useMerchantCatalog(params: {
+  merchantId?: string;
+  merchantName?: string;
+  preferredBranchId?: string;
+}) {
+  const { merchantId, merchantName = 'Merchant', preferredBranchId } = params;
 
   const { data, isLoading, error, refetch, isStale } = useQuery({
-    queryKey: QUERY_KEYS.catalog(merchantId!),
-    queryFn: () => loadCatalog(merchantId!, merchantName),
+    queryKey: QUERY_KEYS.catalog(merchantId!, preferredBranchId),
+    queryFn: () => loadCatalog(merchantId!, merchantName, preferredBranchId),
     enabled: !!merchantId,
     staleTime: STALE_TIMES.PRODUCTS,
   });

@@ -15,6 +15,8 @@ export type RootStackParamList = {
   Merchant: {
     merchantId?: string;
     merchantName?: string;
+    branchId?: string;
+    branchName?: string;
     merchantLogoUrl?: string;
     distanceMeters?: number;
   };

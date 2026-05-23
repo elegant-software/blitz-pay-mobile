@@ -11,6 +11,17 @@ export interface NearbyMerchant {
   logoUrl?: string;
 }
 
+export interface ActiveAppearance {
+  appearanceId: string;
+  merchantId: string;
+  merchantName: string;
+  branchId: string;
+  branchName: string;
+  distanceMeters?: number;
+  startTime: string;
+  endTime: string;
+}
+
 export interface NearbyMerchantQuery {
   latitude: number;
   longitude: number;
