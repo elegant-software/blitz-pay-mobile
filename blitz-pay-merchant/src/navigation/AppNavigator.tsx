@@ -12,6 +12,7 @@ import ProductEditScreen from '../screens/ProductEditScreen';
 import MerchantQRCodeScreen from '../screens/MerchantQRCodeScreen';
 import PaymentsHistoryScreen from '../screens/PaymentsHistoryScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
+import AppearancesScreen from '../screens/AppearancesScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -38,6 +39,7 @@ export default function AppNavigator() {
           <Stack.Screen name="MerchantQRCode" component={MerchantQRCodeScreen} />
           <Stack.Screen name="PaymentsHistory" component={PaymentsHistoryScreen} />
           <Stack.Screen name="Notifications" component={NotificationsScreen} />
+          <Stack.Screen name="Appearances" component={AppearancesScreen} />
         </>
       )}
     </Stack.Navigator>

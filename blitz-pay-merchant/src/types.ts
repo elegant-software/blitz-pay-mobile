@@ -22,6 +22,7 @@ export type RootStackParamList = {
   };
   PaymentsHistory: undefined;
   Notifications: undefined;
+  Appearances: undefined;
 };
 
 export type TabParamList = {

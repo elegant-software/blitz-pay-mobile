@@ -12,6 +12,10 @@ _Avoid_: Merchant, account, member
 The operational branch whose orders, products, and related data are managed in the merchant portal.
 _Avoid_: Store, shop, location
 
+**Appearance**:
+A scheduled, time-bounded live presence of one **Merchant Branch** that a **Merchant User** can create or cancel.
+_Avoid_: Live toggle, nearby merchant, branch location
+
 **Branch Membership**:
 The authorization of a Merchant User to access one Merchant Branch, derived from a branch group in the access token.
 _Avoid_: Nearby branch, detected branch, location scope
@@ -36,6 +40,7 @@ _Avoid_: Customer name display, shopper profile visibility, identity lookup from
 - A **Merchant Action Queue** belongs to exactly one **Merchant Branch**
 - A **Merchant Action Queue** prioritises orders needing merchant action over reference/history states
 - **Shopper Identity Withholding** applies across the entire merchant portal UI within one **Merchant Branch**
+- An **Appearance** belongs to exactly one **Merchant Branch**
 
 ## Example dialogue
 

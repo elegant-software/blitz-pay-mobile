@@ -4,6 +4,7 @@ import { storage } from './storage';
 import { config } from './config';
 import { observability } from './observability';
 import { fetchMerchantBranches, fetchMerchantName } from './merchantProducts';
+import { fetchMerchantBranchDetails } from './merchantBranches';
 
 const LocalAuthentication = Platform.OS !== 'web'
   ? require('expo-local-authentication')
@@ -27,6 +28,10 @@ export interface ActiveBranchScope {
   branchId: string;
   branchName: string | null;
   merchantName: string | null;
+  branchStatus?: string | null;
+  latitude?: number;
+  longitude?: number;
+  geofenceRadiusMeters?: number;
   source: 'branch_membership';
   status: 'resolved';
 }
@@ -236,6 +241,35 @@ async function refreshAccessToken(refreshToken: string): Promise<StoredSession |
   }
 }
 
+async function enrichBranchScope(scope: ActiveBranchScope | null): Promise<ActiveBranchScope | null> {
+  if (!scope) return null;
+
+  const details = await fetchMerchantBranchDetails(scope.merchantId, scope.branchId).catch(() => null);
+  if (!details) {
+    observability.warn('merchant_branch_scope_enrichment_failed', {
+      merchantId: scope.merchantId,
+      branchId: scope.branchId,
+      reason: 'branch_details_unavailable',
+    });
+    return scope;
+  }
+
+  observability.info('merchant_branch_scope_enrichment_succeeded', {
+    merchantId: scope.merchantId,
+    branchId: scope.branchId,
+    branchStatus: details.status ?? null,
+  });
+
+  return {
+    ...scope,
+    branchName: details.name,
+    branchStatus: details.status ?? null,
+    latitude: details.latitude,
+    longitude: details.longitude,
+    geofenceRadiusMeters: details.geofenceRadiusMeters,
+  };
+}
+
 const BYPASS_USER: UserProfile = {
   id: 'dev-bypass',
   merchantId: 'dev-bypass-merchant',
@@ -319,7 +353,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const parsed = parseUser(accessToken, idToken, preferredActiveBranchId);
     setUser(parsed.profile);
-    setActiveBranchScope(parsed.activeBranchScope);
+    const enrichedScope = await enrichBranchScope(parsed.activeBranchScope);
+    setActiveBranchScope(enrichedScope);
     setBranchScopeError(parsed.errorKey);
 
     if (parsed.activeBranchScope) {
@@ -541,11 +576,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       activeBranchId: branchId,
     };
     const nextScope = buildBranchScope(nextProfile.branchMemberships, branchId);
+    const enrichedScope = await enrichBranchScope(nextScope.activeBranchScope);
     setUser({
       ...nextProfile,
       activeBranchId: nextScope.activeBranchId,
     });
-    setActiveBranchScope(nextScope.activeBranchScope);
+    setActiveBranchScope(enrichedScope);
     setBranchScopeError(nextScope.errorKey);
 
     if (nextScope.activeBranchScope) {
@@ -564,7 +600,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     observability.info('merchant_branch_scope_selection_succeeded', {
       branchId,
-      merchantId: nextScope.activeBranchScope?.merchantId ?? null,
+      merchantId: enrichedScope?.merchantId ?? null,
     });
   };
 
