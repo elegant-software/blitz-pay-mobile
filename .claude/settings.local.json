@@ -45,8 +45,23 @@
       "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\({k:v for k,v in {**d.get\\('dependencies',{}\\), **d.get\\('devDependencies',{}\\)}.items\\(\\)}, indent=2\\)\\)\")",
       "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\('expo',{}\\).get\\('plugins',[]\\), indent=2\\)\\)\")",
       "Bash(bash *)",
-      "Bash(git -C /Users/mehdi/MyProject/blitz-pay-prototype log --oneline main..HEAD)",
-      "Bash(git *)"
+      "Bash(.specify/scripts/bash/create-new-feature.sh there is ai asistant icon in the application whenever user unmutes the mic app should record a voice and send it to the back-end *)",
+      "Bash(echo \"Exit: $?\")",
+      "Bash(git mv *)",
+      "Bash(xargs cat *)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:developer.amazon.com)",
+      "WebFetch(domain:xdaforums.com)",
+      "WebFetch(domain:www.npmjs.com)",
+      "WebFetch(domain:reactnative.directory)",
+      "WebFetch(domain:www.shariqsp.com)",
+      "Bash(node *)",
+      "WebFetch(domain:docs.stripe.com)",
+      "Bash(npx jest *)",
+      "mcp__idea__list_directory_tree",
+      "mcp__idea__get_file_text_by_path",
+      "mcp__idea__insert_walkthrough_tangents",
+      "Bash(git commit -m ' *)"
     ]
   }
 }
