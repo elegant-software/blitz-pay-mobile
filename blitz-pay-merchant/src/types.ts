@@ -5,6 +5,9 @@ export type RootStackParamList = {
   Login: undefined;
   Signup: undefined;
   Main: undefined;
+  PaymentSetupPrototype: {
+    variant?: 'A' | 'B' | 'C';
+  } | undefined;
   OrderDetail: {
     orderId: string;
     orderNumber?: string;

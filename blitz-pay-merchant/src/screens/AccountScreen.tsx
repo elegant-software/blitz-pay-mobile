@@ -116,6 +116,12 @@ export default function AccountScreen() {
           onPress: () => navigation.navigate('PaymentsHistory' as never),
           showArrow: true,
         },
+        ...(__DEV__ ? [{
+          icon: 'card-outline' as const,
+          label: t('payment_setup_prototype'),
+          onPress: () => (navigation as any).navigate('PaymentSetupPrototype', {}),
+          showArrow: true,
+        }] : []),
       ],
     },
     {
