@@ -66,7 +66,12 @@ export interface AuthState {
 const SESSION_KEY = 'blitzpay_merchant_session';
 const BIOMETRIC_KEY = 'blitzpay_merchant_biometric_enrolled';
 const ACTIVE_BRANCH_KEY = 'blitzpay_merchant_active_branch_id';
-const BRANCH_GROUP_PATTERN = /^\/merchants\/merchant_([^/]+)\/branch_([^/]+)$/;
+const BRANCH_GROUP_PATTERNS = [
+  /^\/merchants\/merchant_([^/]+)\/branch_([^/]+)$/,
+  /^\/merchants\/([^/]+)\/branches\/([^/]+)$/,
+  /^\/merchant_([^/]+)\/branch_([^/]+)$/,
+  /^\/([^/]+)\/branches\/([^/]+)$/,
+];
 
 function decodeJwt(token: string): Record<string, unknown> {
   try {
@@ -87,6 +92,31 @@ function readStringArrayClaim(claims: Record<string, unknown>, key: string): str
   if (typeof value === 'string' && value.trim()) return [value];
   if (!Array.isArray(value)) return [];
   return value.filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0);
+}
+
+function readNestedStringArrayClaim(
+  claims: Record<string, unknown>,
+  parentKey: string,
+  childKey: string,
+): string[] {
+  const parent = claims[parentKey];
+  if (!parent || typeof parent !== 'object') return [];
+  return readStringArrayClaim(parent as Record<string, unknown>, childKey);
+}
+
+function summarizeClaimSource(claims: Record<string, unknown>) {
+  const accessGroup = readStringArrayClaim(claims, 'access_group');
+  const accessGroups = readStringArrayClaim(claims, 'access_groups');
+  const groups = readStringArrayClaim(claims, 'groups');
+  const realmRoles = readNestedStringArrayClaim(claims, 'realm_access', 'roles');
+
+  return {
+    accessGroupCount: accessGroup.length,
+    accessGroupsCount: accessGroups.length,
+    groupsCount: groups.length,
+    realmRolesCount: realmRoles.length,
+    groupSample: [...accessGroup, ...accessGroups, ...groups, ...realmRoles].slice(0, 5).join(' | ') || null,
+  };
 }
 
 function resolveMerchantId(claims: Record<string, unknown>): string | null {
@@ -112,31 +142,41 @@ function resolveMerchantId(claims: Record<string, unknown>): string | null {
   return null;
 }
 
-function parseBranchMemberships(claims: Record<string, unknown>): { memberships: BranchMembership[]; invalidCount: number } {
-  const groups = [
-    ...readStringArrayClaim(claims, 'access_group'),
-    ...readStringArrayClaim(claims, 'groups'),
-  ];
+function parseBranchMemberships(
+  ...claimSets: Record<string, unknown>[]
+): { memberships: BranchMembership[]; invalidCount: number } {
   const seen = new Set<string>();
   const memberships: BranchMembership[] = [];
   let invalidCount = 0;
 
-  for (const groupPath of groups) {
-    const match = groupPath.match(BRANCH_GROUP_PATTERN);
-    if (!match) {
-      if (groupPath.startsWith('/merchants/')) invalidCount += 1;
-      continue;
-    }
+  for (const claims of claimSets) {
+    const groups = [
+      ...readStringArrayClaim(claims, 'access_group'),
+      ...readStringArrayClaim(claims, 'access_groups'),
+      ...readStringArrayClaim(claims, 'groups'),
+      ...readNestedStringArrayClaim(claims, 'realm_access', 'roles'),
+    ];
 
-    const [, merchantId, branchId] = match;
-    const key = `${merchantId}:${branchId}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    memberships.push({
-      groupPath,
-      merchantId,
-      branchId,
-    });
+    for (const groupPath of groups) {
+      const match = BRANCH_GROUP_PATTERNS
+        .map((pattern) => groupPath.match(pattern))
+        .find((result) => result != null);
+
+      if (!match) {
+        if (groupPath.includes('merchant') || groupPath.includes('branch')) invalidCount += 1;
+        continue;
+      }
+
+      const [, merchantId, branchId] = match;
+      const key = `${merchantId}:${branchId}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      memberships.push({
+        groupPath,
+        merchantId,
+        branchId,
+      });
+    }
   }
 
   return { memberships, invalidCount };
@@ -182,6 +222,25 @@ function parseUser(accessToken: string, idToken: string, preferredActiveBranchId
   const accessClaims = decodeJwt(accessToken);
   const idClaims = decodeJwt(idToken);
   const profileClaims = idClaims.sub ? idClaims : accessClaims;
+  const accessClaimSummary = summarizeClaimSource(accessClaims);
+  const idClaimSummary = summarizeClaimSource(idClaims);
+
+  observability.info('merchant_branch_claims_decoded', {
+    accessHasSub: typeof accessClaims.sub === 'string',
+    idHasSub: typeof idClaims.sub === 'string',
+    accessMerchantId: resolveMerchantId(accessClaims),
+    idMerchantId: resolveMerchantId(idClaims),
+    accessAccessGroupCount: accessClaimSummary.accessGroupCount,
+    accessAccessGroupsCount: accessClaimSummary.accessGroupsCount,
+    accessGroupsCount: accessClaimSummary.groupsCount,
+    accessRealmRolesCount: accessClaimSummary.realmRolesCount,
+    accessGroupSample: accessClaimSummary.groupSample,
+    idAccessGroupCount: idClaimSummary.accessGroupCount,
+    idAccessGroupsCount: idClaimSummary.accessGroupsCount,
+    idGroupsCount: idClaimSummary.groupsCount,
+    idRealmRolesCount: idClaimSummary.realmRolesCount,
+    idGroupSample: idClaimSummary.groupSample,
+  });
 
   if (!profileClaims.sub) {
     return {
@@ -192,13 +251,27 @@ function parseUser(accessToken: string, idToken: string, preferredActiveBranchId
     };
   }
 
-  const { memberships, invalidCount } = parseBranchMemberships(accessClaims);
+  const { memberships, invalidCount } = parseBranchMemberships(accessClaims, idClaims);
   const branchScope = buildBranchScope(memberships, preferredActiveBranchId);
   const merchantId =
     resolveMerchantId(accessClaims) ??
     resolveMerchantId(profileClaims) ??
     memberships[0]?.merchantId ??
     null;
+  const errorKey = invalidCount > 0 && memberships.length === 0 ? 'merchant_branch_access_invalid' : branchScope.errorKey;
+
+  observability.info('merchant_branch_memberships_parsed', {
+    membershipCount: memberships.length,
+    invalidMembershipCount: invalidCount,
+    preferredActiveBranchId: preferredActiveBranchId ?? null,
+    resolvedActiveBranchId: branchScope.activeBranchId ?? null,
+    resolvedMerchantId: merchantId,
+    membershipSample: memberships
+      .slice(0, 5)
+      .map((membership) => `${membership.merchantId}:${membership.branchId}`)
+      .join(' | ') || null,
+    errorKey,
+  });
 
   return {
     profile: {
@@ -211,7 +284,7 @@ function parseUser(accessToken: string, idToken: string, preferredActiveBranchId
       activeBranchId: branchScope.activeBranchId,
     },
     activeBranchScope: branchScope.activeBranchScope,
-    errorKey: invalidCount > 0 && memberships.length === 0 ? 'merchant_branch_access_invalid' : branchScope.errorKey,
+    errorKey,
     invalidMembershipCount: invalidCount,
   };
 }

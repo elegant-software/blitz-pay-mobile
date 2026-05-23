@@ -198,10 +198,21 @@ export async function listMerchantAppearances(
     },
   );
 
-  return rows
+  const mapped = rows
     .map(mapAppearance)
     .filter((value): value is MerchantAppearance => value != null)
     .sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+  if (rows.length !== mapped.length) {
+    observability.warn('merchant_appearances_response_filtered', {
+      merchantId,
+      branchId,
+      responseCount: rows.length,
+      mappedCount: mapped.length,
+    });
+  }
+
+  return mapped;
 }
 
 export async function createMerchantAppearance(
@@ -232,6 +243,11 @@ export async function createMerchantAppearance(
 
   const mapped = mapAppearance(response);
   if (!mapped) {
+    observability.error('merchant_appearance_response_invalid', {
+      merchantId: input.merchantId,
+      branchId: input.branchId,
+      reason: 'invalid_appearance_response',
+    });
     throw new MerchantAppearanceError(
       'merchant_appearance_create_failed',
       'invalid_appearance_response',

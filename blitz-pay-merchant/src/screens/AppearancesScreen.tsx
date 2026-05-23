@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useAuth } from '../lib/auth';
 import { useLanguage } from '../lib/LanguageContext';
+import { observability } from '../lib/observability';
 import {
   cancelMerchantAppearance,
   createMerchantAppearance,
@@ -135,20 +136,41 @@ export default function AppearancesScreen() {
 
   const loadAppearances = useCallback(async () => {
     if (!activeBranchScope) {
+      observability.warn('merchant_appearances_scope_missing', {
+        branchScopeError: branchScopeError ?? 'merchant_branch_access_missing',
+      });
       setAppearances([]);
       setLoadErrorKey(branchScopeError ?? 'merchant_branch_access_missing');
       setLoading(false);
       return;
     }
 
+    observability.info('merchant_appearances_scope_resolved', {
+      merchantId: activeBranchScope.merchantId,
+      branchId: activeBranchScope.branchId,
+      branchName: activeBranchScope.branchName ?? null,
+      branchStatus: activeBranchScope.branchStatus ?? null,
+    });
     setLoading(true);
     setLoadErrorKey(null);
 
     try {
       const rows = await listMerchantAppearances(activeBranchScope.merchantId, activeBranchScope.branchId);
+      observability.info('merchant_appearances_screen_load_succeeded', {
+        merchantId: activeBranchScope.merchantId,
+        branchId: activeBranchScope.branchId,
+        count: rows.length,
+      });
       setAppearances(rows);
       setLoading(false);
     } catch (error) {
+      observability.error('merchant_appearances_screen_load_failed', {
+        merchantId: activeBranchScope.merchantId,
+        branchId: activeBranchScope.branchId,
+        reason: error instanceof Error ? error.message : 'unknown_error',
+        errorKey: error instanceof MerchantAppearanceError ? error.key : 'merchant_appearances_load_failed',
+        status: error instanceof MerchantAppearanceError ? error.status ?? null : null,
+      });
       setAppearances([]);
       setLoadErrorKey(error instanceof MerchantAppearanceError ? error.key : 'merchant_appearances_load_failed');
       setLoading(false);
@@ -177,6 +199,9 @@ export default function AppearancesScreen() {
 
   const submit = async () => {
     if (!activeBranchScope) {
+      observability.warn('merchant_appearance_create_scope_missing', {
+        branchScopeError: branchScopeError ?? 'merchant_branch_access_missing',
+      });
       setSubmitErrorKey(branchScopeError ?? 'merchant_branch_access_missing');
       return;
     }
@@ -201,6 +226,12 @@ export default function AppearancesScreen() {
     setSaving(true);
     setSubmitErrorKey(null);
     try {
+      observability.info('merchant_appearance_create_attempted', {
+        merchantId: activeBranchScope.merchantId,
+        branchId: activeBranchScope.branchId,
+        startTime,
+        endTime,
+      });
       await createMerchantAppearance({
         merchantId: activeBranchScope.merchantId,
         branchId: activeBranchScope.branchId,
@@ -213,6 +244,13 @@ export default function AppearancesScreen() {
       setForm(buildInitialForm(activeBranchScope.latitude, activeBranchScope.longitude));
       await loadAppearances();
     } catch (error) {
+      observability.error('merchant_appearance_create_screen_failed', {
+        merchantId: activeBranchScope.merchantId,
+        branchId: activeBranchScope.branchId,
+        reason: error instanceof Error ? error.message : 'unknown_error',
+        errorKey: error instanceof MerchantAppearanceError ? error.key : 'merchant_appearance_create_failed',
+        status: error instanceof MerchantAppearanceError ? error.status ?? null : null,
+      });
       setSubmitErrorKey(error instanceof MerchantAppearanceError ? error.key : 'merchant_appearance_create_failed');
     } finally {
       setSaving(false);
