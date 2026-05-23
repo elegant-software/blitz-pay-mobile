@@ -44,6 +44,10 @@ function formatAmount(amountMinor: number, currency: string) {
   return new Intl.NumberFormat('de-DE', { style: 'currency', currency }).format(amountMinor / 100);
 }
 
+function formatMerchantLabel(merchantName?: string, branchName?: string): string | null {
+  return merchantName ?? branchName ?? null;
+}
+
 export default function OrderDetailScreen() {
   const { t } = useLanguage();
   const { token, user } = useAuth();
@@ -93,6 +97,10 @@ export default function OrderDetailScreen() {
     [availableChannels],
   );
   const effectiveSelectedMethod = selectedMethod ?? (availableMethods.length === 1 ? availableMethods[0].key : null);
+  const merchantLabel = formatMerchantLabel(order?.merchantName ?? route.params.merchantName, order?.branchName ?? route.params.branchName);
+  const branchLabel = (order?.merchantName ?? route.params.merchantName)
+    ? (order?.branchName ?? route.params.branchName)
+    : null;
 
   useEffect(() => {
     if (availableMethods.length === 1 && selectedMethod !== availableMethods[0].key) {
@@ -112,7 +120,7 @@ export default function OrderDetailScreen() {
     try {
       await resumeOrderPayment({
         order,
-        merchantName: route.params.merchantName ?? t('merchant_mode'),
+        merchantName: formatMerchantLabel(route.params.merchantName, route.params.branchName) ?? 'Merchant',
         branchName: route.params.branchName,
         merchantLogoUrl: route.params.merchantLogoUrl,
         selectedMethod: effectiveSelectedMethod,
@@ -188,9 +196,11 @@ export default function OrderDetailScreen() {
             <View style={styles.summaryHeader}>
               <View style={styles.summaryText}>
                 <Text style={styles.summaryTitle}>{t('order_reference_label', { orderId: order.orderId })}</Text>
-                <Text style={styles.summaryMeta}>{order.merchantName ?? route.params.merchantName ?? t('merchant_mode')}</Text>
-                {order.branchName ?? route.params.branchName ? (
-                  <Text style={styles.summaryMeta}>{order.branchName ?? route.params.branchName}</Text>
+                {merchantLabel ? (
+                  <Text style={styles.summaryMeta}>{merchantLabel}</Text>
+                ) : null}
+                {branchLabel ? (
+                  <Text style={styles.summaryMeta}>{branchLabel}</Text>
                 ) : null}
               </View>
               <View style={[styles.statusBadge, { backgroundColor: `${STATUS_COLORS[order.status]}18` }]}>
