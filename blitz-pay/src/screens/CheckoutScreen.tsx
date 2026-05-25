@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -21,6 +21,8 @@ import type { RootStackNav, RootStackParamList } from '../types';
 import { useOrderPayment } from '../features/order-payment/hooks/useOrderPayment';
 import type { CheckoutIntent, CheckoutPaymentMethod } from '../features/order-payment/types/orderPayment';
 import { isMethodAvailable } from '../features/order-payment/types/orderPayment';
+import { fetchMerchantStripeConnectStatus } from '../features/merchant-catalog/services/merchantCatalogService';
+import type { PaymentChannel } from '../features/merchant-catalog/types/catalog';
 
 function resolveImageUri(uri?: string): string | undefined {
   if (!uri) return undefined;
@@ -60,7 +62,6 @@ export default function CheckoutScreen() {
   const branchId = route.params?.branchId;
   const branchName = route.params?.branchName;
   const merchantLogoUrl = route.params?.merchantLogoUrl;
-  const activePaymentChannels = route.params?.activePaymentChannels ?? [];
   const basketSummary = route.params?.basketSummary;
   const basketItemCount = route.params?.basketItemCount ?? route.params?.basketItems?.length ?? 0;
   const basketItems = route.params?.basketItems ?? [];
@@ -73,6 +74,45 @@ export default function CheckoutScreen() {
   const [selectedMethod, setSelectedMethod] = useState<CheckoutPaymentMethod | null>(null);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState('');
+  const [activePaymentChannels, setActivePaymentChannels] = useState<PaymentChannel[]>([]);
+
+  useEffect(() => {
+    let active = true;
+
+    if (!merchantId) {
+      setActivePaymentChannels([]);
+      return () => {
+        active = false;
+      };
+    }
+
+    void fetchMerchantStripeConnectStatus(merchantId)
+      .then((status) => {
+        if (!active) return;
+        const channels: PaymentChannel[] = [
+          ...(status?.charges_enabled === true ? ['STRIPE' as const] : []),
+          ...(status?.pay_by_bank_enabled === true ? ['PAY_BY_BANK' as const] : []),
+        ];
+        setActivePaymentChannels(channels);
+        setSelectedMethod((current) => {
+          if (!current) return current;
+          return isMethodAvailable(current, channels) ? current : null;
+        });
+      })
+      .catch((fetchError: unknown) => {
+        if (!active) return;
+        observability.warn('checkout_stripe_status_load_failed', {
+          merchantId,
+          message: fetchError instanceof Error ? fetchError.message : String(fetchError),
+        });
+        setActivePaymentChannels([]);
+        setSelectedMethod(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [merchantId]);
 
   const methods = useMemo(
     () =>
@@ -88,6 +128,12 @@ export default function CheckoutScreen() {
           icon: 'card-outline',
           label: t('credit_debit_card'),
           sub: t('visa_mastercard'),
+        },
+        {
+          key: 'pay_by_bank' as const,
+          icon: 'swap-horizontal-outline',
+          label: t('pay_by_bank'),
+          sub: t('stripe_pay_by_bank_subtitle'),
         },
         {
           key: 'paypal' as const,
@@ -343,7 +389,11 @@ export default function CheckoutScreen() {
           <View style={styles.securityTextBox}>
             <Text style={styles.securityTitle}>{t('encrypted_transaction')}</Text>
             <Text style={styles.securityDesc}>
-              {selectedMethod === 'bank' ? t('truelayer_secure_checkout') : t('secure_msg')}
+              {selectedMethod === 'bank'
+                ? t('truelayer_secure_checkout')
+                : selectedMethod === 'pay_by_bank'
+                  ? t('stripe_pay_by_bank_secure_checkout')
+                  : t('secure_msg')}
             </Text>
           </View>
         </View>
@@ -368,7 +418,11 @@ export default function CheckoutScreen() {
               <Text style={styles.confirmBtnText}>
                 {selectedIntent === 'PAY_LATER'
                   ? `${t('checkout_intent_pay_later')} · €${amount.toFixed(2)}`
-                  : `${selectedMethod === 'bank' ? t('pay_with_truelayer') : t('confirm_payment')} · €${amount.toFixed(2)}`}
+                  : `${selectedMethod === 'bank'
+                      ? t('pay_with_truelayer')
+                      : selectedMethod === 'pay_by_bank'
+                        ? t('pay_with_stripe_pay_by_bank')
+                        : t('confirm_payment')} · €${amount.toFixed(2)}`}
               </Text>
             </>
           )}

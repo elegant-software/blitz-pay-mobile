@@ -491,6 +491,86 @@ export async function createStripeIntentForOrder(
   };
 }
 
+export interface StripePayByBankCheckoutParams {
+  paymentRequestId: string;
+  checkoutUrl: string;
+}
+
+export async function createStripePayByBankCheckoutForOrder(
+  context: OrderPaymentIntentContext,
+): Promise<StripePayByBankCheckoutParams> {
+  const successUrl = `${config.trueLayerRedirectScheme}://payments/stripe-return/${encodeURIComponent(
+    context.orderId,
+  )}/success`;
+  const cancelUrl = `${config.trueLayerRedirectScheme}://payments/stripe-return/${encodeURIComponent(
+    context.orderId,
+  )}/cancelled`;
+
+  observability.info('stripe_pay_by_bank_checkout_started', {
+    orderId: context.orderId,
+    merchantId: context.merchantId,
+    branchId: context.branchId ?? null,
+    successUrl,
+    cancelUrl,
+  });
+
+  const response = await authedFetch('/v1/payments/stripe/pay-by-bank/create-checkout-session', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({
+      orderId: context.orderId,
+      merchantId: context.merchantId,
+      branchId: context.branchId,
+      productId: context.productId,
+      successUrl,
+      cancelUrl,
+    }),
+  });
+
+  if (!response.ok) {
+    const message = await readError(response);
+    observability.warn('stripe_pay_by_bank_checkout_failed', {
+      orderId: context.orderId,
+      status: response.status,
+      message,
+    });
+    throw new Error(message);
+  }
+
+  const data = (await response.json()) as Record<string, unknown>;
+  const paymentRequestId = typeof data.paymentRequestId === 'string' ? data.paymentRequestId : undefined;
+  const checkoutUrl =
+    typeof data.checkoutUrl === 'string'
+      ? data.checkoutUrl
+      : typeof data.url === 'string'
+        ? data.url
+        : typeof data.checkoutSessionUrl === 'string'
+          ? data.checkoutSessionUrl
+          : undefined;
+
+  if (!paymentRequestId || !checkoutUrl) {
+    observability.error('stripe_pay_by_bank_checkout_invalid_response', {
+      orderId: context.orderId,
+      hasPaymentRequestId: Boolean(paymentRequestId),
+      hasCheckoutUrl: Boolean(checkoutUrl),
+    });
+    throw new Error('stripe_pay_by_bank_invalid_response');
+  }
+
+  observability.info('stripe_pay_by_bank_checkout_succeeded', {
+    orderId: context.orderId,
+    paymentRequestId,
+  });
+
+  return {
+    paymentRequestId,
+    checkoutUrl,
+  };
+}
+
 export async function submitBraintreeOrderNonce(
   request: BraintreeCheckoutRequest,
 ): Promise<BraintreeCheckoutResponse> {

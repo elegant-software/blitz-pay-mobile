@@ -26,9 +26,10 @@ import {
 } from '../features/order-payment/types/orderPayment';
 import type { RootStackNav, RootStackParamList } from '../types';
 
-const METHODS: Array<{ key: CheckoutPaymentMethod; icon: React.ComponentProps<typeof Ionicons>['name']; labelKey: 'bank_account_direct' | 'credit_debit_card' | 'paypal' }> = [
+const METHODS: Array<{ key: CheckoutPaymentMethod; icon: React.ComponentProps<typeof Ionicons>['name']; labelKey: 'bank_account_direct' | 'credit_debit_card' | 'pay_by_bank' | 'paypal' }> = [
   { key: 'bank', icon: 'business-outline', labelKey: 'bank_account_direct' },
   { key: 'card', icon: 'card-outline', labelKey: 'credit_debit_card' },
+  { key: 'pay_by_bank', icon: 'swap-horizontal-outline', labelKey: 'pay_by_bank' },
   { key: 'paypal', icon: 'logo-paypal', labelKey: 'paypal' },
 ];
 

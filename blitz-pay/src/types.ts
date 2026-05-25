@@ -73,6 +73,10 @@ export type RootStackParamList = {
     merchantLogoUrl?: string;
     basketSummary?: string;
   };
+  StripeCheckoutReturn: {
+    orderId: string;
+    status?: 'success' | 'cancelled';
+  };
   InvoicePdfPreview: {
     localUri: string;
     invoiceNumber: string;

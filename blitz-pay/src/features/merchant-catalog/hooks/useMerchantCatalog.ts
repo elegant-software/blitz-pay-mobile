@@ -6,6 +6,7 @@ import {
   fetchActiveProducts,
   fetchMerchantBranches,
   fetchMerchantDetails,
+  fetchMerchantStripeConnectStatus,
   resolveMerchantBranch,
 } from '../services/merchantCatalogService';
 import type { ActiveProduct, MerchantBranch } from '../types/catalog';
@@ -23,9 +24,10 @@ async function loadCatalog(
   merchantName: string,
   preferredBranchId?: string,
 ): Promise<CatalogResult> {
-  const [branches, merchantDetails] = await Promise.all([
+  const [branches, merchantDetails, stripeStatus] = await Promise.all([
     fetchMerchantBranches(merchantId),
     fetchMerchantDetails(merchantId),
+    fetchMerchantStripeConnectStatus(merchantId),
   ]);
 
   let coords: { latitude: number; longitude: number } | undefined;
@@ -42,7 +44,14 @@ async function loadCatalog(
   if (!branch) throw new Error('merchant_branch_unavailable');
 
   const products = await fetchActiveProducts(merchantId, branch.branchId);
-  const branchWithPolicy = { ...branch, delayedPaymentEnabled: merchantDetails.delayedPaymentEnabled };
+  const branchWithPolicy = {
+    ...branch,
+    delayedPaymentEnabled: merchantDetails.delayedPaymentEnabled,
+    activePaymentChannels: [
+      ...(stripeStatus?.charges_enabled === true ? ['STRIPE' as const] : []),
+      ...(stripeStatus?.pay_by_bank_enabled === true ? ['PAY_BY_BANK' as const] : []),
+    ] as MerchantBranch['activePaymentChannels'],
+  };
 
   setBasketMerchantContext({
     merchantId,

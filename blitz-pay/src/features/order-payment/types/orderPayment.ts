@@ -1,7 +1,7 @@
 import type { BasketCheckoutItemSummary } from '../../basket/types/basket';
 import type { PaymentChannel as MerchantPaymentChannel } from '../../merchant-catalog/types/catalog';
 
-export type CheckoutPaymentMethod = 'bank' | 'card' | 'paypal';
+export type CheckoutPaymentMethod = 'bank' | 'card' | 'paypal' | 'pay_by_bank';
 export type OrderPaymentChannel = MerchantPaymentChannel;
 export type CreateOrderPaymentMethod = 'TRUELAYER' | 'STRIPE' | 'BRAINTREE';
 export type OrderType = 'PRE_ORDER' | 'WALK_IN_ORDERING';
@@ -146,6 +146,7 @@ export const METHOD_TO_CHANNEL: Record<CheckoutPaymentMethod, OrderPaymentChanne
   bank: 'TRUELAYER',
   card: 'STRIPE',
   paypal: 'PAYPAL',
+  pay_by_bank: 'PAY_BY_BANK',
 };
 
 export function mapMethodToChannel(method: CheckoutPaymentMethod): OrderPaymentChannel {
@@ -154,7 +155,7 @@ export function mapMethodToChannel(method: CheckoutPaymentMethod): OrderPaymentC
 
 export function mapMethodToOrderPaymentMethod(method: CheckoutPaymentMethod): CreateOrderPaymentMethod {
   if (method === 'paypal') return 'BRAINTREE';
-  if (method === 'card') return 'STRIPE';
+  if (method === 'card' || method === 'pay_by_bank') return 'STRIPE';
   return 'TRUELAYER';
 }
 

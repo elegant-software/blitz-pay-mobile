@@ -40,6 +40,7 @@ const linking: LinkingOptions<RootStackParamList> = {
       PaymentResult: 'payments/:paymentRequestId/result',
       PaymentProcessing: 'payments/:paymentRequestId/processing',
       PaymentPending: 'payments/:paymentRequestId/pending',
+      StripeCheckoutReturn: 'payments/stripe-return/:orderId/:status',
     },
   },
 };

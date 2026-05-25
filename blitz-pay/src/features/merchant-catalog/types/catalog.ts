@@ -1,4 +1,4 @@
-export type PaymentChannel = 'PAYPAL' | 'STRIPE' | 'TRUELAYER';
+export type PaymentChannel = 'PAYPAL' | 'STRIPE' | 'TRUELAYER' | 'PAY_BY_BANK';
 
 export interface MerchantBranch {
   branchId: string;

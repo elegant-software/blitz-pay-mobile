@@ -18,6 +18,7 @@ import NotificationsScreen from '../screens/NotificationsScreen';
 import PaymentProcessingScreen from '../screens/PaymentProcessingScreen';
 import PaymentResultScreen from '../screens/PaymentResultScreen';
 import PaymentPendingScreen from '../screens/PaymentPendingScreen';
+import StripeCheckoutReturnScreen from '../screens/StripeCheckoutReturnScreen';
 import InvoicePdfPreviewScreen from '../screens/InvoicePdfPreviewScreen';
 import ProductDetailScreen from '../screens/ProductDetailScreen';
 import OrderDetailScreen from '../screens/OrderDetailScreen';
@@ -65,6 +66,11 @@ export default function AppNavigator() {
           <Stack.Screen
             name="PaymentPending"
             component={PaymentPendingScreen}
+            options={{ gestureEnabled: false }}
+          />
+          <Stack.Screen
+            name="StripeCheckoutReturn"
+            component={StripeCheckoutReturnScreen}
             options={{ gestureEnabled: false }}
           />
           <Stack.Screen name="InvoicePdfPreview" component={InvoicePdfPreviewScreen} />
