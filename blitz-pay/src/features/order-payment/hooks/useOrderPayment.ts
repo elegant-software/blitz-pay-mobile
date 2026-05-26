@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { Linking } from 'react-native';
 import { registerDeviceForPayment } from '../../../lib/notifications/pushRegistration';
 import { observability } from '../../../lib/observability';
 import { paymentResultTracker } from '../../../lib/payments/paymentResultTracker';
@@ -10,6 +11,7 @@ import {
   addOrderItem,
   cancelOrder,
   createOrder,
+  createStripePayByBankCheckoutForOrder,
   createStripeIntentForOrder,
   fetchOrder,
   removeOrderLine,
@@ -266,6 +268,71 @@ export function useOrderPayment() {
           checkoutIntent: session.checkoutIntent,
           paymentSource: refreshed?.paymentSource,
         });
+        return;
+      }
+
+      if (args.selectedMethod === 'pay_by_bank') {
+        const checkout = await createStripePayByBankCheckoutForOrder({
+          orderId: session.orderId,
+          merchantId: session.merchantId,
+          branchId: session.branchId,
+          productId: session.basketItems[0]?.productId,
+        });
+        orderPaymentStore.patchSession(session.orderId, {
+          availableChannels: args.availableChannels,
+          selectedMethod: args.selectedMethod,
+          selectedChannel,
+          paymentRequestId: checkout.paymentRequestId,
+          paymentProvider: 'STRIPE',
+          orderStatus: 'PAYMENT_IN_PROGRESS',
+        });
+        void registerDeviceForPayment(session.orderId);
+        if (!paymentResultTracker.isTracking(checkout.paymentRequestId)) {
+          void paymentResultTracker.start(checkout.paymentRequestId);
+        }
+        args.navigation.replace('PaymentProcessing', {
+          paymentRequestId: checkout.paymentRequestId,
+          orderId: session.orderId,
+          amount: args.amount,
+          currency: session.currency,
+          merchantName: args.merchantName,
+          branchName: args.branchName,
+          merchantLogoUrl: args.merchantLogoUrl,
+          invoiceId: args.invoiceId,
+        });
+        try {
+          await Linking.openURL(checkout.checkoutUrl);
+        } catch (err) {
+          observability.error(
+            'stripe_pay_by_bank_redirect_failed',
+            {
+              orderId: session.orderId,
+              paymentRequestId: checkout.paymentRequestId,
+              checkoutUrl: checkout.checkoutUrl,
+              message: err instanceof Error ? err.message : String(err),
+            },
+            err instanceof Error ? err : undefined,
+          );
+          paymentResultTracker.applyRecoveredResult({
+            paymentRequestId: checkout.paymentRequestId,
+            orderId: session.orderId,
+            provider: 'STRIPE',
+            status: 'failed',
+            reason: 'redirect_open_failed',
+          });
+          args.navigation.replace('PaymentResult', {
+            paymentRequestId: checkout.paymentRequestId,
+            orderId: session.orderId,
+            status: 'failed',
+            amount: args.amount,
+            currency: session.currency,
+            merchantName: args.merchantName,
+            branchName: args.branchName,
+            merchantLogoUrl: args.merchantLogoUrl,
+            checkoutIntent: session.checkoutIntent,
+            reason: 'stripe_pay_by_bank_redirect_failed',
+          });
+        }
         return;
       }
 

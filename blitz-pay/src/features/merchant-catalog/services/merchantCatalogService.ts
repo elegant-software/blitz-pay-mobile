@@ -1,5 +1,7 @@
 import type { BasketItem } from '../../basket/types/basket';
 import { fetchMerchantCommerceJson } from '../../../lib/api/merchantCommerce';
+import { authedFetch } from '../../../lib/api/authedFetch';
+import { observability } from '../../../lib/observability';
 import type { ActiveProduct, CatalogValidationIssue, MerchantBranch } from '../types/catalog';
 
 type BranchResponse = {
@@ -29,6 +31,12 @@ export interface MerchantDetails {
   logoUrl?: string;
   delayedPaymentEnabled?: boolean;
 }
+
+type StripeConnectStatusResponse = {
+  charges_enabled?: boolean;
+  pay_by_bank_enabled?: boolean;
+  enabled_payment_flows?: string[];
+};
 
 type ProductResponse = {
   productId?: string;
@@ -124,6 +132,57 @@ export async function fetchMerchantDetails(merchantId: string): Promise<Merchant
     };
   } catch {
     return {};
+  }
+}
+
+export async function fetchMerchantStripeConnectStatus(
+  merchantId: string,
+): Promise<StripeConnectStatusResponse | null> {
+  try {
+    const response = await authedFetch(`/v1/merchants/${merchantId}/stripe-connect/status`);
+    const text = await response.text().catch(() => '');
+    observability.info('checkout_stripe_status_response_received', {
+      merchantId,
+      status: response.status,
+      ok: response.ok,
+      bodyPreview: text.slice(0, 1000),
+    });
+    if (!response.ok) return null;
+    const raw = JSON.parse(text) as Record<string, unknown>;
+    const enabledPaymentFlows = Array.isArray(raw.enabledPaymentFlows)
+      ? raw.enabledPaymentFlows.filter((value): value is string => typeof value === 'string')
+      : Array.isArray(raw.enabled_payment_flows)
+        ? raw.enabled_payment_flows.filter((value): value is string => typeof value === 'string')
+        : [];
+    observability.info('checkout_stripe_status_flags_parsed', {
+      merchantId,
+      chargesEnabledRaw:
+        typeof raw.charges_enabled === 'boolean'
+          ? raw.charges_enabled
+          : typeof raw.chargesEnabled === 'boolean'
+            ? raw.chargesEnabled
+            : null,
+      payByBankEnabledRaw:
+        typeof raw.pay_by_bank_enabled === 'boolean'
+          ? raw.pay_by_bank_enabled
+          : typeof raw.payByBankEnabled === 'boolean'
+            ? raw.payByBankEnabled
+            : null,
+      enabledPaymentFlows: enabledPaymentFlows.join(',') || null,
+    });
+    return {
+      charges_enabled:
+        raw.charges_enabled === true ||
+        raw.chargesEnabled === true ||
+        enabledPaymentFlows.includes('CARD'),
+      pay_by_bank_enabled:
+        raw.pay_by_bank_enabled === true ||
+        raw.payByBankEnabled === true ||
+        enabledPaymentFlows.includes('PAY_BY_BANK'),
+      enabled_payment_flows: enabledPaymentFlows,
+    };
+  } catch {
+    return null;
   }
 }
 
