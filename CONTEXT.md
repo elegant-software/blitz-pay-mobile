@@ -8,6 +8,10 @@ This context covers the shared commercial language for orders and payment orches
 A committed purchase record that exists before any payment provider flow begins.
 _Avoid_: Basket, transaction
 
+**QR Order Poll**:
+The interval-based status check the merchant app performs on a newly created Order while its QR code is displayed, stopping on `paid` status or after 5 minutes (100 × 3 s intervals).
+_Avoid_: Payment watch, order subscription, real-time update
+
 **Editable Unpaid Order**:
 An Order in `PENDING_PAYMENT` that may still be changed before payment starts.
 _Avoid_: Draft order, open basket

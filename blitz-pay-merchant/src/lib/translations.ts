@@ -150,6 +150,11 @@ export const translations = {
     create_order_view_order: 'View Order',
     create_order_total: 'Total',
     create_order_items_selected: '{{count}} items selected',
+    create_order_waiting: 'Waiting for payment…',
+    create_order_paid_title: 'Payment confirmed!',
+    create_order_paid_subtitle: 'The order has been paid',
+    create_order_expired_title: 'Payment window expired',
+    create_order_expired_subtitle: 'No payment received within 5 minutes',
     // QR
     merchant_qr: 'Payment QR Code',
     qr_amount: 'Amount (optional)',
@@ -390,6 +395,11 @@ export const translations = {
     create_order_view_order: 'Bestellung ansehen',
     create_order_total: 'Gesamt',
     create_order_items_selected: '{{count}} Artikel ausgewählt',
+    create_order_waiting: 'Warte auf Zahlung…',
+    create_order_paid_title: 'Zahlung bestätigt!',
+    create_order_paid_subtitle: 'Die Bestellung wurde bezahlt',
+    create_order_expired_title: 'Zahlungsfenster abgelaufen',
+    create_order_expired_subtitle: 'Keine Zahlung innerhalb von 5 Minuten eingegangen',
     // QR
     merchant_qr: 'Zahlungs-QR-Code',
     qr_amount: 'Betrag (optional)',

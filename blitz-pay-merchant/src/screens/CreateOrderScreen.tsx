@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -14,19 +14,27 @@ import QRCode from 'react-native-qrcode-svg';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../lib/auth';
 import { useLanguage } from '../lib/LanguageContext';
+import { observability } from '../lib/observability';
 import { colors, spacing, radius, shadow } from '../lib/theme';
 import { useMerchantProducts } from '../features/products/hooks/useMerchantProducts';
-import { createMerchantOrder, MerchantOrderError } from '../features/orders/services/orderService';
+import {
+  createMerchantOrder,
+  fetchMerchantOrderDetail,
+  MerchantOrderError,
+} from '../features/orders/services/orderService';
 import type { RootStackNav } from '../types';
 import type { Product } from '../types';
 
 const APP_LOGO = require('../../assets/app-icon.png');
 
+const POLL_INTERVAL_MS = 3000;
+const MAX_POLLS = 100; // 5 minutes
+
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(amount);
 }
 
-type Mode = 'compose' | 'qr';
+type Mode = 'compose' | 'qr' | 'paid' | 'expired';
 
 export default function CreateOrderScreen() {
   const { t } = useLanguage();
@@ -43,6 +51,59 @@ export default function CreateOrderScreen() {
   const [createError, setCreateError] = useState('');
   const [createdOrderId, setCreatedOrderId] = useState('');
   const [orderTotal, setOrderTotal] = useState(0);
+
+  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Poll order status while QR is displayed
+  useEffect(() => {
+    if (mode !== 'qr' || !createdOrderId || !activeBranchScope) return;
+
+    let cancelled = false;
+    let pollCount = 0;
+
+    const poll = async () => {
+      if (cancelled) return;
+      try {
+        const order = await fetchMerchantOrderDetail(createdOrderId, activeBranchScope);
+        if (cancelled) return;
+        observability.info('create_order_poll_result', {
+          orderId: createdOrderId,
+          status: order.status,
+          pollCount,
+        });
+        if (order.status === 'paid') {
+          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          setMode('paid');
+          return;
+        }
+      } catch {
+        // transient backend error — keep polling
+      }
+
+      pollCount += 1;
+      if (pollCount >= MAX_POLLS) {
+        if (!cancelled) {
+          observability.info('create_order_poll_expired', { orderId: createdOrderId });
+          setMode('expired');
+        }
+        return;
+      }
+
+      if (!cancelled) {
+        pollTimerRef.current = setTimeout(() => { void poll(); }, POLL_INTERVAL_MS);
+      }
+    };
+
+    pollTimerRef.current = setTimeout(() => { void poll(); }, POLL_INTERVAL_MS);
+
+    return () => {
+      cancelled = true;
+      if (pollTimerRef.current) {
+        clearTimeout(pollTimerRef.current);
+        pollTimerRef.current = null;
+      }
+    };
+  }, [mode, createdOrderId, activeBranchScope]);
 
   const selectedCount = Object.values(quantities).filter((q) => q > 0).length;
   const runningTotal = activeProducts.reduce(
@@ -98,6 +159,96 @@ export default function CreateOrderScreen() {
 
   const qrValue = `blitzpay://order/${createdOrderId}`;
 
+  if (mode === 'paid') {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+        <View style={styles.header}>
+          <View style={{ width: 40 }} />
+          <Text style={styles.headerTitle}>{t('create_order')}</Text>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.closeBtn}>
+            <Ionicons name="close" size={22} color={colors.onSurface} />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.resultContainer}>
+          <View style={[styles.resultCard, shadow.lg]}>
+            <View style={[styles.resultIcon, styles.resultIconPaid]}>
+              <Ionicons name="checkmark" size={48} color={colors.white} />
+            </View>
+            <Text style={styles.resultTitle}>{t('create_order_paid_title')}</Text>
+            <Text style={styles.resultSubtitle}>{t('create_order_paid_subtitle')}</Text>
+            <Text style={styles.resultAmount}>{formatCurrency(orderTotal)}</Text>
+            <Text style={styles.resultOrderId}>#{createdOrderId}</Text>
+          </View>
+
+          <View style={styles.qrActions}>
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.secondaryBtn]}
+              onPress={() => navigation.navigate('OrderDetail', { orderId: createdOrderId })}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="receipt-outline" size={18} color={colors.primary} />
+              <Text style={styles.secondaryBtnText}>{t('create_order_view_order')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.primaryBtn]}
+              onPress={handleReset}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="add" size={18} color={colors.black} />
+              <Text style={styles.primaryBtnText}>{t('create_order_new')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    );
+  }
+
+  if (mode === 'expired') {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+        <View style={styles.header}>
+          <View style={{ width: 40 }} />
+          <Text style={styles.headerTitle}>{t('create_order')}</Text>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.closeBtn}>
+            <Ionicons name="close" size={22} color={colors.onSurface} />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.resultContainer}>
+          <View style={[styles.resultCard, shadow.lg]}>
+            <View style={[styles.resultIcon, styles.resultIconExpired]}>
+              <Ionicons name="time-outline" size={48} color={colors.white} />
+            </View>
+            <Text style={styles.resultTitle}>{t('create_order_expired_title')}</Text>
+            <Text style={styles.resultSubtitle}>{t('create_order_expired_subtitle')}</Text>
+            <Text style={styles.resultAmount}>{formatCurrency(orderTotal)}</Text>
+            <Text style={styles.resultOrderId}>#{createdOrderId}</Text>
+          </View>
+
+          <View style={styles.qrActions}>
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.secondaryBtn]}
+              onPress={() => navigation.navigate('OrderDetail', { orderId: createdOrderId })}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="receipt-outline" size={18} color={colors.primary} />
+              <Text style={styles.secondaryBtnText}>{t('create_order_view_order')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.primaryBtn]}
+              onPress={handleReset}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="add" size={18} color={colors.black} />
+              <Text style={styles.primaryBtnText}>{t('create_order_new')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    );
+  }
+
   if (mode === 'qr') {
     return (
       <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
@@ -127,6 +278,10 @@ export default function CreateOrderScreen() {
             <View style={styles.qrMeta}>
               <Text style={styles.qrTotal}>{formatCurrency(orderTotal)}</Text>
               <Text style={styles.qrOrderId}>#{createdOrderId}</Text>
+            </View>
+            <View style={styles.waitingRow}>
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text style={styles.waitingText}>{t('create_order_waiting')}</Text>
             </View>
           </View>
 
@@ -371,6 +526,8 @@ const styles = StyleSheet.create({
   qrMeta: { alignItems: 'center', gap: 4 },
   qrTotal: { fontSize: 28, fontWeight: '800', color: colors.onSurface },
   qrOrderId: { fontSize: 13, color: colors.gray500 },
+  waitingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  waitingText: { fontSize: 13, color: colors.gray500 },
   qrActions: { flexDirection: 'row', gap: spacing.sm, width: '100%' },
   actionBtn: {
     flex: 1,
@@ -385,4 +542,33 @@ const styles = StyleSheet.create({
   primaryBtnText: { fontSize: 15, fontWeight: '700', color: colors.black },
   secondaryBtn: { borderWidth: 1.5, borderColor: colors.primary, backgroundColor: `${colors.primary}10` },
   secondaryBtnText: { fontSize: 15, fontWeight: '600', color: colors.primary },
+  // Paid / expired result modes
+  resultContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.lg,
+    gap: spacing.xl,
+  },
+  resultCard: {
+    backgroundColor: colors.white,
+    borderRadius: radius.xxl,
+    padding: spacing.xl,
+    alignItems: 'center',
+    gap: spacing.md,
+    width: '100%',
+  },
+  resultIcon: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  resultIconPaid: { backgroundColor: colors.success },
+  resultIconExpired: { backgroundColor: colors.gray400 },
+  resultTitle: { fontSize: 22, fontWeight: '800', color: colors.onSurface, textAlign: 'center' },
+  resultSubtitle: { fontSize: 14, color: colors.gray500, textAlign: 'center' },
+  resultAmount: { fontSize: 32, fontWeight: '800', color: colors.onSurface },
+  resultOrderId: { fontSize: 13, color: colors.gray500 },
 });
