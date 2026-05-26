@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -291,7 +293,10 @@ export default function AppearancesScreen() {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <KeyboardAvoidingView
+      style={[styles.container, { paddingTop: insets.top }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="chevron-back" size={22} color={colors.onSurface} />
@@ -309,6 +314,7 @@ export default function AppearancesScreen() {
       <ScrollView
         contentContainerStyle={{ paddingHorizontal: spacing.md, paddingBottom: 100 + insets.bottom, paddingTop: spacing.md }}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
         <View style={[styles.formCard, shadow.sm]}>
           <View style={styles.formHeader}>
@@ -446,7 +452,7 @@ export default function AppearancesScreen() {
           </>
         )}
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
