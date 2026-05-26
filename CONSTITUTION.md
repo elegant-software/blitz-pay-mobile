@@ -48,6 +48,39 @@ All React Native / Expo code in this repo follows the **Feature-Based + MVVM + C
 ### VII. Simplicity Over Abstraction
 Three similar lines beat a premature abstraction. No framework-ish helpers, feature flags, or compatibility shims until a second real caller exists. Remove dead code instead of deprecating it.
 
+### XI. Backend Errors Must Reach the UI
+
+When a backend API call fails with a non-2xx response, the service layer MUST:
+
+1. **Parse the error body** — attempt to extract a human-readable detail from the response JSON (`error` field first, then `message`). Fall back to raw text, then `HTTP <status>`.
+2. **Log before throwing** — call `observability.error` with the raw detail and HTTP status *before* throwing. Never swallow the backend's reason.
+3. **Throw a typed domain error** — e.g. `MerchantOrderError`, `MerchantProductError` — that carries both an `i18nKey` (for telemetry/fallback) and the extracted `detail` string (for display).
+
+The calling screen/hook MUST:
+
+4. **Show the detail when present** — `e instanceof DomainError ? e.detail : t('generic_fallback_key')`. Never render only a generic key when the backend returned an actionable message.
+5. **Never show a blank error state** — every non-2xx path must end in visible user feedback.
+
+**Pattern (service layer)**:
+```typescript
+if (!response.ok) {
+  const reason = await readError(response); // extracts json.error ?? json.message ?? raw text
+  observability.error('my_operation_failed', { status: response.status, reason });
+  throw new MyDomainError('my_operation_failed', reason, response.status);
+}
+```
+
+**Pattern (screen/hook)**:
+```typescript
+} catch (e) {
+  setError(e instanceof MyDomainError ? e.detail : t('my_operation_failed'));
+}
+```
+
+**Forbidden**:
+- `catch { setError(t('generic_key')) }` when the service already has the backend reason.
+- Throwing `new Error('some_key')` from a service without attaching the backend detail.
+
 ### IX. App Targeting Must Follow Product Intent
 Changes must be applied to the product that matches the business domain named in the request. Merchant-facing features, fixes, and catalog/admin workflows belong in `blitz-pay-merchant/`. Consumer-facing discovery, checkout, payment, and shopper flows belong in `blitz-pay/`. If the target app is ambiguous, stop and confirm before editing code.
 

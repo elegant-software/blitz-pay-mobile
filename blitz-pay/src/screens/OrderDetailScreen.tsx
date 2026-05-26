@@ -24,6 +24,9 @@ import {
   type OrderPaymentChannel,
   type OrderSummary,
 } from '../features/order-payment/types/orderPayment';
+import { fetchMerchantStripeConnectStatus } from '../features/merchant-catalog/services/merchantCatalogService';
+import type { PaymentChannel } from '../features/merchant-catalog/types/catalog';
+import { observability } from '../lib/observability';
 import type { RootStackNav, RootStackParamList } from '../types';
 
 const METHODS: Array<{ key: CheckoutPaymentMethod; icon: React.ComponentProps<typeof Ionicons>['name']; labelKey: 'bank_account_direct' | 'credit_debit_card' | 'pay_by_bank' | 'paypal' }> = [
@@ -64,6 +67,7 @@ export default function OrderDetailScreen() {
     route.params.preferredMethod ?? null,
   );
   const [submitting, setSubmitting] = useState(false);
+  const [activePaymentChannels, setActivePaymentChannels] = useState<PaymentChannel[]>([]);
   const session = orderPaymentStore.getSession(route.params.orderId);
 
   useEffect(() => {
@@ -88,10 +92,51 @@ export default function OrderDetailScreen() {
     };
   }, [refreshOrder, route.params.orderId]);
 
+  useEffect(() => {
+    let active = true;
+    const merchantId = order?.merchantId;
+
+    observability.info('order_detail_channels_effect', {
+      merchantId: merchantId ?? null,
+      orderStatus: order?.status ?? null,
+    });
+
+    if (!merchantId) {
+      setActivePaymentChannels([]);
+      return () => { active = false; };
+    }
+
+    void fetchMerchantStripeConnectStatus(merchantId)
+      .then((status) => {
+        if (!active) return;
+        const channels: PaymentChannel[] = [
+          ...(status?.charges_enabled === true ? ['STRIPE' as const] : []),
+          ...(status?.pay_by_bank_enabled === true ? ['PAY_BY_BANK' as const] : []),
+        ];
+        observability.info('order_detail_channels_set', {
+          merchantId,
+          chargesEnabled: status?.charges_enabled ?? null,
+          payByBankEnabled: status?.pay_by_bank_enabled ?? null,
+          channels: channels.join(',') || 'none',
+        });
+        setActivePaymentChannels(channels);
+      })
+      .catch((fetchError: unknown) => {
+        if (!active) return;
+        observability.warn('order_detail_stripe_status_load_failed', {
+          merchantId,
+          message: fetchError instanceof Error ? fetchError.message : String(fetchError),
+        });
+        setActivePaymentChannels([]);
+      });
+
+    return () => { active = false; };
+  }, [order?.merchantId]);
+
   const canResume = Boolean(order && isOrderResumable(order.status));
   const availableChannels = useMemo<OrderPaymentChannel[]>(
-    () => route.params.availableChannels ?? session?.availableChannels ?? (session?.selectedChannel ? [session.selectedChannel] : []),
-    [route.params.availableChannels, session?.availableChannels, session?.selectedChannel],
+    () => route.params.availableChannels ?? session?.availableChannels ?? (session?.selectedChannel ? [session.selectedChannel] : activePaymentChannels),
+    [route.params.availableChannels, session?.availableChannels, session?.selectedChannel, activePaymentChannels],
   );
   const availableMethods = useMemo(
     () => METHODS.filter((method) => isMethodAvailable(method.key, availableChannels)),

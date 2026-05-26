@@ -56,6 +56,14 @@ _Avoid_: Order type, fulfillment mode
 The actor allowed to initiate payment for an Order.
 _Avoid_: Approver, fulfiller
 
+**Merchant-Initiated Order**:
+An Order created by the merchant operator in `blitz-pay-merchant` from the product catalog before any shopper interaction, with **Checkout Intent** fixed to `PAY_NOW`, represented as a QR code the shopper scans to review, edit, and pay.
+_Avoid_: Pre-built basket, merchant draft order, merchant checkout
+
+**Merchant Order QR**:
+The QR code generated from a **Merchant-Initiated Order** that encodes only the **OrderId** as `blitzpay://order/{orderId}`, so the shopper app can fetch and act on the live Order.
+_Avoid_: Payment QR, basket QR, encoded item list
+
 **Cancelled Empty Order**:
 An Order that becomes `CANCELLED` because all existing items were removed before payment success.
 _Avoid_: Empty basket, zero-total order
@@ -126,9 +134,15 @@ _Avoid_: Order state, payment method timing
 - `Pay now` chooses payment method first, then creates the **Order** and immediately initiates payment
 - Choosing `Pay later` creates an **Editable Unpaid Order** at checkout
 - `Pay later` creates the **Order** without initiating payment or selecting a payment method
-- No **Order** exists before the shopper confirms checkout
-- In this feature, `blitz-pay-merchant` does not create **Orders** directly
+- No **Order** exists before the shopper confirms checkout, unless the merchant creates a **Merchant-Initiated Order**
+- In the base flow, `blitz-pay-merchant` does not create **Orders** directly; a **Merchant-Initiated Order** is the exception
 - The shopper in `blitz-pay` is the only **Payment Starter**
+- A **Merchant-Initiated Order** is composed from the merchant's product catalog with quantities, and has **Checkout Intent** fixed to `PAY_NOW`
+- A **Merchant-Initiated Order** is created in `awaiting_payment` state and appears immediately in the **Merchant Action Queue**
+- A **Merchant-Initiated Order** is surfaced to the shopper via a **Merchant Order QR** displayed inline on the Create Order screen after the order is persisted
+- Scanning a **Merchant Order QR** in `blitz-pay` navigates to `OrderDetail` with the **OrderId**, where the shopper may perform a **Pre-Payment Order Edit** before proceeding to checkout
+- A **Merchant-Initiated Order** that is never scanned does not expire automatically; **Manual Payment Follow-Up** applies
+- A **Merchant-Initiated Order** follows the same **Awaiting Payment** / **Merchant Action Queue** lifecycle as any other unpaid **Order**
 - The shopper sees the **OrderId** immediately after the **Order** is created
 - After successful `Pay now` payment, `blitz-pay` shows the payment result screen first
 - After `Pay later` order creation, `blitz-pay` opens the new order detail screen

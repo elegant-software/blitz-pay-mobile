@@ -24,6 +24,7 @@ export type RootStackParamList = {
   PaymentsHistory: undefined;
   Notifications: undefined;
   Appearances: undefined;
+  CreateOrder: undefined;
 };
 
 export type TabParamList = {
