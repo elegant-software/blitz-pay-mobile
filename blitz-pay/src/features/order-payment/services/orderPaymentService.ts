@@ -458,6 +458,10 @@ export async function createStripeIntentForOrder(
       : typeof data.paymentIntent === 'string'
         ? data.paymentIntent
         : undefined;
+  const connectedAccountId =
+    typeof data.connectedAccountId === 'string' ? data.connectedAccountId :
+    typeof data.stripeAccountId === 'string' ? data.stripeAccountId :
+    undefined;
 
   if (!paymentRequestId || !clientSecret || typeof data.publishableKey !== 'string') {
     observability.error('stripe_create_intent_invalid_response', {
@@ -474,6 +478,7 @@ export async function createStripeIntentForOrder(
     paymentRequestId,
     hasEphemeralKey: typeof data.ephemeralKey === 'string',
     hasCustomer: typeof data.customer === 'string',
+    hasConnectedAccountId: Boolean(connectedAccountId),
   });
 
   return {
@@ -482,6 +487,7 @@ export async function createStripeIntentForOrder(
     ephemeralKey: typeof data.ephemeralKey === 'string' ? data.ephemeralKey : '',
     customer: typeof data.customer === 'string' ? data.customer : '',
     publishableKey: data.publishableKey,
+    connectedAccountId,
   };
 }
 

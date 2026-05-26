@@ -28,6 +28,14 @@ _Avoid_: Role, branch claim, geofence
 The default merchant order-screen view that prioritises orders needing operational follow-up ahead of in-progress, completed, and cancelled orders.
 _Avoid_: Flat history, customer list, generic recent orders
 
+**Merchant Payment Account**:
+The merchant-level payment account connected to BlitzPay so the merchant can accept supported payment methods and receive settlement.
+_Avoid_: Branch account, checkout screen, shopper wallet
+
+**Stripe Connect Onboarding**:
+The hosted Stripe Connect flow a Merchant User starts from the merchant app to connect or complete the Merchant Payment Account setup, then return to BlitzPay Merchant.
+_Avoid_: Shopper card entry, merchant signup, native in-app onboarding form
+
 **Shopper Identity Withholding**:
 The privacy rule that the merchant portal UI must not expose shopper personal identity anywhere in the merchant app.
 _Avoid_: Customer name display, shopper profile visibility, identity lookup from orders
@@ -39,6 +47,9 @@ _Avoid_: Customer name display, shopper profile visibility, identity lookup from
 - A **Branch Group** encodes exactly one **Branch Membership**
 - A **Merchant Action Queue** belongs to exactly one **Merchant Branch**
 - A **Merchant Action Queue** prioritises orders needing merchant action over reference/history states
+- A **Merchant Payment Account** belongs to one merchant, not to a **Merchant Branch**
+- A **Merchant User** may start **Stripe Connect Onboarding** for the merchant they are authorized to operate
+- **Stripe Connect Onboarding** configures exactly one **Merchant Payment Account**
 - **Shopper Identity Withholding** applies across the entire merchant portal UI within one **Merchant Branch**
 - An **Appearance** belongs to exactly one **Merchant Branch**
 

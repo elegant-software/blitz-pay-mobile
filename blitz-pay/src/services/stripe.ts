@@ -1,4 +1,4 @@
-import { initPaymentSheet, CardBrand } from '@stripe/stripe-react-native';
+import { initStripe, initPaymentSheet, CardBrand } from '@stripe/stripe-react-native';
 
 export interface StripeParams {
   paymentRequestId: string;
@@ -6,23 +6,29 @@ export interface StripeParams {
   ephemeralKey: string;
   customer: string;
   publishableKey: string;
+  connectedAccountId?: string;
 }
 
 export const initializeStripePaymentSheet = async (
   params: StripeParams,
   merchantDisplayName: string = 'BlitzPay'
 ) => {
+  // Re-initialize the SDK scoped to the connected account so the PaymentIntent
+  // is looked up on the correct account, not the platform account.
+  await initStripe({
+    publishableKey: params.publishableKey,
+    ...(params.connectedAccountId ? { stripeAccountId: params.connectedAccountId } : {}),
+  });
+
   const { error } = await initPaymentSheet({
     merchantDisplayName,
     customerId: params.customer,
     customerEphemeralKeySecret: params.ephemeralKey,
     paymentIntentClientSecret: params.clientSecret,
-    // Set allowsDelayedPaymentMethods to true if you want to support methods like SEPA Debit
     allowsDelayedPaymentMethods: true,
     defaultBillingDetails: {
-      name: 'User Name', // Should ideally come from user profile
+      name: 'User Name',
     },
-    // Enable card scanning
     preferredNetworks: [CardBrand.Visa, CardBrand.Mastercard],
   });
 
