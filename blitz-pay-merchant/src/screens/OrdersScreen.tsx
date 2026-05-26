@@ -161,6 +161,14 @@ export default function OrdersScreen() {
         </View>
       </View>
 
+      <TouchableOpacity
+        style={[styles.fab, { bottom: 90 + insets.bottom }]}
+        onPress={() => navigation.navigate('CreateOrder')}
+        activeOpacity={0.85}
+      >
+        <Ionicons name="add" size={26} color={colors.black} />
+      </TouchableOpacity>
+
       <ScrollView
         ref={scrollRef}
         contentContainerStyle={{ paddingHorizontal: spacing.md, paddingBottom: 90 + insets.bottom, paddingTop: spacing.sm }}
@@ -344,4 +352,20 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   retryBtnText: { color: colors.black, fontWeight: '700' },
+  fab: {
+    position: 'absolute',
+    right: spacing.lg,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+    shadowColor: colors.black,
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
+  },
 });

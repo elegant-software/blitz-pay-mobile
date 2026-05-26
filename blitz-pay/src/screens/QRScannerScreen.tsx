@@ -20,12 +20,13 @@ export default function QRScannerScreen() {
   const handleBarcodeScanned = ({ data }: { data: string }) => {
     if (scanned) return;
     setScanned(true);
-    // If QR is a blitzpay merchant URL, navigate to merchant
-    if (data.includes('blitzpay://merchant/')) {
+    if (data.startsWith('blitzpay://order/')) {
+      const orderId = data.replace('blitzpay://order/', '');
+      navigation.replace('OrderDetail', { orderId });
+    } else if (data.includes('blitzpay://merchant/')) {
       const merchantId = data.split('/').pop();
       navigation.replace('Merchant', { merchantId, merchantName: 'Scanned Merchant' });
     } else {
-      // Generic QR — navigate to merchant with the raw data
       navigation.replace('Merchant', { merchantId: '1', merchantName: 'Scanned Merchant' });
     }
   };
