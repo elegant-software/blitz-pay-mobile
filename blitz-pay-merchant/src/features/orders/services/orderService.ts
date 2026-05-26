@@ -121,9 +121,29 @@ function parseDetail(raw: RawOrder): MerchantOrderDetail {
 async function readError(response: Response): Promise<string> {
   try {
     const text = await response.text();
-    return text.trim() ? text.slice(0, 500) : `HTTP ${response.status}`;
+    if (!text.trim()) return `HTTP ${response.status}`;
+    try {
+      const json = JSON.parse(text) as Record<string, unknown>;
+      const detail = typeof json.error === 'string' ? json.error
+        : typeof json.message === 'string' ? json.message
+        : null;
+      return detail ?? text.slice(0, 500);
+    } catch {
+      return text.slice(0, 500);
+    }
   } catch {
     return `HTTP ${response.status}`;
+  }
+}
+
+export class MerchantOrderError extends Error {
+  constructor(
+    public readonly key: string,
+    public readonly detail: string,
+    public readonly status?: number,
+  ) {
+    super(key);
+    this.name = 'MerchantOrderError';
   }
 }
 
@@ -165,6 +185,35 @@ async function mutateOrder(
     status: order.status,
     itemCount: order.items.length,
   });
+  return order;
+}
+
+export interface CreateMerchantOrderItem {
+  productId: string;
+  quantity: number;
+}
+
+export async function createMerchantOrder(
+  merchantId: string,
+  branchId: string,
+  items: CreateMerchantOrderItem[],
+): Promise<MerchantOrderDetail> {
+  observability.info('merchant_order_create_started', { merchantId, branchId, itemCount: items.length });
+  const response = await authedFetch('/v1/orders', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ branchId, orderType: 'PRE_ORDER', usesDeferredPayment: false, items }),
+  });
+
+  if (!response.ok) {
+    const reason = await readError(response);
+    observability.error('merchant_order_create_failed', { merchantId, branchId, status: response.status, reason });
+    throw new MerchantOrderError('merchant_order_create_failed', reason, response.status);
+  }
+
+  const payload = (await response.json()) as RawOrder;
+  const order = parseDetail(payload);
+  observability.info('merchant_order_create_succeeded', { orderId: order.orderId, branchId });
   return order;
 }
 

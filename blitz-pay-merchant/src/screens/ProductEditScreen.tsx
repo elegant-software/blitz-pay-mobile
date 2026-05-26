@@ -234,30 +234,38 @@ export default function ProductEditScreen() {
       {
         text: t('product_image_take_photo'),
         onPress: async () => {
-          const { status } = await ImagePicker.requestCameraPermissionsAsync();
-          if (status !== 'granted') return;
-          const result = await ImagePicker.launchCameraAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsEditing: true,
-            quality: 0.8,
-          });
-          if (!result.canceled && result.assets[0]) {
-            handleChange('imageUri', result.assets[0].uri);
+          try {
+            const { status } = await ImagePicker.requestCameraPermissionsAsync();
+            if (status !== 'granted') return;
+            const result = await ImagePicker.launchCameraAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              allowsEditing: true,
+              quality: 0.8,
+            });
+            if (!result.canceled && result.assets[0]) {
+              handleChange('imageUri', result.assets[0].uri);
+            }
+          } catch {
+            // expo-keep-awake can reject on Android when the camera activity is recycled
           }
         },
       },
       {
         text: t('product_image_choose_library'),
         onPress: async () => {
-          const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-          if (status !== 'granted') return;
-          const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsEditing: true,
-            quality: 0.8,
-          });
-          if (!result.canceled && result.assets[0]) {
-            handleChange('imageUri', result.assets[0].uri);
+          try {
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== 'granted') return;
+            const result = await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              allowsEditing: true,
+              quality: 0.8,
+            });
+            if (!result.canceled && result.assets[0]) {
+              handleChange('imageUri', result.assets[0].uri);
+            }
+          } catch {
+            // expo-keep-awake can reject on Android when the activity is recycled
           }
         },
       },
