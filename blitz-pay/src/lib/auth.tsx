@@ -32,16 +32,20 @@ export interface AuthState {
   user: UserProfile | null;
   isBiometricAvailable: boolean;
   biometricEnrolled: boolean;
+  biometricPromptDismissed: boolean;
   login: (email: string, password: string) => Promise<void>;
   loginWithBiometric: () => Promise<void>;
   logout: () => Promise<void>;
   enrollBiometric: () => Promise<void>;
+  unenrollBiometric: () => Promise<void>;
+  dismissBiometricPrompt: () => Promise<void>;
 }
 
 // ─── Storage keys ────────────────────────────────────────────────────────────
 
 const SESSION_KEY = 'blitzpay_session';
 const BIOMETRIC_KEY = 'blitzpay_biometric_enrolled';
+const PROMPT_DISMISSED_KEY = 'blitzpay_biometric_prompt_dismissed';
 
 // ─── JWT helpers ─────────────────────────────────────────────────────────────
 
@@ -121,10 +125,13 @@ const defaultAuth: AuthState = {
   user: null,
   isBiometricAvailable: false,
   biometricEnrolled: false,
+  biometricPromptDismissed: false,
   login: async () => {},
   loginWithBiometric: async () => {},
   logout: async () => {},
   enrollBiometric: async () => {},
+  unenrollBiometric: async () => {},
+  dismissBiometricPrompt: async () => {},
 };
 
 const AuthContext = createContext<AuthState>(defaultAuth);
@@ -148,7 +155,25 @@ export function AuthProvider({ children, onSessionExpired }: AuthProviderProps) 
   const [user, setUser] = useState<UserProfile | null>(isBypass ? BYPASS_USER : null);
   const [isBiometricAvailable, setIsBiometricAvailable] = useState(false);
   const [biometricEnrolled, setBiometricEnrolled] = useState(false);
+  const [biometricPromptDismissed, setBiometricPromptDismissed] = useState(false);
   const initStarted = useRef(false);
+
+  useEffect(() => {
+    if (!isBypass) return;
+    void (async () => {
+      if (LocalAuthentication) {
+        const hasHardware = await LocalAuthentication.hasHardwareAsync();
+        const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+        setIsBiometricAvailable(hasHardware && isEnrolled);
+      }
+      try {
+        const raw = await storage.getItem(BIOMETRIC_KEY);
+        setBiometricEnrolled(raw === 'true');
+        const dismissed = await storage.getItem(PROMPT_DISMISSED_KEY);
+        setBiometricPromptDismissed(dismissed === 'true');
+      } catch {}
+    })();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const clearSessionState = React.useCallback(async () => {
     setAuthenticated(false);
@@ -190,6 +215,8 @@ export function AuthProvider({ children, onSessionExpired }: AuthProviderProps) 
       try {
         const raw = await storage.getItem(BIOMETRIC_KEY);
         setBiometricEnrolled(raw === 'true');
+        const dismissed = await storage.getItem(PROMPT_DISMISSED_KEY);
+        setBiometricPromptDismissed(dismissed === 'true');
       } catch {}
 
       // Restore session from secure store
@@ -355,6 +382,16 @@ export function AuthProvider({ children, onSessionExpired }: AuthProviderProps) 
     setBiometricEnrolled(true);
   };
 
+  const unenrollBiometric = async (): Promise<void> => {
+    await storage.deleteItem(BIOMETRIC_KEY);
+    setBiometricEnrolled(false);
+  };
+
+  const dismissBiometricPrompt = async (): Promise<void> => {
+    await storage.setItem(PROMPT_DISMISSED_KEY, 'true');
+    setBiometricPromptDismissed(true);
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -364,10 +401,13 @@ export function AuthProvider({ children, onSessionExpired }: AuthProviderProps) 
         user,
         isBiometricAvailable,
         biometricEnrolled,
+        biometricPromptDismissed,
         login,
         loginWithBiometric,
         logout,
         enrollBiometric,
+        unenrollBiometric,
+        dismissBiometricPrompt,
       }}
     >
       {children}

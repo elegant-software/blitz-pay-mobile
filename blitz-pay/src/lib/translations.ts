@@ -246,6 +246,10 @@ export const translations = {
     passwords_do_not_match: "Passwords do not match",
     face_id_login: "Sign in with Face ID",
     enable_face_id: "Enable Face ID",
+    biometric_prompt_title: "Sign in faster next time",
+    biometric_prompt_body: "Enable Face ID or fingerprint so you can skip the password next time.",
+    biometric_prompt_enable: "Enable",
+    biometric_prompt_not_now: "Not now",
     continue: "Continue",
     payment_processing_title: "Processing Payment",
     payment_processing_body: "Please wait while we process your bank payment…",
@@ -657,6 +661,10 @@ export const translations = {
     passwords_do_not_match: "Passwörter stimmen nicht überein",
     face_id_login: "Mit Face ID anmelden",
     enable_face_id: "Face ID aktivieren",
+    biometric_prompt_title: "Schneller anmelden",
+    biometric_prompt_body: "Face ID oder Fingerabdruck aktivieren, um das Passwort zu überspringen.",
+    biometric_prompt_enable: "Aktivieren",
+    biometric_prompt_not_now: "Nicht jetzt",
   },
 };
 

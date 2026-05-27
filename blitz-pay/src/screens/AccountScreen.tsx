@@ -19,7 +19,7 @@ import type { Language } from '../lib/translations';
 
 export default function AccountScreen() {
   const { t, language, setLanguage } = useLanguage();
-  const { user, logout, isBiometricAvailable, biometricEnrolled, enrollBiometric } = useAuth();
+  const { user, logout, isBiometricAvailable, biometricEnrolled, enrollBiometric, unenrollBiometric } = useAuth();
   const insets = useSafeAreaInsets();
 
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -60,6 +60,8 @@ export default function AccountScreen() {
     setBiometricEnabled(value);
     if (value) {
       await enrollBiometric();
+    } else {
+      await unenrollBiometric();
     }
   };
 

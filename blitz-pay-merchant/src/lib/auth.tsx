@@ -55,16 +55,20 @@ export interface AuthState {
   branchScopeError: string | null;
   isBiometricAvailable: boolean;
   biometricEnrolled: boolean;
+  biometricPromptDismissed: boolean;
   retryBranchScope: () => Promise<void>;
   selectActiveBranch: (branchId: string) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   loginWithBiometric: () => Promise<void>;
   logout: () => Promise<void>;
   enrollBiometric: () => Promise<void>;
+  unenrollBiometric: () => Promise<void>;
+  dismissBiometricPrompt: () => Promise<void>;
 }
 
 const SESSION_KEY = 'blitzpay_merchant_session';
 const BIOMETRIC_KEY = 'blitzpay_merchant_biometric_enrolled';
+const PROMPT_DISMISSED_KEY = 'blitzpay_merchant_biometric_prompt_dismissed';
 const ACTIVE_BRANCH_KEY = 'blitzpay_merchant_active_branch_id';
 const BRANCH_GROUP_PATTERNS = [
   /^\/merchants\/merchant_([^/]+)\/branch_([^/]+)$/,
@@ -377,12 +381,15 @@ const defaultAuth: AuthState = {
   branchScopeError: null,
   isBiometricAvailable: false,
   biometricEnrolled: false,
+  biometricPromptDismissed: false,
   retryBranchScope: async () => {},
   selectActiveBranch: async () => {},
   login: async () => {},
   loginWithBiometric: async () => {},
   logout: async () => {},
   enrollBiometric: async () => {},
+  unenrollBiometric: async () => {},
+  dismissBiometricPrompt: async () => {},
 };
 
 const AuthContext = createContext<AuthState>(defaultAuth);
@@ -398,7 +405,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [branchScopeError, setBranchScopeError] = useState<string | null>(null);
   const [isBiometricAvailable, setIsBiometricAvailable] = useState(false);
   const [biometricEnrolled, setBiometricEnrolled] = useState(false);
+  const [biometricPromptDismissed, setBiometricPromptDismissed] = useState(false);
   const initStarted = useRef(false);
+
+  useEffect(() => {
+    if (!isBypass) return;
+    void (async () => {
+      if (LocalAuthentication) {
+        const hasHardware = await LocalAuthentication.hasHardwareAsync();
+        const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+        setIsBiometricAvailable(hasHardware && isEnrolled);
+      }
+      try {
+        const raw = await storage.getItem(BIOMETRIC_KEY);
+        setBiometricEnrolled(raw === 'true');
+        const dismissed = await storage.getItem(PROMPT_DISMISSED_KEY);
+        setBiometricPromptDismissed(dismissed === 'true');
+      } catch {}
+    })();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function readActiveBranchId(): Promise<string | null> {
     try {
@@ -484,6 +509,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const raw = await storage.getItem(BIOMETRIC_KEY);
         setBiometricEnrolled(raw === 'true');
+        const dismissed = await storage.getItem(PROMPT_DISMISSED_KEY);
+        setBiometricPromptDismissed(dismissed === 'true');
       } catch {}
 
       try {
@@ -614,6 +641,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setBiometricEnrolled(true);
   };
 
+  const unenrollBiometric = async (): Promise<void> => {
+    await storage.deleteItem(BIOMETRIC_KEY);
+    setBiometricEnrolled(false);
+  };
+
+  const dismissBiometricPrompt = async (): Promise<void> => {
+    await storage.setItem(PROMPT_DISMISSED_KEY, 'true');
+    setBiometricPromptDismissed(true);
+  };
+
   const retryBranchScope = async (): Promise<void> => {
     if (isBypass) {
       setBranchScopeError(null);
@@ -680,9 +717,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider value={{
       initialized, authenticated, token, user, activeBranchScope, branchScopeError,
-      isBiometricAvailable, biometricEnrolled,
+      isBiometricAvailable, biometricEnrolled, biometricPromptDismissed,
       retryBranchScope, selectActiveBranch,
-      login, loginWithBiometric, logout, enrollBiometric,
+      login, loginWithBiometric, logout, enrollBiometric, unenrollBiometric, dismissBiometricPrompt,
     }}>
       {children}
     </AuthContext.Provider>

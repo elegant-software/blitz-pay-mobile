@@ -16,7 +16,7 @@ const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreCl
 
 export default function AccountScreen() {
   const { t, language, setLanguage } = useLanguage();
-  const { user, logout, isBiometricAvailable, biometricEnrolled, enrollBiometric } = useAuth();
+  const { user, logout, isBiometricAvailable, biometricEnrolled, enrollBiometric, unenrollBiometric } = useAuth();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
 
@@ -27,7 +27,11 @@ export default function AccountScreen() {
 
   const handleBiometricToggle = async (value: boolean) => {
     setBiometricEnabled(value);
-    if (value) await enrollBiometric();
+    if (value) {
+      await enrollBiometric();
+    } else {
+      await unenrollBiometric();
+    }
   };
 
   const handleGeofenceToggle = async (value: boolean) => {
