@@ -16,6 +16,9 @@ module.exports = {
     ios: {
       supportsTablet: false,
       bundleIdentifier: "app.blitzpay.merchant",
+      entitlements: {
+        "com.apple.developer.proximity-reader.payment.acceptance": true,
+      },
       infoPlist: {
         NSCameraUsageDescription: "Used to scan QR codes for payments",
         NSFaceIDUsageDescription: "Used for biometric authentication",
@@ -58,6 +61,9 @@ module.exports = {
       [
         "expo-build-properties",
         {
+          android: {
+            minSdkVersion: 26,
+          },
           ios: {
             deploymentTarget: "15.1",
           },
@@ -73,6 +79,7 @@ module.exports = {
       "expo-secure-store",
       ["expo-notifications", { sounds: [] }],
       "expo-font",
+      ["@stripe/stripe-terminal-react-native", { appDelegate: true, tapToPayCheck: true }],
     ],
     extra: {
       eas: {

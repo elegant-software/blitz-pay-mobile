@@ -7,6 +7,15 @@ export type MerchantOrderStatus =
   | 'cancelled';
 export type MerchantCheckoutIntent = 'PAY_NOW' | 'PAY_LATER';
 export type MerchantPaymentSource = 'APP_PAYMENT' | 'MANUAL_SETTLEMENT';
+export type MerchantCheckoutPaymentMethod = 'BANK_ACCOUNT' | 'CARD' | 'PAY_BY_BANK' | 'TERMINAL' | 'PAYPAL';
+export type MerchantPaymentProvider =
+  | 'STRIPE'
+  | 'STRIPE_TERMINAL'
+  | 'STRIPE_PAY_BY_BANK'
+  | 'TERMINAL'
+  | 'TRUELAYER'
+  | 'BRAINTREE'
+  | 'QRPAY';
 export type MerchantOrderPriceSource = 'CATALOG' | 'MERCHANT_OVERRIDE';
 export type MerchantOrderUpdateActor = 'MERCHANT' | 'SHOPPER';
 
@@ -29,6 +38,8 @@ export interface MerchantOrderSummary {
   status: MerchantOrderStatus;
   checkoutIntent: MerchantCheckoutIntent;
   paymentSource?: MerchantPaymentSource;
+  checkoutPaymentMethod?: MerchantCheckoutPaymentMethod;
+  paymentProvider?: MerchantPaymentProvider;
   createdAt: string;
   updatedAt: string;
   itemCount?: number;

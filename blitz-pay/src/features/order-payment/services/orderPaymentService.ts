@@ -35,6 +35,7 @@ interface RawOrderResponse {
   status?: string;
   checkoutIntent?: string | null;
   paymentSource?: string | null;
+  checkoutPaymentMethod?: string | null;
   currency?: string;
   totalAmountMinor?: number;
   items?: RawOrderItemResponse[];
@@ -88,6 +89,17 @@ function normalizePaymentSource(source: unknown): 'APP_PAYMENT' | 'MANUAL_SETTLE
   return undefined;
 }
 
+function normalizeCheckoutPaymentMethod(
+  method: unknown,
+): 'BANK_ACCOUNT' | 'CARD' | 'PAY_BY_BANK' | 'TERMINAL' | 'PAYPAL' | undefined {
+  if (method === 'BANK_ACCOUNT') return 'BANK_ACCOUNT';
+  if (method === 'CARD') return 'CARD';
+  if (method === 'PAY_BY_BANK') return 'PAY_BY_BANK';
+  if (method === 'TERMINAL') return 'TERMINAL';
+  if (method === 'PAYPAL') return 'PAYPAL';
+  return undefined;
+}
+
 function normalizePriceSource(source: unknown): 'CATALOG' | 'MERCHANT_OVERRIDE' {
   return source === 'MERCHANT_OVERRIDE' ? 'MERCHANT_OVERRIDE' : 'CATALOG';
 }
@@ -128,6 +140,7 @@ function parseOrder(payload: RawOrderResponse): OrderSummary {
     checkoutIntent: normalizeCheckoutIntent(payload.checkoutIntent),
     status,
     paymentSource: normalizePaymentSource(payload.paymentSource),
+    checkoutPaymentMethod: normalizeCheckoutPaymentMethod(payload.checkoutPaymentMethod),
     currency: payload.currency,
     totalAmountMinor: payload.totalAmountMinor ?? 0,
     items: (payload.items ?? []).map((item, index) => ({
@@ -220,6 +233,7 @@ export async function createOrder(input: CreateOrderInput): Promise<OrderSummary
       unitPriceMinor: item.unitPriceMinor,
     })),
     paymentMethod: input.paymentMethod,
+    checkoutPaymentMethod: input.checkoutPaymentMethod,
   };
 
   observability.info('order_create_started', {
@@ -227,6 +241,7 @@ export async function createOrder(input: CreateOrderInput): Promise<OrderSummary
     branchId: input.branchId,
     orderType: input.orderType,
     paymentMethod: input.paymentMethod ?? null,
+    checkoutPaymentMethod: input.checkoutPaymentMethod ?? null,
     itemCount: input.items.length,
   });
   observability.info('order_create_request_payload', {
@@ -235,6 +250,7 @@ export async function createOrder(input: CreateOrderInput): Promise<OrderSummary
     orderType: requestBody.orderType,
     usesDeferredPayment: requestBody.usesDeferredPayment,
     paymentMethod: requestBody.paymentMethod ?? null,
+    checkoutPaymentMethod: requestBody.checkoutPaymentMethod ?? null,
     itemCount: requestBody.items.length,
     itemsJson: JSON.stringify(
       requestBody.items.map((item) => ({
@@ -260,6 +276,7 @@ export async function createOrder(input: CreateOrderInput): Promise<OrderSummary
     observability.error('order_create_response_failed', {
       checkoutIntent: input.checkoutIntent,
       paymentMethod: input.paymentMethod ?? null,
+      checkoutPaymentMethod: input.checkoutPaymentMethod ?? null,
       status: response.status,
       message,
       usesDeferredPayment: requestBody.usesDeferredPayment,
@@ -269,6 +286,7 @@ export async function createOrder(input: CreateOrderInput): Promise<OrderSummary
     observability.warn('order_create_failed', {
       checkoutIntent: input.checkoutIntent,
       paymentMethod: input.paymentMethod ?? null,
+      checkoutPaymentMethod: input.checkoutPaymentMethod ?? null,
       status: response.status,
       message,
     });
@@ -283,6 +301,7 @@ export async function createOrder(input: CreateOrderInput): Promise<OrderSummary
     status: payload.status ?? null,
     checkoutIntent: payload.checkoutIntent ?? null,
     paymentSource: payload.paymentSource ?? null,
+    checkoutPaymentMethod: payload.checkoutPaymentMethod ?? null,
     hasPaymentRequestId: Boolean(payload.lastPaymentRequestId),
     itemCount: payload.items?.length ?? 0,
   });
@@ -294,6 +313,7 @@ export async function createOrder(input: CreateOrderInput): Promise<OrderSummary
     branchId: order.branchId ?? null,
     status: order.status,
     checkoutIntent: order.checkoutIntent,
+    checkoutPaymentMethod: order.checkoutPaymentMethod ?? null,
     lastPaymentRequestId: order.lastPaymentRequestId ?? null,
   });
 
@@ -437,6 +457,7 @@ export async function createStripeIntentForOrder(
       merchantId: context.merchantId,
       branchId: context.branchId,
       productId: context.productId,
+      ...(context.paymentMethodType ? { paymentMethodType: context.paymentMethodType } : {}),
     }),
   });
 

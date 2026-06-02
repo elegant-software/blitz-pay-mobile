@@ -1,9 +1,10 @@
 import type { BasketCheckoutItemSummary } from '../../basket/types/basket';
 import type { PaymentChannel as MerchantPaymentChannel } from '../../merchant-catalog/types/catalog';
 
-export type CheckoutPaymentMethod = 'bank' | 'card' | 'paypal' | 'pay_by_bank';
+export type CheckoutPaymentMethod = 'bank' | 'card' | 'paypal' | 'pay_by_bank' | 'tap_to_pay';
 export type OrderPaymentChannel = MerchantPaymentChannel;
 export type CreateOrderPaymentMethod = 'TRUELAYER' | 'STRIPE' | 'BRAINTREE';
+export type BackendCheckoutPaymentMethod = 'BANK_ACCOUNT' | 'CARD' | 'PAY_BY_BANK' | 'TERMINAL' | 'PAYPAL';
 export type OrderType = 'PRE_ORDER' | 'WALK_IN_ORDERING';
 export type CheckoutIntent = 'PAY_NOW' | 'PAY_LATER';
 export type PaymentSource = 'APP_PAYMENT' | 'MANUAL_SETTLEMENT';
@@ -28,6 +29,7 @@ export interface CreateOrderInput {
   orderType: OrderType;
   checkoutIntent: CheckoutIntent;
   paymentMethod?: CreateOrderPaymentMethod;
+  checkoutPaymentMethod?: BackendCheckoutPaymentMethod;
   items: CreateOrderItemInput[];
 }
 
@@ -55,6 +57,7 @@ export interface OrderPaymentIntentContext {
   merchantId: string;
   branchId?: string;
   productId?: string;
+  paymentMethodType?: string;
 }
 
 export interface OrderItemSummary {
@@ -84,6 +87,7 @@ export interface OrderSummary {
   checkoutIntent: CheckoutIntent;
   status: OrderStatus;
   paymentSource?: PaymentSource;
+  checkoutPaymentMethod?: BackendCheckoutPaymentMethod;
   currency: string;
   totalAmountMinor: number;
   items: OrderItemSummary[];
@@ -115,6 +119,7 @@ export interface OrderPaymentSession {
   basketItemCount: number;
   basketItems: BasketCheckoutItemSummary[];
   selectedMethod?: CheckoutPaymentMethod;
+  checkoutPaymentMethod?: BackendCheckoutPaymentMethod;
   selectedChannel?: OrderPaymentChannel;
   orderStatus: OrderStatus;
   paymentSource?: PaymentSource;
@@ -147,6 +152,7 @@ export const METHOD_TO_CHANNEL: Record<CheckoutPaymentMethod, OrderPaymentChanne
   card: 'STRIPE',
   paypal: 'PAYPAL',
   pay_by_bank: 'PAY_BY_BANK',
+  tap_to_pay: 'TAP_TO_PAY',
 };
 
 export function mapMethodToChannel(method: CheckoutPaymentMethod): OrderPaymentChannel {
@@ -155,8 +161,16 @@ export function mapMethodToChannel(method: CheckoutPaymentMethod): OrderPaymentC
 
 export function mapMethodToOrderPaymentMethod(method: CheckoutPaymentMethod): CreateOrderPaymentMethod {
   if (method === 'paypal') return 'BRAINTREE';
-  if (method === 'card' || method === 'pay_by_bank') return 'STRIPE';
+  if (method === 'card' || method === 'pay_by_bank' || method === 'tap_to_pay') return 'STRIPE';
   return 'TRUELAYER';
+}
+
+export function mapMethodToBackendCheckoutPaymentMethod(method: CheckoutPaymentMethod): BackendCheckoutPaymentMethod {
+  if (method === 'bank') return 'BANK_ACCOUNT';
+  if (method === 'card') return 'CARD';
+  if (method === 'pay_by_bank') return 'PAY_BY_BANK';
+  if (method === 'tap_to_pay') return 'TERMINAL';
+  return 'PAYPAL';
 }
 
 export function isMethodAvailable(

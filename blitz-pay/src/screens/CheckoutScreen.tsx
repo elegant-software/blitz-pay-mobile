@@ -48,6 +48,10 @@ function summarizeImageUri(uri?: string): { host: string | null; path: string | 
   }
 }
 
+function mergePaymentChannels(...channelGroups: Array<readonly PaymentChannel[] | undefined>): PaymentChannel[] {
+  return Array.from(new Set(channelGroups.flatMap((channels) => channels ?? []))) as PaymentChannel[];
+}
+
 export default function CheckoutScreen() {
   const { t } = useLanguage();
   const { token, user } = useAuth();
@@ -74,13 +78,17 @@ export default function CheckoutScreen() {
   const [selectedMethod, setSelectedMethod] = useState<CheckoutPaymentMethod | null>(null);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState('');
-  const [activePaymentChannels, setActivePaymentChannels] = useState<PaymentChannel[]>([]);
+  const routePaymentChannels = useMemo(
+    () => route.params?.activePaymentChannels ?? [],
+    [route.params?.activePaymentChannels],
+  );
+  const [activePaymentChannels, setActivePaymentChannels] = useState<PaymentChannel[]>(routePaymentChannels);
 
   useEffect(() => {
     let active = true;
 
     if (!merchantId) {
-      setActivePaymentChannels([]);
+      setActivePaymentChannels(routePaymentChannels);
       return () => {
         active = false;
       };
@@ -89,10 +97,12 @@ export default function CheckoutScreen() {
     void fetchMerchantStripeConnectStatus(merchantId)
       .then((status) => {
         if (!active) return;
-        const channels: PaymentChannel[] = [
+        const stripeChannels: PaymentChannel[] = [
           ...(status?.charges_enabled === true ? ['STRIPE' as const] : []),
           ...(status?.pay_by_bank_enabled === true ? ['PAY_BY_BANK' as const] : []),
+          ...(status?.tap_to_pay_enabled === true ? ['TAP_TO_PAY' as const] : []),
         ];
+        const channels = mergePaymentChannels(routePaymentChannels, stripeChannels);
         setActivePaymentChannels(channels);
         setSelectedMethod((current) => {
           if (!current) return current;
@@ -105,14 +115,14 @@ export default function CheckoutScreen() {
           merchantId,
           message: fetchError instanceof Error ? fetchError.message : String(fetchError),
         });
-        setActivePaymentChannels([]);
+        setActivePaymentChannels(routePaymentChannels);
         setSelectedMethod(null);
       });
 
     return () => {
       active = false;
     };
-  }, [merchantId]);
+  }, [merchantId, routePaymentChannels]);
 
   const methods = useMemo(
     () =>
@@ -134,6 +144,12 @@ export default function CheckoutScreen() {
           icon: 'swap-horizontal-outline',
           label: t('pay_by_bank'),
           sub: t('stripe_pay_by_bank_subtitle'),
+        },
+        {
+          key: 'tap_to_pay' as const,
+          icon: 'phone-portrait-outline',
+          label: t('tap_to_pay'),
+          sub: t('tap_to_pay_subtitle'),
         },
         {
           key: 'paypal' as const,

@@ -29,10 +29,15 @@ import type { PaymentChannel } from '../features/merchant-catalog/types/catalog'
 import { observability } from '../lib/observability';
 import type { RootStackNav, RootStackParamList } from '../types';
 
-const METHODS: Array<{ key: CheckoutPaymentMethod; icon: React.ComponentProps<typeof Ionicons>['name']; labelKey: 'bank_account_direct' | 'credit_debit_card' | 'pay_by_bank' | 'paypal' }> = [
+const METHODS: Array<{
+  key: CheckoutPaymentMethod;
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+  labelKey: 'bank_account_direct' | 'credit_debit_card' | 'pay_by_bank' | 'tap_to_pay' | 'paypal';
+}> = [
   { key: 'bank', icon: 'business-outline', labelKey: 'bank_account_direct' },
   { key: 'card', icon: 'card-outline', labelKey: 'credit_debit_card' },
   { key: 'pay_by_bank', icon: 'swap-horizontal-outline', labelKey: 'pay_by_bank' },
+  { key: 'tap_to_pay', icon: 'phone-portrait-outline', labelKey: 'tap_to_pay' },
   { key: 'paypal', icon: 'logo-paypal', labelKey: 'paypal' },
 ];
 
@@ -46,6 +51,10 @@ const STATUS_COLORS = {
 
 function formatAmount(amountMinor: number, currency: string) {
   return new Intl.NumberFormat('de-DE', { style: 'currency', currency }).format(amountMinor / 100);
+}
+
+function mergePaymentChannels(...channelGroups: Array<readonly OrderPaymentChannel[] | undefined>): OrderPaymentChannel[] {
+  return Array.from(new Set(channelGroups.flatMap((channels) => channels ?? []))) as OrderPaymentChannel[];
 }
 
 function formatMerchantLabel(merchantName?: string, branchName?: string): string | null {
@@ -112,11 +121,13 @@ export default function OrderDetailScreen() {
         const channels: PaymentChannel[] = [
           ...(status?.charges_enabled === true ? ['STRIPE' as const] : []),
           ...(status?.pay_by_bank_enabled === true ? ['PAY_BY_BANK' as const] : []),
+          ...(status?.tap_to_pay_enabled === true ? ['TAP_TO_PAY' as const] : []),
         ];
         observability.info('order_detail_channels_set', {
           merchantId,
           chargesEnabled: status?.charges_enabled ?? null,
           payByBankEnabled: status?.pay_by_bank_enabled ?? null,
+          tapToPayEnabled: status?.tap_to_pay_enabled ?? null,
           channels: channels.join(',') || 'none',
         });
         setActivePaymentChannels(channels);
@@ -135,7 +146,12 @@ export default function OrderDetailScreen() {
 
   const canResume = Boolean(order && isOrderResumable(order.status));
   const availableChannels = useMemo<OrderPaymentChannel[]>(
-    () => route.params.availableChannels ?? session?.availableChannels ?? (session?.selectedChannel ? [session.selectedChannel] : activePaymentChannels),
+    () => mergePaymentChannels(
+      route.params.availableChannels,
+      session?.availableChannels,
+      session?.selectedChannel ? [session.selectedChannel] : undefined,
+      activePaymentChannels,
+    ),
     [route.params.availableChannels, session?.availableChannels, session?.selectedChannel, activePaymentChannels],
   );
   const availableMethods = useMemo(

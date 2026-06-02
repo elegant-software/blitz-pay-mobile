@@ -50,6 +50,7 @@ async function loadCatalog(
     activePaymentChannels: [
       ...(stripeStatus?.charges_enabled === true ? ['STRIPE' as const] : []),
       ...(stripeStatus?.pay_by_bank_enabled === true ? ['PAY_BY_BANK' as const] : []),
+      ...(stripeStatus?.tap_to_pay_enabled === true ? ['TAP_TO_PAY' as const] : []),
     ] as MerchantBranch['activePaymentChannels'],
   };
 
