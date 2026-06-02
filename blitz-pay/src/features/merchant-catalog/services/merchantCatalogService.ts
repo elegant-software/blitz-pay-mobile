@@ -35,6 +35,7 @@ export interface MerchantDetails {
 type StripeConnectStatusResponse = {
   charges_enabled?: boolean;
   pay_by_bank_enabled?: boolean;
+  tap_to_pay_enabled?: boolean;
   enabled_payment_flows?: string[];
 };
 
@@ -179,6 +180,9 @@ export async function fetchMerchantStripeConnectStatus(
         raw.pay_by_bank_enabled === true ||
         raw.payByBankEnabled === true ||
         enabledPaymentFlows.includes('PAY_BY_BANK'),
+      tap_to_pay_enabled:
+        raw.tap_to_pay_enabled === true ||
+        enabledPaymentFlows.includes('TAP_TO_PAY'),
       enabled_payment_flows: enabledPaymentFlows,
     };
   } catch {

@@ -31,6 +31,8 @@ interface RawOrder {
   status?: string;
   checkoutIntent?: string | null;
   paymentSource?: string | null;
+  checkoutPaymentMethod?: string | null;
+  lastPaymentProvider?: string | null;
   createdAt?: string;
   updatedAt?: string;
   items?: RawOrderItem[];
@@ -54,6 +56,28 @@ function mapCheckoutIntent(intent: unknown): 'PAY_NOW' | 'PAY_LATER' {
 function mapPaymentSource(source: unknown): 'APP_PAYMENT' | 'MANUAL_SETTLEMENT' | undefined {
   if (source === 'MANUAL_SETTLEMENT') return 'MANUAL_SETTLEMENT';
   if (source === 'APP_PAYMENT') return 'APP_PAYMENT';
+  return undefined;
+}
+
+function mapPaymentProvider(
+  provider: unknown,
+): 'STRIPE' | 'STRIPE_TERMINAL' | 'STRIPE_PAY_BY_BANK' | 'TERMINAL' | 'TRUELAYER' | 'BRAINTREE' | 'QRPAY' | undefined {
+  if (provider === 'STRIPE') return 'STRIPE';
+  if (provider === 'STRIPE_TERMINAL') return 'STRIPE_TERMINAL';
+  if (provider === 'STRIPE_PAY_BY_BANK') return 'STRIPE_PAY_BY_BANK';
+  if (provider === 'TERMINAL') return 'TERMINAL';
+  if (provider === 'TRUELAYER') return 'TRUELAYER';
+  if (provider === 'BRAINTREE') return 'BRAINTREE';
+  if (provider === 'QRPAY') return 'QRPAY';
+  return undefined;
+}
+
+function mapCheckoutPaymentMethod(method: unknown): 'BANK_ACCOUNT' | 'CARD' | 'PAY_BY_BANK' | 'TERMINAL' | 'PAYPAL' | undefined {
+  if (method === 'BANK_ACCOUNT') return 'BANK_ACCOUNT';
+  if (method === 'CARD') return 'CARD';
+  if (method === 'PAY_BY_BANK') return 'PAY_BY_BANK';
+  if (method === 'TERMINAL') return 'TERMINAL';
+  if (method === 'PAYPAL') return 'PAYPAL';
   return undefined;
 }
 
@@ -85,6 +109,8 @@ function parseSummary(raw: RawOrder): MerchantOrderSummary {
     status: mapStatus(raw.status),
     checkoutIntent: mapCheckoutIntent(raw.checkoutIntent),
     paymentSource: mapPaymentSource(raw.paymentSource),
+    checkoutPaymentMethod: mapCheckoutPaymentMethod(raw.checkoutPaymentMethod),
+    paymentProvider: mapPaymentProvider(raw.lastPaymentProvider),
     createdAt: raw.createdAt,
     updatedAt: raw.updatedAt ?? raw.createdAt,
     itemCount: itemCount && itemCount > 0 ? itemCount : undefined,

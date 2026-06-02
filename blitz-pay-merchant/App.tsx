@@ -12,6 +12,8 @@ import AppNavigator from './src/navigation/AppNavigator';
 import ErrorBoundary from './src/components/ErrorBoundary';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { queryClient, productsPersister } from './src/lib/queryClient';
+import { StripeTerminalProvider } from '@stripe/stripe-terminal-react-native';
+import { terminalTokenProvider } from './src/services/stripeTerminal';
 // Register geofence background tasks before any React component mounts (expo-task-manager requirement).
 // defineTask is safe to call in any environment — Expo Go simply won't execute background tasks.
 import './src/tasks/geofenceTask';
@@ -31,6 +33,7 @@ export default function App() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <ErrorBoundary>
+          <StripeTerminalProvider tokenProvider={terminalTokenProvider} logLevel="verbose">
           <PersistQueryClientProvider
             client={queryClient}
             persistOptions={{
@@ -54,6 +57,7 @@ export default function App() {
             </>
           </LanguageProvider>
           </PersistQueryClientProvider>
+          </StripeTerminalProvider>
         </ErrorBoundary>
       </SafeAreaProvider>
     </GestureHandlerRootView>

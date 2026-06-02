@@ -11,6 +11,7 @@ import { colors, spacing, radius, shadow } from '../lib/theme';
 import type { RootStackParamList } from '../types';
 import { getMerchantOrderStatusIcon, getMerchantOrderStatusLabelKey } from '../features/orders/orderPresentation';
 import { useMerchantOrderDetail } from '../features/orders/hooks/useMerchantOrderDetail';
+import { useStripeTerminalPayment } from '../hooks/useStripeTerminalPayment';
 
 type RouteProps = RouteProp<RootStackParamList, 'OrderDetail'>;
 
@@ -32,10 +33,13 @@ export default function OrderDetailScreen() {
   const navigation = useNavigation();
   const route = useRoute<RouteProps>();
   const insets = useSafeAreaInsets();
-  const { order, loading, error, mutationError, mutating, cancelOrder, markManuallyPaid } = useMerchantOrderDetail(
+  const { order, loading, error, mutationError, mutating, cancelOrder, markManuallyPaid, reconcileTerminalPayment } = useMerchantOrderDetail(
     route.params.orderId,
     activeBranchScope,
   );
+  const { status: terminalStatus, errorMessage: terminalError, collectPayment, reset: resetTerminal } = useStripeTerminalPayment();
+  const [terminalReconciling, setTerminalReconciling] = React.useState(false);
+  const terminalBusy = terminalReconciling || (terminalStatus !== 'idle' && terminalStatus !== 'succeeded' && terminalStatus !== 'failed');
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -62,7 +66,7 @@ export default function OrderDetailScreen() {
         <ScrollView contentContainerStyle={{ paddingBottom: 96 + insets.bottom }} showsVerticalScrollIndicator={false}>
           <View style={[styles.summaryCard, shadow.md]}>
             <View style={styles.summaryTop}>
-              <View>
+              <View style={styles.summaryIdentity}>
                 <Text style={styles.orderNum}>{t('order_number')}{order.orderId}</Text>
                 <Text style={styles.orderId}>ID: {order.orderId}</Text>
               </View>
@@ -142,6 +146,49 @@ export default function OrderDetailScreen() {
 
           {(order.status === 'awaiting_payment' || order.status === 'payment_failed') ? (
             <View style={styles.actions}>
+              <TouchableOpacity
+                style={[styles.terminalAction, terminalBusy && styles.actionDisabled]}
+                disabled={mutating || terminalBusy}
+                onPress={async () => {
+                  if (!activeBranchScope?.merchantId || !activeBranchScope?.branchId) return;
+                  resetTerminal();
+                  const result = await collectPayment({
+                    orderId: order.orderId,
+                    merchantId: activeBranchScope.merchantId,
+                    branchId: activeBranchScope.branchId,
+                    simulated: __DEV__,
+                  });
+                  if (result.succeeded) {
+                    setTerminalReconciling(true);
+                    try {
+                      await reconcileTerminalPayment();
+                    } finally {
+                      setTerminalReconciling(false);
+                    }
+                  }
+                }}
+              >
+                {terminalBusy ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : (
+                  <Ionicons name="phone-portrait-outline" size={16} color={colors.primary} />
+                )}
+                <Text style={styles.terminalActionText}>
+                  {terminalReconciling ? t('merchant_terminal_payment_succeeded') : terminalBusy ? terminalStatus : t('merchant_collect_via_terminal')}
+                </Text>
+              </TouchableOpacity>
+              {terminalError ? (
+                <View style={styles.errorBanner}>
+                  <Ionicons name="alert-circle-outline" size={14} color={colors.error} />
+                  <Text style={styles.errorBannerText}>{terminalError}</Text>
+                </View>
+              ) : null}
+              {terminalStatus === 'succeeded' ? (
+                <View style={styles.banner}>
+                  <Ionicons name="checkmark-circle-outline" size={14} color={colors.success} />
+                  <Text style={styles.bannerText}>{t('merchant_terminal_payment_succeeded')}</Text>
+                </View>
+              ) : null}
               <TouchableOpacity style={styles.secondaryAction} disabled={mutating} onPress={() => void cancelOrder()}>
                 <Text style={styles.secondaryActionText}>{t('cancel_order')}</Text>
               </TouchableOpacity>
@@ -172,11 +219,22 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white, borderRadius: radius.xl,
     margin: spacing.md, padding: spacing.lg,
   },
-  summaryTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  summaryTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: spacing.md },
+  summaryIdentity: { flex: 1, minWidth: 0 },
   orderNum: { fontSize: 18, fontWeight: '700', color: colors.onSurface },
   orderId: { fontSize: 12, color: colors.gray500, marginTop: 2 },
-  statusPill: { borderRadius: radius.full, paddingHorizontal: 12, paddingVertical: 4, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  statusText: { fontSize: 13, fontWeight: '600' },
+  statusPill: {
+    maxWidth: '46%',
+    minHeight: 30,
+    borderRadius: radius.full,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  statusText: { flexShrink: 1, fontSize: 12, lineHeight: 15, fontWeight: '700', textAlign: 'center' },
   divider: { height: 1, backgroundColor: colors.gray200, marginVertical: spacing.md },
   detailRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.sm },
   detailLabel: { fontSize: 14, color: colors.gray600 },
@@ -215,6 +273,19 @@ const styles = StyleSheet.create({
   itemTotal: { fontSize: 14, fontWeight: '700', color: colors.onSurface },
   emptyItemsText: { fontSize: 13, color: colors.gray500 },
   actions: { paddingHorizontal: spacing.md, paddingTop: spacing.md, gap: spacing.sm },
+  terminalAction: {
+    borderRadius: radius.full,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    backgroundColor: `${colors.primary}15`,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  terminalActionText: { fontSize: 14, fontWeight: '700', color: colors.primary },
+  actionDisabled: { opacity: 0.6 },
   secondaryAction: {
     borderRadius: radius.full,
     paddingVertical: spacing.md,

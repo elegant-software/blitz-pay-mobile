@@ -19,7 +19,7 @@ export default function PaymentProcessingScreen() {
 
     if (state.status === 'timeout') {
       navigation.replace('PaymentPending', {
-        paymentRequestId,
+        paymentRequestId: paymentRequestId ?? orderId ?? 'pending',
         orderId,
         amount,
         currency,
@@ -30,8 +30,9 @@ export default function PaymentProcessingScreen() {
       return;
     }
 
+    const resolvedPaymentRequestId = paymentRequestId ?? state.result.paymentRequestId ?? orderId ?? 'unknown';
     navigation.replace('PaymentResult', {
-      paymentRequestId,
+      paymentRequestId: resolvedPaymentRequestId,
       orderId: state.result.orderId ?? orderId,
       status: state.status,
       amount: state.result.amount ?? amount,
@@ -48,8 +49,12 @@ export default function PaymentProcessingScreen() {
     <View style={styles.container}>
       <View style={styles.card}>
         <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.title}>{t('payment_processing_title')}</Text>
-        <Text style={styles.body}>{t('payment_processing_body')}</Text>
+        <Text style={styles.title}>
+          {paymentRequestId ? t('payment_processing_title') : t('tap_to_pay_waiting_title')}
+        </Text>
+        <Text style={styles.body}>
+          {paymentRequestId ? t('payment_processing_body') : t('tap_to_pay_waiting_body')}
+        </Text>
         {merchantName ? (
           <Text style={styles.meta}>
             {merchantName}

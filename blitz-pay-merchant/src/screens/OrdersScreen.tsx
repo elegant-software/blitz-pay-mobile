@@ -59,6 +59,41 @@ function getCheckoutIntentLabel(
     : t('merchant_order_queue_checkout_pay_now');
 }
 
+function getPaymentMethodMeta(
+  t: (key: TranslationKeys) => string,
+  order: MerchantOrderSummary,
+): { icon: React.ComponentProps<typeof Ionicons>['name']; label: string; color: string } {
+  if (order.paymentSource === 'MANUAL_SETTLEMENT') {
+    return { icon: 'cash', label: t('merchant_payment_method_CASH'), color: colors.success };
+  }
+  if (order.checkoutPaymentMethod === 'TERMINAL') {
+    return { icon: 'phone-portrait', label: t('merchant_payment_method_TERMINAL'), color: colors.primary };
+  }
+  if (order.checkoutPaymentMethod === 'CARD' || order.checkoutPaymentMethod === 'PAYPAL') {
+    return { icon: 'card', label: t('merchant_payment_method_CARD'), color: colors.secondary };
+  }
+  if (order.checkoutPaymentMethod === 'BANK_ACCOUNT' || order.checkoutPaymentMethod === 'PAY_BY_BANK') {
+    return { icon: 'wallet', label: t('merchant_payment_method_BANK_ACCOUNT'), color: colors.warning };
+  }
+  if (order.paymentProvider === 'STRIPE_TERMINAL' || order.paymentProvider === 'TERMINAL') {
+    return { icon: 'phone-portrait', label: t('merchant_payment_method_TERMINAL'), color: colors.primary };
+  }
+  if (order.paymentProvider === 'STRIPE' || order.paymentProvider === 'BRAINTREE') {
+    return { icon: 'card', label: t('merchant_payment_method_CARD'), color: colors.secondary };
+  }
+  if (order.paymentProvider === 'TRUELAYER' || order.paymentProvider === 'STRIPE_PAY_BY_BANK') {
+    return { icon: 'wallet', label: t('merchant_payment_method_BANK_ACCOUNT'), color: colors.warning };
+  }
+  if (order.paymentProvider === 'QRPAY') {
+    return { icon: 'wallet', label: t('merchant_payment_method_BANK_ACCOUNT'), color: colors.warning };
+  }
+  return {
+    icon: order.checkoutIntent === 'PAY_LATER' ? 'calendar-outline' : 'flash-outline',
+    label: getCheckoutIntentLabel(t, order.checkoutIntent),
+    color: colors.gray500,
+  };
+}
+
 function getVisibleOrders(orders: MerchantOrderSummary[], expanded: boolean, previewCount?: number) {
   if (!previewCount || expanded) return orders;
   return orders.slice(0, previewCount);
@@ -126,7 +161,7 @@ export default function OrdersScreen() {
   return (
     <KeyboardAvoidingView
       style={[styles.container, { paddingTop: insets.top }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <View style={styles.header}>
         <Text style={styles.title}>{t('orders_today_title')}</Text>
@@ -237,6 +272,9 @@ export default function OrdersScreen() {
               </View>
 
               {visibleOrders.map((order) => (
+                (() => {
+                  const paymentMethod = getPaymentMethodMeta(t, order);
+                  return (
                 <TouchableOpacity
                   key={order.orderId}
                   style={[
@@ -268,7 +306,15 @@ export default function OrdersScreen() {
                           {t(getMerchantOrderStatusLabelKey(order.status))}
                         </Text>
                       </View>
-                      <Text style={styles.orderAmount}>{formatCurrency(order.amountMinor, order.currency)}</Text>
+                      <View style={styles.orderAmountStack}>
+                        <Text style={styles.orderAmount}>{formatCurrency(order.amountMinor, order.currency)}</Text>
+                        <View style={styles.paymentMethodRow}>
+                          <View style={[styles.paymentMethodIconWrap, { backgroundColor: `${paymentMethod.color}18` }]}>
+                            <Ionicons name={paymentMethod.icon} size={11} color={paymentMethod.color} />
+                          </View>
+                          <Text style={styles.paymentMethodText}>{paymentMethod.label}</Text>
+                        </View>
+                      </View>
                     </View>
 
                     <View style={styles.orderMetaRow}>
@@ -284,6 +330,8 @@ export default function OrdersScreen() {
                     </View>
                   </View>
                 </TouchableOpacity>
+                  );
+                })()
               ))}
             </View>
           );
@@ -345,7 +393,22 @@ const styles = StyleSheet.create({
   statusText: { marginTop: 4, fontSize: 12, fontWeight: '700' },
   orderMetaRow: { marginTop: spacing.sm, flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   orderMeta: { fontSize: 12, color: colors.gray600 },
+  orderAmountStack: { alignItems: 'flex-end', gap: 4, maxWidth: 118 },
   orderAmount: { fontSize: 17, fontWeight: '700', color: colors.onSurface },
+  paymentMethodRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 4,
+  },
+  paymentMethodIconWrap: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  paymentMethodText: { flexShrink: 1, fontSize: 11, fontWeight: '600', color: colors.gray500, textAlign: 'right' },
   empty: { alignItems: 'center', paddingTop: 80, gap: spacing.md },
   emptyTitle: { fontSize: 16, fontWeight: '700', color: colors.onSurface },
   emptyText: { fontSize: 15, color: colors.gray500, textAlign: 'center' },

@@ -40,7 +40,7 @@ export type RootStackParamList = {
   SendInvoice: undefined;
   Notifications: undefined;
   PaymentProcessing: {
-    paymentRequestId: string;
+    paymentRequestId?: string;
     orderId?: string;
     amount?: number;
     currency?: string;

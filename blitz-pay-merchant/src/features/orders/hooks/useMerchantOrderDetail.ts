@@ -15,8 +15,17 @@ import {
 } from '../services/orderService';
 import type { MerchantOrderDetail } from '../types/order';
 
+const TERMINAL_SETTLEMENT_RETRY_DELAY_MS = 1_500;
+const TERMINAL_SETTLEMENT_MAX_ATTEMPTS = 8;
+
 function isEditableStatus(status: MerchantOrderDetail['status']) {
   return status === 'awaiting_payment' || status === 'payment_failed';
+}
+
+function delay(ms: number) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }
 
 export function useMerchantOrderDetail(orderId: string, activeBranchScope: ActiveBranchScope | null) {
@@ -98,6 +107,42 @@ export function useMerchantOrderDetail(orderId: string, activeBranchScope: Activ
     [order, orderId, queryClient, activeBranchScope],
   );
 
+  const reconcileTerminalPayment = useCallback(async (): Promise<MerchantOrderDetail | null> => {
+    if (!activeBranchScope) return null;
+
+    for (let attempt = 1; attempt <= TERMINAL_SETTLEMENT_MAX_ATTEMPTS; attempt += 1) {
+      if (attempt > 1) {
+        await delay(TERMINAL_SETTLEMENT_RETRY_DELAY_MS);
+      }
+
+      try {
+        const nextOrder = await fetchMerchantOrderDetail(orderId, activeBranchScope);
+        queryClient.setQueryData(QUERY_KEYS.orderDetail(orderId), nextOrder);
+        void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ordersList(activeBranchScope.branchId) });
+
+        observability.info('merchant_terminal_order_reconcile_result', {
+          orderId: nextOrder.orderId,
+          attempt,
+          status: nextOrder.status,
+          paymentSource: nextOrder.paymentSource ?? null,
+        });
+
+        if (nextOrder.status === 'paid' || nextOrder.status === 'payment_failed' || nextOrder.status === 'cancelled') {
+          return nextOrder;
+        }
+      } catch (err) {
+        observability.warn('merchant_terminal_order_reconcile_retry', {
+          orderId,
+          attempt,
+          reason: err instanceof Error ? err.message : 'merchant_order_detail_load_failed',
+        });
+      }
+    }
+
+    const result = await refetch();
+    return result.data ?? null;
+  }, [activeBranchScope, orderId, queryClient, refetch]);
+
   const loadError = !activeBranchScope
     ? 'merchant_branch_access_missing'
     : error
@@ -111,6 +156,7 @@ export function useMerchantOrderDetail(orderId: string, activeBranchScope: Activ
     error: loadError,
     mutationError,
     reload: refetch,
+    reconcileTerminalPayment,
     addItem: (productId: string, quantity: number) =>
       runMutation(() => addMerchantOrderItem(orderId, { productId, quantity }), 'merchant_add_item'),
     updateLineQuantity: (lineId: string, quantity: number) =>

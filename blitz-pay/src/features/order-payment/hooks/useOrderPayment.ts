@@ -22,6 +22,7 @@ import {
   isMethodAvailable,
   isOrderEditable,
   isOrderResumable,
+  mapMethodToBackendCheckoutPaymentMethod,
   mapMethodToChannel,
   mapMethodToOrderPaymentMethod,
   mapOrderStatusToPaymentResult,
@@ -80,6 +81,7 @@ function toSession(args: ConfirmCheckoutArgs, order: OrderSummary): OrderPayment
     basketItemCount: args.basketItemCount,
     basketItems: args.basketItems,
     selectedMethod: args.selectedMethod ?? undefined,
+    checkoutPaymentMethod: args.selectedMethod ? mapMethodToBackendCheckoutPaymentMethod(args.selectedMethod) : order.checkoutPaymentMethod,
     selectedChannel: args.selectedMethod ? mapMethodToChannel(args.selectedMethod) : undefined,
     orderStatus: order.status,
     paymentSource: order.paymentSource,
@@ -114,6 +116,7 @@ function toResumeSession(args: ResumeOrderPaymentArgs): OrderPaymentSession {
       lineTotal: item.lineTotalMinor / 100,
     })),
     selectedMethod: args.selectedMethod,
+    checkoutPaymentMethod: mapMethodToBackendCheckoutPaymentMethod(args.selectedMethod),
     selectedChannel: mapMethodToChannel(args.selectedMethod),
     orderStatus: args.order.status,
     paymentSource: args.order.paymentSource,
@@ -162,6 +165,7 @@ export function useOrderPayment() {
           availableChannels: args.availableChannels,
           selectedMethod: args.selectedMethod,
           selectedChannel,
+          checkoutPaymentMethod: mapMethodToBackendCheckoutPaymentMethod(args.selectedMethod),
           paymentRequestId: context.paymentRequestId,
           paymentProvider: 'TRUELAYER',
           orderStatus: 'PAYMENT_IN_PROGRESS',
@@ -205,6 +209,7 @@ export function useOrderPayment() {
           availableChannels: args.availableChannels,
           selectedMethod: args.selectedMethod,
           selectedChannel,
+          checkoutPaymentMethod: mapMethodToBackendCheckoutPaymentMethod(args.selectedMethod),
           paymentRequestId: stripeParams.paymentRequestId,
           paymentProvider: 'STRIPE',
           orderStatus: 'PAYMENT_IN_PROGRESS',
@@ -219,6 +224,7 @@ export function useOrderPayment() {
             paymentRequestId: refreshed.lastPaymentRequestId,
             paymentProvider: refreshed.lastPaymentProvider,
             paymentSource: refreshed.paymentSource,
+            checkoutPaymentMethod: refreshed.checkoutPaymentMethod,
             updatedAt: refreshed.updatedAt,
           });
         }
@@ -282,6 +288,7 @@ export function useOrderPayment() {
           availableChannels: args.availableChannels,
           selectedMethod: args.selectedMethod,
           selectedChannel,
+          checkoutPaymentMethod: mapMethodToBackendCheckoutPaymentMethod(args.selectedMethod),
           paymentRequestId: checkout.paymentRequestId,
           paymentProvider: 'STRIPE',
           orderStatus: 'PAYMENT_IN_PROGRESS',
@@ -336,6 +343,29 @@ export function useOrderPayment() {
         return;
       }
 
+      if (args.selectedMethod === 'tap_to_pay') {
+        // The merchant's device creates the card_present intent and collects the physical payment.
+        // The order stays in PENDING_PAYMENT so the merchant can see it in their queue.
+        // PaymentProcessing polls by orderId until the merchant's terminal webhook fires.
+        orderPaymentStore.patchSession(session.orderId, {
+          availableChannels: args.availableChannels,
+          selectedMethod: args.selectedMethod,
+          selectedChannel,
+          checkoutPaymentMethod: mapMethodToBackendCheckoutPaymentMethod(args.selectedMethod),
+        });
+        void registerDeviceForPayment(session.orderId);
+        args.navigation.replace('PaymentProcessing', {
+          orderId: session.orderId,
+          amount: args.amount,
+          currency: session.currency,
+          merchantName: args.merchantName,
+          branchName: args.branchName,
+          merchantLogoUrl: args.merchantLogoUrl,
+          invoiceId: args.invoiceId,
+        });
+        return;
+      }
+
       void registerDeviceForPayment(session.orderId);
       const result = await presentPayPal({
         paymentRequestId: session.paymentRequestId,
@@ -352,6 +382,7 @@ export function useOrderPayment() {
           availableChannels: args.availableChannels,
           selectedMethod: args.selectedMethod,
           selectedChannel,
+          checkoutPaymentMethod: mapMethodToBackendCheckoutPaymentMethod(args.selectedMethod),
           paymentRequestId: result.paymentRequestId,
           paymentProvider: 'BRAINTREE',
           orderStatus: 'PAYMENT_IN_PROGRESS',
@@ -364,6 +395,7 @@ export function useOrderPayment() {
           paymentRequestId: refreshed.lastPaymentRequestId,
           paymentProvider: refreshed.lastPaymentProvider,
           paymentSource: refreshed.paymentSource,
+          checkoutPaymentMethod: refreshed.checkoutPaymentMethod,
           updatedAt: refreshed.updatedAt,
         });
       }
@@ -420,6 +452,7 @@ export function useOrderPayment() {
       observability.info('checkout_intent_selected', {
         checkoutIntent: args.selectedIntent,
         paymentMethod: args.selectedMethod ?? null,
+        checkoutPaymentMethod: args.selectedMethod ? mapMethodToBackendCheckoutPaymentMethod(args.selectedMethod) : null,
         merchantId: args.merchantId,
         branchId: args.branchId ?? null,
         basketItemCount: args.basketItemCount,
@@ -427,6 +460,7 @@ export function useOrderPayment() {
       observability.info('checkout_order_create_requested', {
         checkoutIntent: args.selectedIntent,
         paymentMethod: args.selectedMethod ? mapMethodToOrderPaymentMethod(args.selectedMethod) : null,
+        checkoutPaymentMethod: args.selectedMethod ? mapMethodToBackendCheckoutPaymentMethod(args.selectedMethod) : null,
         usesDeferredPayment: args.selectedIntent === 'PAY_LATER',
         merchantId: args.merchantId,
         branchId: args.branchId ?? null,
@@ -444,6 +478,7 @@ export function useOrderPayment() {
         orderType: 'PRE_ORDER',
         checkoutIntent: args.selectedIntent,
         paymentMethod: args.selectedMethod ? mapMethodToOrderPaymentMethod(args.selectedMethod) : undefined,
+        checkoutPaymentMethod: args.selectedMethod ? mapMethodToBackendCheckoutPaymentMethod(args.selectedMethod) : undefined,
         items: args.basketItems.map((item) => ({
           productId: item.productId,
           quantity: item.quantity,
@@ -528,6 +563,7 @@ export function useOrderPayment() {
       orderPaymentStore.patchSession(orderId, {
         orderStatus: order.status,
         paymentSource: order.paymentSource,
+        checkoutPaymentMethod: order.checkoutPaymentMethod,
         banner: order.banner,
         updatedAt: order.updatedAt,
         paymentRequestId: order.lastPaymentRequestId,
@@ -558,6 +594,7 @@ export function useOrderPayment() {
         orderPaymentStore.patchSession(orderId, {
           orderStatus: nextOrder.status,
           paymentSource: nextOrder.paymentSource,
+          checkoutPaymentMethod: nextOrder.checkoutPaymentMethod,
           banner: nextOrder.banner,
           updatedAt: nextOrder.updatedAt,
           paymentRequestId: nextOrder.lastPaymentRequestId,
