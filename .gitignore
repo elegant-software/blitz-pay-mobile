@@ -7,6 +7,8 @@ coverage/
 .env*
 !.env.example
 /blitz-pay/.expo/
+/blitz-pay/android/
+/blitz-pay/ios/
 /blitz-pay-merchant/.expo/
 .expo/
 .idea/
