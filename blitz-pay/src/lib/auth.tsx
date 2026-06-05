@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 import { storage } from './storage';
 import { config } from './config';
 import { observability } from './observability';
+import { unregisterShopperPushToken } from './notifications/shopperPushRegistration';
 
 // expo-local-authentication is native-only — not available on web
 const LocalAuthentication = Platform.OS !== 'web'
@@ -374,6 +375,7 @@ export function AuthProvider({ children, onSessionExpired }: AuthProviderProps) 
   };
 
   const logout = async (): Promise<void> => {
+    void unregisterShopperPushToken();
     await clearSessionState();
   };
 

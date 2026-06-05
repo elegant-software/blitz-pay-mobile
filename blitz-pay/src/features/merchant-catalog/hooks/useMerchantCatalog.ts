@@ -16,6 +16,7 @@ import { QUERY_KEYS, STALE_TIMES } from '../../../lib/queryClient';
 type CatalogResult = {
   branch: MerchantBranch;
   merchantLogoUrl?: string;
+  appointmentsEnabled?: boolean;
   products: ActiveProduct[];
 };
 
@@ -61,7 +62,7 @@ async function loadCatalog(
     branchName: branchWithPolicy.name,
   });
 
-  return { branch: branchWithPolicy, merchantLogoUrl: merchantDetails.logoUrl, products };
+  return { branch: branchWithPolicy, merchantLogoUrl: merchantDetails.logoUrl, appointmentsEnabled: merchantDetails.appointmentsEnabled, products };
 }
 
 export function useMerchantCatalog(params: {
@@ -97,6 +98,7 @@ export function useMerchantCatalog(params: {
     errorKey,
     branch: data?.branch ?? null,
     merchantLogoUrl: data?.merchantLogoUrl,
+    appointmentsEnabled: data?.appointmentsEnabled ?? false,
     products: data?.products ?? [],
     retry: refetch,
   };

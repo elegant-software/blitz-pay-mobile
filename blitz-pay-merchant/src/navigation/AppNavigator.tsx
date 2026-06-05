@@ -16,6 +16,10 @@ import PaymentsHistoryScreen from '../screens/PaymentsHistoryScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import AppearancesScreen from '../screens/AppearancesScreen';
 import CreateOrderScreen from '../screens/CreateOrderScreen';
+import EmployeeCalendarScreen from '../screens/EmployeeCalendarScreen';
+import AppointmentDetailScreen from '../screens/AppointmentDetailScreen';
+import NewAppointmentScreen from '../screens/NewAppointmentScreen';
+import RescheduleAppointmentScreen from '../screens/RescheduleAppointmentScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -53,6 +57,10 @@ export default function AppNavigator() {
           <Stack.Screen name="Notifications" component={NotificationsScreen} />
           <Stack.Screen name="Appearances" component={AppearancesScreen} />
           <Stack.Screen name="CreateOrder" component={CreateOrderScreen} />
+          <Stack.Screen name="EmployeeCalendar" component={EmployeeCalendarScreen} />
+          <Stack.Screen name="AppointmentDetail" component={AppointmentDetailScreen} />
+          <Stack.Screen name="NewAppointment" component={NewAppointmentScreen} />
+          <Stack.Screen name="RescheduleAppointment" component={RescheduleAppointmentScreen} />
         </>
       )}
     </Stack.Navigator>

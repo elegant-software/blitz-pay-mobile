@@ -24,12 +24,14 @@ type MerchantDetailsResponse = {
   logoUrl?: string;
   delayedPaymentEnabled?: boolean;
   deferredPaymentEnabled?: boolean;
+  appointmentsEnabled?: boolean;
   offerings?: string[];
 };
 
 export interface MerchantDetails {
   logoUrl?: string;
   delayedPaymentEnabled?: boolean;
+  appointmentsEnabled?: boolean;
 }
 
 type StripeConnectStatusResponse = {
@@ -120,6 +122,12 @@ export async function fetchMerchantBranches(merchantId: string): Promise<Merchan
 export async function fetchMerchantDetails(merchantId: string): Promise<MerchantDetails> {
   try {
     const details = await fetchMerchantCommerceJson<MerchantDetailsResponse>(`/merchants/${merchantId}`);
+    console.log('[catalog] raw merchant details:', JSON.stringify(details, null, 2));
+    const offerings = Array.isArray(details.offerings) ? details.offerings : [];
+    const appointmentsEnabled =
+      typeof details.appointmentsEnabled === 'boolean'
+        ? details.appointmentsEnabled
+        : offerings.includes('APPOINTMENT_BOOKING') || offerings.includes('APPOINTMENTS') || offerings.includes('APPOINTMENT');
     return {
       logoUrl: details.logoUrl ?? undefined,
       delayedPaymentEnabled:
@@ -127,9 +135,10 @@ export async function fetchMerchantDetails(merchantId: string): Promise<Merchant
           ? details.delayedPaymentEnabled
           : typeof details.deferredPaymentEnabled === 'boolean'
             ? details.deferredPaymentEnabled
-            : Array.isArray(details.offerings)
-              ? details.offerings.includes('DEFERRED_PAYMENT')
+            : offerings.length > 0
+              ? offerings.includes('DEFERRED_PAYMENT')
               : undefined,
+      appointmentsEnabled,
     };
   } catch {
     return {};

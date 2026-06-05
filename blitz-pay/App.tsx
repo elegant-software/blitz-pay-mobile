@@ -24,6 +24,7 @@ import Constants, { ExecutionEnvironment } from 'expo-constants';
 
 const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 import { recoverInFlight } from './src/lib/payments/recoverInFlight';
+import { registerShopperPushToken } from './src/lib/notifications/shopperPushRegistration';
 import type { RootStackParamList } from './src/types';
 // Register geofence background tasks before any React component mounts (expo-task-manager requirement)
 import './src/tasks/geofenceTask';
@@ -54,6 +55,7 @@ function PostAuthEffects() {
     if (ranRef.current) return;
     ranRef.current = true;
     void recoverInFlight();
+    if (!isExpoGo) void registerShopperPushToken();
   }, [initialized, authenticated]);
 
   return null;

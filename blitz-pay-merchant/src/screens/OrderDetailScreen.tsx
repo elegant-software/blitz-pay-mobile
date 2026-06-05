@@ -144,7 +144,7 @@ export default function OrderDetailScreen() {
             </View>
           </View>
 
-          {(order.status === 'awaiting_payment' || order.status === 'payment_failed') ? (
+          {(order.status === 'awaiting_payment' || order.status === 'payment_failed' || order.status === 'payment_in_progress') ? (
             <View style={styles.actions}>
               <TouchableOpacity
                 style={[styles.terminalAction, terminalBusy && styles.actionDisabled]}
@@ -159,6 +159,16 @@ export default function OrderDetailScreen() {
                     simulated: __DEV__,
                   });
                   if (result.succeeded) {
+                    setTerminalReconciling(true);
+                    try {
+                      await reconcileTerminalPayment();
+                    } finally {
+                      setTerminalReconciling(false);
+                    }
+                  } else {
+                    // Poll for the webhook revert after cancellation. The backend handles
+                    // payment_intent.canceled and reverts the order to awaiting_payment;
+                    // reconcileTerminalPayment exits as soon as it sees that status.
                     setTerminalReconciling(true);
                     try {
                       await reconcileTerminalPayment();

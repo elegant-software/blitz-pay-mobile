@@ -6,6 +6,7 @@ const API_VERSION = 'v1';
 
 type MerchantDetailResponse = {
   legalBusinessName?: string;
+  offerings?: string[];
 };
 
 type MerchantBranchResponse = {
@@ -241,6 +242,19 @@ export async function fetchMerchantName(merchantId: string): Promise<string | nu
     return response.legalBusinessName ?? null;
   } catch {
     return null;
+  }
+}
+
+export async function fetchMerchantOfferings(merchantId: string): Promise<string[]> {
+  try {
+    const response = await requestJson<MerchantDetailResponse>(
+      `/merchants/${merchantId}`,
+      { method: 'GET' },
+      { event: 'fetch_merchant_offerings', merchantId, failureKey: 'merchant_products_load_failed' },
+    );
+    return Array.isArray(response.offerings) ? response.offerings : [];
+  } catch {
+    return [];
   }
 }
 

@@ -127,7 +127,12 @@ export function useMerchantOrderDetail(orderId: string, activeBranchScope: Activ
           paymentSource: nextOrder.paymentSource ?? null,
         });
 
-        if (nextOrder.status === 'paid' || nextOrder.status === 'payment_failed' || nextOrder.status === 'cancelled') {
+        if (
+          nextOrder.status === 'paid' ||
+          nextOrder.status === 'awaiting_payment' ||
+          nextOrder.status === 'payment_failed' ||
+          nextOrder.status === 'cancelled'
+        ) {
           return nextOrder;
         }
       } catch (err) {

@@ -104,6 +104,30 @@ export type RootStackParamList = {
     preferredMethod?: CheckoutPaymentMethod;
     checkoutIntent?: CheckoutIntent;
   };
+  AvailableSlots: {
+    branchId: string;
+    productId: string;
+    productCategoryId: string;
+    productName: string;
+    merchantName: string;
+    branchName: string;
+  };
+  BookingConfirmation: {
+    branchId: string;
+    productId: string;
+    productCategoryId: string;
+    productName: string;
+    merchantName: string;
+    branchName: string;
+    startTime: string;
+    endTime: string;
+    employeeId: string;
+    employeeName: string;
+  };
+  MyAppointments: undefined;
+  AppointmentDetail: {
+    appointmentId: string;
+  };
 };
 
 export type TabParamList = {
