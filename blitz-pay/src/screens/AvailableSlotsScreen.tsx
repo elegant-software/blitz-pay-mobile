@@ -66,7 +66,7 @@ export default function AvailableSlotsScreen() {
   const route = useRoute<RouteProp<RootStackParamList, 'AvailableSlots'>>();
   const insets = useSafeAreaInsets();
 
-  const { branchId, productId, productCategoryId, productName, merchantName, branchName } = route.params;
+  const { branchId, productId, productCategoryId, productName, merchantName, branchName, rescheduleAppointmentId } = route.params;
 
   const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date()));
   const [slots, setSlots] = useState<BookableSlot[]>([]);
@@ -114,6 +114,7 @@ export default function AvailableSlotsScreen() {
       endTime: slot.endTime,
       employeeId: slot.employeeId,
       employeeName: slot.employeeName,
+      rescheduleAppointmentId,
     });
   };
 
@@ -125,7 +126,9 @@ export default function AvailableSlotsScreen() {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} hitSlop={12}>
           <Ionicons name="chevron-back" size={24} color={colors.onSurface} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>{t('available_slots')}</Text>
+        <Text style={styles.headerTitle} numberOfLines={1}>
+          {rescheduleAppointmentId ? t('reschedule_appointment') : t('available_slots')}
+        </Text>
         <View style={{ width: 32 }} />
       </View>
 

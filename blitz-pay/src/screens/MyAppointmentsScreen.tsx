@@ -170,7 +170,9 @@ export default function MyAppointmentsScreen() {
                   {appt.employeeId ? (
                     <View style={styles.apptEmployeeRow}>
                       <Ionicons name="person-outline" size={13} color={colors.gray600} />
-                      <Text style={styles.apptEmployeeText}>Staff assigned</Text>
+                      <Text style={styles.apptEmployeeText}>
+                        {appt.employeeName ?? t('appointment_employee_label')}
+                      </Text>
                     </View>
                   ) : null}
                 </TouchableOpacity>

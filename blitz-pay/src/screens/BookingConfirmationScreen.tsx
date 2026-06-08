@@ -18,7 +18,7 @@ import { useLanguage } from '../lib/LanguageContext';
 import { useAuth } from '../lib/auth';
 import { colors, spacing, radius, shadow } from '../lib/theme';
 import type { RootStackNav, RootStackParamList } from '../types';
-import { bookAppointment } from '../features/appointments/services/appointmentService';
+import { bookAppointment, rescheduleAppointment } from '../features/appointments/services/appointmentService';
 
 function formatDateTime(iso: string): string {
   return new Intl.DateTimeFormat('en-GB', {
@@ -56,7 +56,10 @@ export default function BookingConfirmationScreen() {
     endTime,
     employeeId,
     employeeName,
+    rescheduleAppointmentId,
   } = route.params;
+
+  const isRescheduling = Boolean(rescheduleAppointmentId);
 
   const [contactName, setContactName] = useState(user?.name ?? '');
   const [contactEmail, setContactEmail] = useState(user?.email ?? '');
@@ -67,40 +70,48 @@ export default function BookingConfirmationScreen() {
 
   const handleBook = async () => {
     setFieldError(null);
-    if (!contactName.trim()) {
+    if (!isRescheduling && !contactName.trim()) {
       setFieldError(t('contact_name_required'));
       return;
     }
 
     setSubmitting(true);
     try {
-      await bookAppointment({
-        branchId,
-        productId,
-        productCategoryId,
-        startTime,
-        employeeId: employeeId || undefined,
-        contactName: contactName.trim(),
-        contactEmail: contactEmail.trim() || undefined,
-        contactPhone: contactPhone.trim() || undefined,
-        note: note.trim() || undefined,
-      });
+      if (isRescheduling && rescheduleAppointmentId) {
+        await rescheduleAppointment(rescheduleAppointmentId, {
+          newProductId: productId,
+          newProductCategoryId: productCategoryId,
+          newStartTime: startTime,
+          newEmployeeId: employeeId || undefined,
+        });
+      } else {
+        await bookAppointment({
+          branchId,
+          productId,
+          productCategoryId,
+          startTime,
+          employeeId: employeeId || undefined,
+          contactName: contactName.trim(),
+          contactEmail: contactEmail.trim() || undefined,
+          contactPhone: contactPhone.trim() || undefined,
+          note: note.trim() || undefined,
+        });
+      }
 
       Alert.alert(
-        t('appointment_booked_title'),
-        t('appointment_booked_body'),
+        isRescheduling ? t('reschedule_appointment') : t('appointment_booked_title'),
+        isRescheduling ? t('appointment_rescheduled_body') : t('appointment_booked_body'),
         [
           {
             text: 'OK',
             onPress: () => {
-              // Navigate to My Appointments, popping to root first
               navigation.navigate('MyAppointments');
             },
           },
         ],
       );
     } catch {
-      setFieldError(t('appointment_booking_failed'));
+      setFieldError(isRescheduling ? t('appointment_reschedule_failed') : t('appointment_booking_failed'));
     } finally {
       setSubmitting(false);
     }
@@ -115,7 +126,9 @@ export default function BookingConfirmationScreen() {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} hitSlop={12}>
           <Ionicons name="chevron-back" size={24} color={colors.onSurface} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>{t('confirm_appointment')}</Text>
+        <Text style={styles.headerTitle} numberOfLines={1}>
+          {isRescheduling ? t('reschedule_appointment') : t('confirm_appointment')}
+        </Text>
         <View style={{ width: 32 }} />
       </View>
 
@@ -180,66 +193,70 @@ export default function BookingConfirmationScreen() {
           </View>
         </View>
 
-        {/* Contact form */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('appointment_contact_label')}</Text>
+        {/* Contact form — hidden in reschedule mode (contact details already on the appointment) */}
+        {!isRescheduling ? (
+          <>
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>{t('appointment_contact_label')}</Text>
 
-          <View style={styles.fieldGroup}>
-            <View style={styles.field}>
-              <Text style={styles.fieldLabel}>{t('appointment_contact_name')}</Text>
-              <TextInput
-                style={styles.input}
-                value={contactName}
-                onChangeText={setContactName}
-                placeholder={t('appointment_contact_name')}
-                placeholderTextColor={colors.gray400}
-                autoCapitalize="words"
-                autoCorrect={false}
-              />
+              <View style={styles.fieldGroup}>
+                <View style={styles.field}>
+                  <Text style={styles.fieldLabel}>{t('appointment_contact_name')}</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={contactName}
+                    onChangeText={setContactName}
+                    placeholder={t('appointment_contact_name')}
+                    placeholderTextColor={colors.gray400}
+                    autoCapitalize="words"
+                    autoCorrect={false}
+                  />
+                </View>
+
+                <View style={[styles.field, styles.fieldBorder]}>
+                  <Text style={styles.fieldLabel}>{t('appointment_contact_email')}</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={contactEmail}
+                    onChangeText={setContactEmail}
+                    placeholder="name@example.com"
+                    placeholderTextColor={colors.gray400}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </View>
+
+                <View style={[styles.field, styles.fieldBorder]}>
+                  <Text style={styles.fieldLabel}>{t('appointment_contact_phone')}</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={contactPhone}
+                    onChangeText={setContactPhone}
+                    placeholder="+49 123 456789"
+                    placeholderTextColor={colors.gray400}
+                    keyboardType="phone-pad"
+                  />
+                </View>
+              </View>
             </View>
 
-            <View style={[styles.field, styles.fieldBorder]}>
-              <Text style={styles.fieldLabel}>{t('appointment_contact_email')}</Text>
+            {/* Note */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>{t('appointment_note')}</Text>
               <TextInput
-                style={styles.input}
-                value={contactEmail}
-                onChangeText={setContactEmail}
-                placeholder="name@example.com"
+                style={styles.noteInput}
+                value={note}
+                onChangeText={setNote}
+                placeholder={t('appointment_note_placeholder')}
                 placeholderTextColor={colors.gray400}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
+                multiline
+                numberOfLines={4}
+                textAlignVertical="top"
               />
             </View>
-
-            <View style={[styles.field, styles.fieldBorder]}>
-              <Text style={styles.fieldLabel}>{t('appointment_contact_phone')}</Text>
-              <TextInput
-                style={styles.input}
-                value={contactPhone}
-                onChangeText={setContactPhone}
-                placeholder="+49 123 456789"
-                placeholderTextColor={colors.gray400}
-                keyboardType="phone-pad"
-              />
-            </View>
-          </View>
-        </View>
-
-        {/* Note */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('appointment_note')}</Text>
-          <TextInput
-            style={styles.noteInput}
-            value={note}
-            onChangeText={setNote}
-            placeholder={t('appointment_note_placeholder')}
-            placeholderTextColor={colors.gray400}
-            multiline
-            numberOfLines={4}
-            textAlignVertical="top"
-          />
-        </View>
+          </>
+        ) : null}
 
         {fieldError ? (
           <View style={styles.errorCard}>
@@ -262,7 +279,11 @@ export default function BookingConfirmationScreen() {
             <Ionicons name="checkmark-circle" size={18} color={colors.black} />
           )}
           <Text style={styles.bookBtnText}>
-            {submitting ? t('booking_appointment') : t('confirm_appointment')}
+            {submitting
+              ? t('booking_appointment')
+              : isRescheduling
+                ? t('reschedule_appointment')
+                : t('confirm_appointment')}
           </Text>
         </TouchableOpacity>
       </View>

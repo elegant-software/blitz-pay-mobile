@@ -14,6 +14,7 @@ export interface AppointmentResponse {
   employeeId: string;
   productId: string;
   productName: string;
+  productPrice: number | null;
   shopperAccountId: string | null;
   status: string; // backend returns string, not enum
   contactType: string;
@@ -24,6 +25,8 @@ export interface AppointmentResponse {
   endTime: string;
   note: string | null;
   durationMinutes: number;
+  createdAt: string;
+  updatedAt: string;
   // Optional fields not always present in backend response
   productCategoryId?: string;
   employeeName?: string | null;

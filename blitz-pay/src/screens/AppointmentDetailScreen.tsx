@@ -45,7 +45,7 @@ function formatTime(iso: string): string {
   );
 }
 
-type TranslationKeys = Parameters<ReturnType<typeof useLanguage>['t']>[0];
+type TranslationKey = Parameters<ReturnType<typeof useLanguage>['t']>[0];
 
 export default function AppointmentDetailScreen() {
   const { t } = useLanguage();
@@ -134,7 +134,7 @@ export default function AppointmentDetailScreen() {
         </View>
         <View style={styles.stateCard}>
           <Ionicons name="alert-circle-outline" size={24} color={colors.secondary} />
-          <Text style={styles.stateTitle}>{t('appointments_load_failed')}</Text>
+          <Text style={styles.stateTitle}>{t((error ?? 'appointments_load_failed') as TranslationKey)}</Text>
           <TouchableOpacity style={styles.retryBtn} onPress={() => void load()}>
             <Text style={styles.retryBtnText}>{t('retry')}</Text>
           </TouchableOpacity>
@@ -174,6 +174,11 @@ export default function AppointmentDetailScreen() {
             <View style={{ flex: 1 }}>
               <Text style={styles.detailLabel}>{t('appointment_product_label')}</Text>
               <Text style={styles.detailValue}>{appointment.productName}</Text>
+              {appointment.productPrice != null ? (
+                <Text style={styles.detailSubvalue}>€{appointment.productPrice.toFixed(2)} · {appointment.durationMinutes} min</Text>
+              ) : (
+                <Text style={styles.detailSubvalue}>{appointment.durationMinutes} min</Text>
+              )}
             </View>
           </View>
 
@@ -203,7 +208,7 @@ export default function AppointmentDetailScreen() {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.detailLabel}>{t('appointment_employee_label')}</Text>
-                  <Text style={styles.detailValue}>Staff assigned</Text>
+                  <Text style={styles.detailValue}>{appointment.employeeName ?? t('appointment_employee_label')}</Text>
                 </View>
               </View>
             </>
@@ -273,6 +278,7 @@ export default function AppointmentDetailScreen() {
                 productName: appointment.productName,
                 merchantName: '',
                 branchName: '',
+                rescheduleAppointmentId: appointment.id,
               });
             }}
             activeOpacity={0.85}

@@ -111,6 +111,8 @@ export type RootStackParamList = {
     productName: string;
     merchantName: string;
     branchName: string;
+    /** Present when rescheduling an existing appointment. */
+    rescheduleAppointmentId?: string;
   };
   BookingConfirmation: {
     branchId: string;
@@ -123,6 +125,8 @@ export type RootStackParamList = {
     endTime: string;
     employeeId: string;
     employeeName: string;
+    /** Present when rescheduling an existing appointment. */
+    rescheduleAppointmentId?: string;
   };
   MyAppointments: undefined;
   AppointmentDetail: {
