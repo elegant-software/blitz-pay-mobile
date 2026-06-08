@@ -36,6 +36,8 @@ export interface ActiveBranchScope {
   status: 'resolved';
 }
 
+export type MerchantUserRole = 'MANAGER' | 'EMPLOYEE';
+
 export interface UserProfile {
   id: string;
   merchantId: string | null;
@@ -44,6 +46,8 @@ export interface UserProfile {
   emailVerified: boolean;
   branchMemberships: BranchMembership[];
   activeBranchId: string | null;
+  /** Resolved from Keycloak realm roles: MANAGER if 'merchant_manager' role present, else EMPLOYEE */
+  role: MerchantUserRole;
 }
 
 export interface AuthState {
@@ -217,6 +221,23 @@ function buildBranchScope(
   };
 }
 
+function resolveMerchantUserRole(
+  ...claimSets: Record<string, unknown>[]
+): MerchantUserRole {
+  for (const claims of claimSets) {
+    const roles = [
+      ...readStringArrayClaim(claims, 'groups'),
+      ...readStringArrayClaim(claims, 'access_group'),
+      ...readStringArrayClaim(claims, 'access_groups'),
+      ...readNestedStringArrayClaim(claims, 'realm_access', 'roles'),
+    ];
+    if (roles.some((r) => r.toLowerCase().includes('merchant_manager') || r.toLowerCase().includes('manager'))) {
+      return 'MANAGER';
+    }
+  }
+  return 'EMPLOYEE';
+}
+
 function parseUser(accessToken: string, idToken: string, preferredActiveBranchId: string | null): {
   profile: UserProfile | null;
   activeBranchScope: ActiveBranchScope | null;
@@ -262,6 +283,7 @@ function parseUser(accessToken: string, idToken: string, preferredActiveBranchId
     resolveMerchantId(profileClaims) ??
     memberships[0]?.merchantId ??
     null;
+  const role = resolveMerchantUserRole(accessClaims, idClaims);
   const errorKey = invalidCount > 0 && memberships.length === 0 ? 'merchant_branch_access_invalid' : branchScope.errorKey;
 
   observability.info('merchant_branch_memberships_parsed', {
@@ -286,6 +308,7 @@ function parseUser(accessToken: string, idToken: string, preferredActiveBranchId
       emailVerified: (profileClaims.email_verified as boolean) ?? false,
       branchMemberships: memberships,
       activeBranchId: branchScope.activeBranchId,
+      role,
     },
     activeBranchScope: branchScope.activeBranchScope,
     errorKey,
@@ -361,6 +384,7 @@ const BYPASS_USER: UserProfile = {
     },
   ],
   activeBranchId: 'branch_demo',
+  role: 'MANAGER',
 };
 
 const BYPASS_BRANCH_SCOPE: ActiveBranchScope = {

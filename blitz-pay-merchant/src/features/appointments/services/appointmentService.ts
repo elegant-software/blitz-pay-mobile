@@ -7,6 +7,26 @@ import type {
   OverrideAppointmentRequest,
 } from '../types/appointment';
 
+export type AppointmentErrorKey =
+  | 'appointment_book_failed'
+  | 'appointment_conflict'
+  | 'appointment_validation_failed'
+  | 'appointment_no_qualified_employee'
+  | 'appointment_time_unavailable'
+  | 'appointment_booking_not_enabled'
+  | 'appointment_merchant_inactive';
+
+export class AppointmentError extends Error {
+  constructor(
+    public readonly i18nKey: AppointmentErrorKey,
+    public readonly detail: string,
+    public readonly status?: number,
+  ) {
+    super(i18nKey);
+    this.name = 'AppointmentError';
+  }
+}
+
 async function readError(response: Response): Promise<string> {
   try {
     const text = await response.text();
@@ -18,6 +38,8 @@ async function readError(response: Response): Promise<string> {
           ? json.error
           : typeof json.message === 'string'
           ? json.message
+          : typeof json.detail === 'string'
+          ? json.detail
           : null;
       return detail ?? text.slice(0, 500);
     } catch {
@@ -26,6 +48,32 @@ async function readError(response: Response): Promise<string> {
   } catch {
     return `HTTP ${response.status}`;
   }
+}
+
+function bookingErrorKey(status: number, detail: string): AppointmentErrorKey {
+  const normalizedDetail = detail.toLowerCase();
+
+  if (
+    normalizedDetail.includes('no qualified employee') ||
+    normalizedDetail.includes('employee cannot perform')
+  ) {
+    return 'appointment_no_qualified_employee';
+  }
+  if (
+    normalizedDetail.includes('requested time is not available') ||
+    normalizedDetail.includes('time slot is no longer available')
+  ) {
+    return 'appointment_time_unavailable';
+  }
+  if (normalizedDetail.includes('appointment booking is not enabled')) {
+    return 'appointment_booking_not_enabled';
+  }
+  if (normalizedDetail.includes('merchant is not active')) {
+    return 'appointment_merchant_inactive';
+  }
+  if (status === 409) return 'appointment_conflict';
+  if (status === 400 || status === 422) return 'appointment_validation_failed';
+  return 'appointment_book_failed';
 }
 
 function parseWindow(from: Date, to: Date): { from: string; to: string } {
@@ -118,33 +166,69 @@ export async function bookMerchantAppointment(
     startTime: request.startTime,
   });
 
-  const response = await authedFetch(
-    `/v1/merchants/${encodeURIComponent(merchantId)}/appointments`,
-    {
-      method: 'POST',
-      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-      body: JSON.stringify(request),
-    },
-  );
+  let response: Response;
+  try {
+    response = await authedFetch(
+      `/v1/merchants/${encodeURIComponent(merchantId)}/appointments`,
+      {
+        method: 'POST',
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify(request),
+      },
+    );
+  } catch (e) {
+    observability.error('merchant_appointment_book_failed', {
+      merchantId,
+      branchId: request.branchId,
+      productId: request.productId,
+      startTime: request.startTime,
+      reason: e instanceof Error ? e.message : 'network_error',
+    });
+    throw new AppointmentError(
+      'appointment_book_failed',
+      'The appointment service could not be reached.',
+    );
+  }
 
   if (!response.ok) {
     const reason = await readError(response);
     observability.error('merchant_appointment_book_failed', {
       merchantId,
+      branchId: request.branchId,
+      productId: request.productId,
+      startTime: request.startTime,
       status: response.status,
       reason,
     });
-    if (response.status === 409) throw new Error('appointment_conflict');
-    if (response.status === 400 || response.status === 422) throw new Error('appointment_validation_failed');
-    throw new Error('appointment_book_failed');
+    throw new AppointmentError(
+      bookingErrorKey(response.status, reason),
+      reason,
+      response.status,
+    );
   }
 
-  const data = (await response.json()) as AppointmentResponse;
-  observability.info('merchant_appointment_book_succeeded', {
-    merchantId,
-    appointmentId: data.id,
-  });
-  return data;
+  try {
+    const data = (await response.json()) as AppointmentResponse;
+    observability.info('merchant_appointment_book_succeeded', {
+      merchantId,
+      branchId: data.branchId,
+      productId: data.productId,
+      appointmentId: data.id,
+    });
+    return data;
+  } catch (e) {
+    observability.error('merchant_appointment_book_failed', {
+      merchantId,
+      branchId: request.branchId,
+      productId: request.productId,
+      startTime: request.startTime,
+      reason: e instanceof Error ? e.message : 'invalid_response',
+    });
+    throw new AppointmentError(
+      'appointment_book_failed',
+      'The appointment service returned an invalid response.',
+    );
+  }
 }
 
 export async function cancelAppointment(

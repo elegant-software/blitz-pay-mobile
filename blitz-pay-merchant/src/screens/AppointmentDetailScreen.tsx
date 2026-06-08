@@ -4,6 +4,7 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
+  TextInput,
   StyleSheet,
   ActivityIndicator,
   Modal,
@@ -19,6 +20,7 @@ import {
   cancelAppointment,
   completeAppointment,
 } from '../features/appointments/services/appointmentService';
+import { patchAppointment } from '../features/appointments/services/employeeService';
 import type { AppointmentResponse } from '../features/appointments/types/appointment';
 import {
   APPOINTMENT_STATUS_COLORS,
@@ -26,6 +28,14 @@ import {
 } from '../features/appointments/appointmentPresentation';
 import { authedFetch } from '../lib/api';
 import { observability } from '../lib/observability';
+
+function isFuture(isoDate: string): boolean {
+  return new Date(isoDate) > new Date();
+}
+
+function isPast(isoDate: string): boolean {
+  return new Date(isoDate) <= new Date();
+}
 
 type RouteProps = RouteProp<RootStackParamList, 'AppointmentDetail'>;
 
@@ -79,6 +89,16 @@ export default function AppointmentDetailScreen() {
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [confirmCancelVisible, setConfirmCancelVisible] = useState(false);
 
+  // Note / contact editing state
+  const [editNoteVisible, setEditNoteVisible] = useState(false);
+  const [editContactVisible, setEditContactVisible] = useState(false);
+  const [editNote, setEditNote] = useState('');
+  const [editContactName, setEditContactName] = useState('');
+  const [editContactEmail, setEditContactEmail] = useState('');
+  const [editContactPhone, setEditContactPhone] = useState('');
+  const [patchSaving, setPatchSaving] = useState(false);
+  const [patchError, setPatchError] = useState<string | null>(null);
+
   const { data: appointment, isLoading, error, refetch } = useQuery({
     queryKey: ['appointment-detail', merchantId, appointmentId],
     queryFn: () => fetchSingleAppointment(merchantId, appointmentId),
@@ -126,11 +146,50 @@ export default function AppointmentDetailScreen() {
     });
   }
 
+  async function handleSaveNote() {
+    if (!appointment || patchSaving) return;
+    setPatchSaving(true);
+    setPatchError(null);
+    try {
+      await patchAppointment(merchantId, appointmentId, { note: editNote.trim() || null });
+      setEditNoteVisible(false);
+      void refetch();
+    } catch {
+      setPatchError(t('appointment_patch_failed'));
+    } finally {
+      setPatchSaving(false);
+    }
+  }
+
+  async function handleSaveContact() {
+    if (!appointment || patchSaving) return;
+    setPatchSaving(true);
+    setPatchError(null);
+    try {
+      await patchAppointment(merchantId, appointmentId, {
+        contactName: editContactName.trim() || appointment.contactName,
+        contactEmail: editContactEmail.trim() || null,
+        contactPhone: editContactPhone.trim() || null,
+      });
+      setEditContactVisible(false);
+      void refetch();
+    } catch {
+      setPatchError(t('appointment_patch_failed'));
+    } finally {
+      setPatchSaving(false);
+    }
+  }
+
   const statusColor = appointment
     ? APPOINTMENT_STATUS_COLORS[appointment.status]
     : colors.gray400;
 
-  const isActionable = appointment?.status === 'BOOKED';
+  const isBooked = appointment?.status === 'BOOKED';
+  // Domain rules:
+  // - Cancel / Reschedule: only future BOOKED
+  // - Complete: only past BOOKED
+  const canCancelOrReschedule = isBooked && appointment != null && isFuture(appointment.startTime);
+  const canComplete = isBooked && appointment != null && isPast(appointment.startTime);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -199,7 +258,25 @@ export default function AppointmentDetailScreen() {
 
           {/* Contact section */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{t('appointment_contact')}</Text>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>{t('appointment_contact')}</Text>
+              {appointment.contactType === 'MERCHANT_CAPTURED' ? (
+                <TouchableOpacity
+                  style={styles.editBtn}
+                  onPress={() => {
+                    setEditContactName(appointment.contactName);
+                    setEditContactEmail(appointment.contactEmail ?? '');
+                    setEditContactPhone(appointment.contactPhone ?? '');
+                    setPatchError(null);
+                    setEditContactVisible(true);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="pencil-outline" size={14} color={colors.primary} />
+                  <Text style={styles.editBtnText}>{t('appointment_edit_contact_title')}</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
             <View style={[styles.sectionCard, shadow.sm]}>
               {appointment.contactPhone ? (
                 <DetailRow
@@ -218,6 +295,12 @@ export default function AppointmentDetailScreen() {
               {!appointment.contactPhone && !appointment.contactEmail ? (
                 <Text style={styles.noContactText}>No contact details provided.</Text>
               ) : null}
+              {appointment.contactType === 'SHOPPER_OWNED' ? (
+                <View style={styles.shopperOwnedBadge}>
+                  <Ionicons name="lock-closed-outline" size={12} color={colors.gray600} />
+                  <Text style={styles.shopperOwnedText}>Shopper-owned — read only</Text>
+                </View>
+              ) : null}
             </View>
           </View>
 
@@ -234,14 +317,30 @@ export default function AppointmentDetailScreen() {
           </View>
 
           {/* Note section */}
-          {appointment.note ? (
-            <View style={styles.section}>
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>{t('appointment_note')}</Text>
-              <View style={[styles.sectionCard, shadow.sm]}>
-                <Text style={styles.noteText}>{appointment.note}</Text>
-              </View>
+              <TouchableOpacity
+                style={styles.editBtn}
+                onPress={() => {
+                  setEditNote(appointment.note ?? '');
+                  setPatchError(null);
+                  setEditNoteVisible(true);
+                }}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="pencil-outline" size={14} color={colors.primary} />
+                <Text style={styles.editBtnText}>{t('appointment_edit_note_title')}</Text>
+              </TouchableOpacity>
             </View>
-          ) : null}
+            <View style={[styles.sectionCard, shadow.sm]}>
+              {appointment.note ? (
+                <Text style={styles.noteText}>{appointment.note}</Text>
+              ) : (
+                <Text style={styles.noContactText}>No note added.</Text>
+              )}
+            </View>
+          </View>
 
           {/* Cancellation reason */}
           {appointment.cancelledReason ? (
@@ -253,8 +352,8 @@ export default function AppointmentDetailScreen() {
             </View>
           ) : null}
 
-          {/* Actions */}
-          {isActionable ? (
+          {/* Actions — domain-rule-gated */}
+          {(canComplete || canCancelOrReschedule) ? (
             <View style={styles.actions}>
               {mutating ? (
                 <View style={styles.mutatingRow}>
@@ -263,17 +362,19 @@ export default function AppointmentDetailScreen() {
                 </View>
               ) : (
                 <>
-                  <TouchableOpacity
-                    style={styles.primaryAction}
-                    onPress={() => void handleComplete()}
-                    disabled={mutating}
-                    activeOpacity={0.85}
-                  >
-                    <Ionicons name="checkmark-circle-outline" size={18} color={colors.black} />
-                    <Text style={styles.primaryActionText}>{t('appointment_mark_complete')}</Text>
-                  </TouchableOpacity>
+                  {canComplete ? (
+                    <TouchableOpacity
+                      style={styles.primaryAction}
+                      onPress={() => void handleComplete()}
+                      disabled={mutating}
+                      activeOpacity={0.85}
+                    >
+                      <Ionicons name="checkmark-circle-outline" size={18} color={colors.black} />
+                      <Text style={styles.primaryActionText}>{t('appointment_mark_complete')}</Text>
+                    </TouchableOpacity>
+                  ) : null}
 
-                  {scope === 'merchant' ? (
+                  {canCancelOrReschedule && scope === 'merchant' ? (
                     <TouchableOpacity
                       style={styles.secondaryAction}
                       onPress={handleReschedule}
@@ -285,21 +386,131 @@ export default function AppointmentDetailScreen() {
                     </TouchableOpacity>
                   ) : null}
 
-                  <TouchableOpacity
-                    style={styles.destructiveAction}
-                    onPress={() => setConfirmCancelVisible(true)}
-                    disabled={mutating}
-                    activeOpacity={0.85}
-                  >
-                    <Ionicons name="close-circle-outline" size={18} color={colors.error} />
-                    <Text style={styles.destructiveActionText}>{t('appointment_cancel')}</Text>
-                  </TouchableOpacity>
+                  {canCancelOrReschedule ? (
+                    <TouchableOpacity
+                      style={styles.destructiveAction}
+                      onPress={() => setConfirmCancelVisible(true)}
+                      disabled={mutating}
+                      activeOpacity={0.85}
+                    >
+                      <Ionicons name="close-circle-outline" size={18} color={colors.error} />
+                      <Text style={styles.destructiveActionText}>{t('appointment_cancel')}</Text>
+                    </TouchableOpacity>
+                  ) : null}
                 </>
               )}
             </View>
           ) : null}
         </ScrollView>
       )}
+
+      {/* Edit Note Modal */}
+      <Modal
+        visible={editNoteVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setEditNoteVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalSheet}>
+            <Text style={styles.modalTitle}>{t('appointment_edit_note_title')}</Text>
+            <TextInput
+              style={[styles.modalInput, styles.modalTextArea]}
+              value={editNote}
+              onChangeText={setEditNote}
+              placeholder="Add a note…"
+              placeholderTextColor={colors.gray400}
+              multiline
+              numberOfLines={4}
+              autoFocus
+            />
+            {patchError ? (
+              <Text style={styles.patchError}>{patchError}</Text>
+            ) : null}
+            <TouchableOpacity
+              style={[styles.modalDestructiveBtn, { backgroundColor: colors.primary }, patchSaving && styles.patchDisabled]}
+              onPress={() => void handleSaveNote()}
+              disabled={patchSaving}
+              activeOpacity={0.85}
+            >
+              {patchSaving ? (
+                <ActivityIndicator size="small" color={colors.black} />
+              ) : null}
+              <Text style={[styles.modalDestructiveBtnText, { color: colors.black }]}>
+                {patchSaving ? t('appointment_edit_saving') : t('appointment_edit_save')}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.modalDismissBtn}
+              onPress={() => setEditNoteVisible(false)}
+            >
+              <Text style={styles.modalDismissBtnText}>{t('cancel')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Edit Contact Modal (MERCHANT_CAPTURED only) */}
+      <Modal
+        visible={editContactVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setEditContactVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalSheet}>
+            <Text style={styles.modalTitle}>{t('appointment_edit_contact_title')}</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={editContactName}
+              onChangeText={setEditContactName}
+              placeholder="Contact name"
+              placeholderTextColor={colors.gray400}
+              autoCapitalize="words"
+              autoFocus
+            />
+            <TextInput
+              style={styles.modalInput}
+              value={editContactPhone}
+              onChangeText={setEditContactPhone}
+              placeholder="+49 123 456789"
+              placeholderTextColor={colors.gray400}
+              keyboardType="phone-pad"
+            />
+            <TextInput
+              style={styles.modalInput}
+              value={editContactEmail}
+              onChangeText={setEditContactEmail}
+              placeholder="email@example.com"
+              placeholderTextColor={colors.gray400}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+            {patchError ? (
+              <Text style={styles.patchError}>{patchError}</Text>
+            ) : null}
+            <TouchableOpacity
+              style={[styles.modalDestructiveBtn, { backgroundColor: colors.primary }, patchSaving && styles.patchDisabled]}
+              onPress={() => void handleSaveContact()}
+              disabled={patchSaving}
+              activeOpacity={0.85}
+            >
+              {patchSaving ? (
+                <ActivityIndicator size="small" color={colors.black} />
+              ) : null}
+              <Text style={[styles.modalDestructiveBtnText, { color: colors.black }]}>
+                {patchSaving ? t('appointment_edit_saving') : t('appointment_edit_save')}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.modalDismissBtn}
+              onPress={() => setEditContactVisible(false)}
+            >
+              <Text style={styles.modalDismissBtnText}>{t('cancel')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* Cancel confirmation modal */}
       <Modal
@@ -449,6 +660,49 @@ const styles = StyleSheet.create({
     padding: spacing.md,
   },
   noContactText: { fontSize: 13, color: colors.gray500 },
+  shopperOwnedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: spacing.sm,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.gray100,
+  },
+  shopperOwnedText: { fontSize: 11, color: colors.gray600, fontStyle: 'italic' },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
+  },
+  editBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radius.full,
+    backgroundColor: `${colors.primary}12`,
+  },
+  editBtnText: { fontSize: 12, fontWeight: '600', color: colors.primary },
+  patchError: { fontSize: 13, color: colors.error },
+  patchDisabled: { opacity: 0.55 },
+  modalInput: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.gray200,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    fontSize: 15,
+    color: colors.onSurface,
+  },
+  modalTextArea: {
+    minHeight: 80,
+    textAlignVertical: 'top',
+    paddingTop: spacing.sm,
+  },
   noteText: { fontSize: 14, color: colors.onSurface, lineHeight: 20 },
   actions: {
     paddingHorizontal: spacing.md,

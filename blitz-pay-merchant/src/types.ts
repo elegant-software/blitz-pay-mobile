@@ -41,6 +41,13 @@ export type RootStackParamList = {
     currentStartTime: string;
     currentEmployeeId: string | null;
   };
+  EmployeeSetup: undefined;
+  EmployeeDetail: {
+    employeeId: string;
+    merchantId: string;
+    employeeName: string;
+  };
+  AppointmentPolicy: undefined;
 };
 
 export type TabParamList = {

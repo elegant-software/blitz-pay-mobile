@@ -16,9 +16,13 @@ import { useNavigation } from '@react-navigation/native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../lib/auth';
 import { useLanguage } from '../lib/LanguageContext';
+import { observability } from '../lib/observability';
 import { colors, spacing, radius, shadow } from '../lib/theme';
 import type { RootStackNav } from '../types';
-import { bookMerchantAppointment } from '../features/appointments/services/appointmentService';
+import {
+  AppointmentError,
+  bookMerchantAppointment,
+} from '../features/appointments/services/appointmentService';
 import { fetchBranchProducts } from '../lib/merchantProducts';
 import type { Product } from '../types';
 
@@ -88,6 +92,15 @@ export default function NewAppointmentScreen() {
   async function handleSubmit() {
     const validationError = validate();
     if (validationError) {
+      observability.warn('merchant_appointment_book_blocked', {
+        merchantId: merchantId ?? 'missing',
+        branchId: branchId ?? 'missing',
+        hasContactName: !!contactName.trim(),
+        hasProduct: !!selectedProduct,
+        date,
+        time,
+        reason: validationError,
+      });
       setSubmitError(validationError);
       return;
     }
@@ -96,11 +109,23 @@ export default function NewAppointmentScreen() {
     setSubmitError(null);
 
     try {
+      const startTime = buildISODateTime(date, time);
+      observability.info('merchant_appointment_book_submitted', {
+        merchantId: merchantId!,
+        branchId: branchId!,
+        productId: selectedProduct!.id,
+        startTime,
+        hasEmployee: !!employeeId.trim(),
+        hasContactEmail: !!contactEmail.trim(),
+        hasContactPhone: !!contactPhone.trim(),
+        hasNote: !!note.trim(),
+      });
+
       await bookMerchantAppointment(merchantId!, {
         branchId: branchId!,
         productId: selectedProduct!.id,
         productCategoryId: selectedProduct!.categoryId ?? '',
-        startTime: buildISODateTime(date, time),
+        startTime,
         employeeId: employeeId.trim() || null,
         contactName: contactName.trim(),
         contactEmail: contactEmail.trim() || null,
@@ -113,14 +138,37 @@ export default function NewAppointmentScreen() {
         queryKey: ['appointments', 'merchant', merchantId],
       });
 
+      observability.info('merchant_appointment_book_ui_succeeded', {
+        merchantId: merchantId!,
+        branchId: branchId!,
+        productId: selectedProduct!.id,
+        startTime,
+      });
       navigation.goBack();
     } catch (e) {
-      const key =
-        e instanceof Error
-          ? e.message
-          : 'appointment_book_failed';
+      const key = e instanceof AppointmentError
+        ? e.i18nKey
+        : 'appointment_book_failed';
+      observability.error('merchant_appointment_book_ui_failed', {
+        merchantId: merchantId ?? 'missing',
+        branchId: branchId ?? 'missing',
+        productId: selectedProduct?.id ?? 'missing',
+        date,
+        time,
+        reason: key,
+      });
+      const translated = t(key as Parameters<typeof t>[0]);
+      const showBackendDetail =
+        e instanceof AppointmentError &&
+        e.status !== undefined &&
+        (e.i18nKey === 'appointment_validation_failed' ||
+          e.i18nKey === 'appointment_book_failed');
       setSubmitError(
-        t(key as Parameters<typeof t>[0]) ?? t('appointment_book_failed'),
+        showBackendDetail
+          ? e.detail
+          : e instanceof AppointmentError && translated === key
+          ? e.detail
+          : translated ?? t('appointment_book_failed'),
       );
     } finally {
       setSubmitting(false);

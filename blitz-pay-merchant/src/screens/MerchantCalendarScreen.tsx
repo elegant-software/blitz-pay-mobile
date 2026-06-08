@@ -35,9 +35,10 @@ type ViewMode = 'day' | 'week';
 
 export default function MerchantCalendarScreen() {
   const { t } = useLanguage();
-  const { activeBranchScope, branchScopeError, retryBranchScope } = useAuth();
+  const { activeBranchScope, branchScopeError, retryBranchScope, user } = useAuth();
   const navigation = useNavigation<RootStackNav>();
   const insets = useSafeAreaInsets();
+  const isManager = user?.role === 'MANAGER';
 
   const [viewMode, setViewMode] = useState<ViewMode>('day');
   const [selectedDate, setSelectedDate] = useState(() => {
@@ -69,6 +70,7 @@ export default function MerchantCalendarScreen() {
       ),
     [grouped],
   );
+  const visibleDayKeys = dayKeys.length > 0 ? dayKeys : [selectedDate.toDateString()];
 
   function navigatePrev() {
     setSelectedDate((d) => addDays(d, viewMode === 'day' ? -1 : -7));
@@ -102,14 +104,36 @@ export default function MerchantCalendarScreen() {
               {activeBranchScope?.branchName ?? activeBranchScope?.merchantId ?? ''}
             </Text>
           </View>
-          <TouchableOpacity
-            style={styles.myScheduleBtn}
-            onPress={() => navigation.navigate('EmployeeCalendar')}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="person-outline" size={15} color={colors.primary} />
-            <Text style={styles.myScheduleBtnText}>My Schedule</Text>
-          </TouchableOpacity>
+          <View style={styles.headerActions}>
+            {isManager ? (
+              <>
+                <TouchableOpacity
+                  style={styles.myScheduleBtn}
+                  onPress={() => navigation.navigate('EmployeeSetup')}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="people-outline" size={15} color={colors.primary} />
+                  <Text style={styles.myScheduleBtnText}>Staff</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.myScheduleBtn}
+                  onPress={() => navigation.navigate('AppointmentPolicy')}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="settings-outline" size={15} color={colors.primary} />
+                  <Text style={styles.myScheduleBtnText}>Policy</Text>
+                </TouchableOpacity>
+              </>
+            ) : null}
+            <TouchableOpacity
+              style={styles.myScheduleBtn}
+              onPress={() => navigation.navigate('EmployeeCalendar')}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="person-outline" size={15} color={colors.primary} />
+              <Text style={styles.myScheduleBtnText}>My Schedule</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* View mode toggle */}
@@ -195,14 +219,7 @@ export default function MerchantCalendarScreen() {
           }}
           showsVerticalScrollIndicator={false}
         >
-          {dayKeys.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Ionicons name="calendar-outline" size={48} color={colors.gray300} />
-              <Text style={styles.emptyTitle}>{t('appointments_empty_title')}</Text>
-              <Text style={styles.emptyText}>{t('appointments_empty_body')}</Text>
-            </View>
-          ) : (
-            dayKeys.map((dayKey) => {
+          {visibleDayKeys.map((dayKey) => {
               const dayAppts = grouped.get(dayKey) ?? [];
               const date = new Date(dayKey);
               const isCurrentDay = isSameDay(date, new Date());
@@ -258,8 +275,7 @@ export default function MerchantCalendarScreen() {
                   )}
                 </View>
               );
-            })
-          )}
+            })}
         </ScrollView>
       )}
     </View>
@@ -353,6 +369,12 @@ const styles = StyleSheet.create({
   headerLeft: { flex: 1 },
   title: { fontSize: 22, fontWeight: '800', color: colors.onSurface },
   subtitle: { fontSize: 13, color: colors.gray600, marginTop: 2 },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginLeft: spacing.sm,
+  },
   myScheduleBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -361,7 +383,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
     paddingHorizontal: spacing.sm,
     paddingVertical: 6,
-    marginLeft: spacing.sm,
   },
   myScheduleBtnText: { fontSize: 13, fontWeight: '600', color: colors.primary },
   toggleRow: {
