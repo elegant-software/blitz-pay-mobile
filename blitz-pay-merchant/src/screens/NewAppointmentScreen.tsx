@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,13 +7,12 @@ import {
   TextInput,
   StyleSheet,
   ActivityIndicator,
-  Platform,
   KeyboardAvoidingView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueries, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../lib/auth';
 import { useLanguage } from '../lib/LanguageContext';
 import { observability } from '../lib/observability';
@@ -23,6 +22,11 @@ import {
   AppointmentError,
   bookMerchantAppointment,
 } from '../features/appointments/services/appointmentService';
+import {
+  fetchEmployees,
+  fetchEmployeeServiceAssignments,
+  type EmployeeResponse,
+} from '../features/appointments/services/employeeService';
 import { fetchBranchProducts } from '../lib/merchantProducts';
 import type { Product } from '../types';
 
@@ -62,7 +66,7 @@ export default function NewAppointmentScreen() {
   const [contactEmail, setContactEmail] = useState('');
   const [contactPhone, setContactPhone] = useState('');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [employeeId, setEmployeeId] = useState('');
+  const [selectedEmployee, setSelectedEmployee] = useState<EmployeeResponse | null>(null);
   const [date, setDate] = useState(todayString());
   const [time, setTime] = useState(currentTimeString());
   const [note, setNote] = useState('');
@@ -70,6 +74,12 @@ export default function NewAppointmentScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [showProductPicker, setShowProductPicker] = useState(false);
+  const [showEmployeePicker, setShowEmployeePicker] = useState(false);
+
+  // Clear employee selection when product changes
+  useEffect(() => {
+    setSelectedEmployee(null);
+  }, [selectedProduct?.id]);
 
   const { data: products, isLoading: productsLoading, error: productsError } = useQuery({
     queryKey: merchantId && branchId ? ['products', merchantId, branchId] : ['products', 'missing'],
@@ -79,6 +89,36 @@ export default function NewAppointmentScreen() {
   });
 
   const activeProducts = (products ?? []).filter((p) => p.active);
+
+  // Fetch all employees, then their service assignments in parallel once a service is selected
+  const { data: allEmployees } = useQuery({
+    queryKey: ['employees', merchantId],
+    queryFn: () => fetchEmployees(merchantId!),
+    enabled: !!merchantId,
+    staleTime: 60_000,
+  });
+
+  const activeEmployees = (allEmployees ?? []).filter((e) => e.active);
+
+  const serviceAssignmentQueries = useQueries({
+    queries: activeEmployees.map((emp) => ({
+      queryKey: ['employee_service_assignments', merchantId, emp.id],
+      queryFn: () => fetchEmployeeServiceAssignments(merchantId!, emp.id),
+      staleTime: 60_000,
+      enabled: !!merchantId && !!selectedProduct?.categoryId,
+    })),
+  });
+
+  const assignmentsLoading = serviceAssignmentQueries.some((q) => q.isLoading);
+
+  const qualifiedEmployees = useMemo(() => {
+    if (!selectedProduct?.categoryId) return [];
+    return activeEmployees.filter((emp, idx) => {
+      const assignments = serviceAssignmentQueries[idx]?.data ?? [];
+      return assignments.some((a) => a.productCategoryId === selectedProduct.categoryId);
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeEmployees, serviceAssignmentQueries, selectedProduct?.categoryId]);
 
   function validate(): string | null {
     if (!contactName.trim()) return t('appointment_validation_failed');
@@ -115,7 +155,7 @@ export default function NewAppointmentScreen() {
         branchId: branchId!,
         productId: selectedProduct!.id,
         startTime,
-        hasEmployee: !!employeeId.trim(),
+        hasEmployee: !!selectedEmployee,
         hasContactEmail: !!contactEmail.trim(),
         hasContactPhone: !!contactPhone.trim(),
         hasNote: !!note.trim(),
@@ -126,7 +166,7 @@ export default function NewAppointmentScreen() {
         productId: selectedProduct!.id,
         productCategoryId: selectedProduct!.categoryId ?? '',
         startTime,
-        employeeId: employeeId.trim() || null,
+        employeeId: selectedEmployee?.id ?? null,
         contactName: contactName.trim(),
         contactEmail: contactEmail.trim() || null,
         contactPhone: contactPhone.trim() || null,
@@ -156,6 +196,8 @@ export default function NewAppointmentScreen() {
         date,
         time,
         reason: key,
+        detail: e instanceof AppointmentError ? e.detail : undefined,
+        httpStatus: e instanceof AppointmentError ? e.status : undefined,
       });
       const translated = t(key as Parameters<typeof t>[0]);
       const showBackendDetail =
@@ -178,7 +220,7 @@ export default function NewAppointmentScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior="padding"
     >
       <View style={[styles.safeTop, { paddingTop: insets.top }]} />
 
@@ -272,25 +314,45 @@ export default function NewAppointmentScreen() {
                 ]}
                 numberOfLines={1}
               >
-                {selectedProduct?.name ?? t('new_appointment_select_product')}
+                {selectedProduct
+                  ? selectedProduct.productCode != null
+                    ? `${selectedProduct.name} · #${selectedProduct.productCode}`
+                    : selectedProduct.name
+                  : t('new_appointment_select_product')}
               </Text>
               <Ionicons name="chevron-down" size={16} color={colors.gray500} />
             </TouchableOpacity>
           )}
         </View>
 
-        {/* Employee ID (optional free text) */}
+        {/* Employee (qualified for selected service) */}
         <View style={styles.field}>
           <Text style={styles.fieldLabel}>{t('new_appointment_employee')}</Text>
-          <TextInput
-            style={styles.input}
-            value={employeeId}
-            onChangeText={setEmployeeId}
-            placeholder={t('new_appointment_select_employee')}
-            placeholderTextColor={colors.gray400}
-            autoCapitalize="none"
-            returnKeyType="next"
-          />
+          {!selectedProduct ? (
+            <View style={[styles.selector, styles.selectorDisabled]}>
+              <Text style={styles.selectorPlaceholder}>{t('new_appointment_select_product_first')}</Text>
+              <Ionicons name="chevron-down" size={16} color={colors.gray400} />
+            </View>
+          ) : assignmentsLoading ? (
+            <View style={styles.inputRow}>
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text style={styles.inputRowText}>{t('new_appointment_employees_loading')}</Text>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={[styles.selector, !selectedEmployee && styles.selectorEmpty]}
+              onPress={() => setShowEmployeePicker(true)}
+              activeOpacity={0.8}
+            >
+              <Text
+                style={[styles.selectorText, !selectedEmployee && styles.selectorPlaceholder]}
+                numberOfLines={1}
+              >
+                {selectedEmployee?.name ?? t('new_appointment_any_employee')}
+              </Text>
+              <Ionicons name="chevron-down" size={16} color={colors.gray500} />
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Date */}
@@ -392,12 +454,73 @@ export default function NewAppointmentScreen() {
                     activeOpacity={0.7}
                   >
                     <View style={styles.pickerRowBody}>
-                      <Text style={styles.pickerRowName}>{product.name}</Text>
+                      <Text style={styles.pickerRowName}>
+                        {product.name}{product.productCode != null ? ` · #${product.productCode}` : ''}
+                      </Text>
                       {product.categoryName ? (
                         <Text style={styles.pickerRowCategory}>{product.categoryName}</Text>
                       ) : null}
                     </View>
                     {selectedProduct?.id === product.id ? (
+                      <Ionicons name="checkmark" size={18} color={colors.primary} />
+                    ) : null}
+                  </TouchableOpacity>
+                ))
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      ) : null}
+
+      {/* Employee picker modal */}
+      {showEmployeePicker ? (
+        <View style={styles.pickerOverlay}>
+          <View style={[styles.pickerSheet, { paddingBottom: insets.bottom + spacing.lg }]}>
+            <View style={styles.pickerHeader}>
+              <Text style={styles.pickerTitle}>{t('new_appointment_employee')}</Text>
+              <TouchableOpacity onPress={() => setShowEmployeePicker(false)} hitSlop={8}>
+                <Ionicons name="close" size={22} color={colors.onSurface} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {/* "Any employee" only appears when there are multiple choices */}
+              {qualifiedEmployees.length > 1 ? (
+                <TouchableOpacity
+                  style={[styles.pickerRow, !selectedEmployee && styles.pickerRowSelected]}
+                  onPress={() => {
+                    setSelectedEmployee(null);
+                    setShowEmployeePicker(false);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.pickerRowBody}>
+                    <Text style={styles.pickerRowName}>{t('new_appointment_any_employee')}</Text>
+                  </View>
+                  {!selectedEmployee ? (
+                    <Ionicons name="checkmark" size={18} color={colors.primary} />
+                  ) : null}
+                </TouchableOpacity>
+              ) : null}
+              {qualifiedEmployees.length === 0 ? (
+                <Text style={styles.pickerEmpty}>{t('new_appointment_no_qualified_employees')}</Text>
+              ) : (
+                qualifiedEmployees.map((emp) => (
+                  <TouchableOpacity
+                    key={emp.id}
+                    style={[
+                      styles.pickerRow,
+                      selectedEmployee?.id === emp.id && styles.pickerRowSelected,
+                    ]}
+                    onPress={() => {
+                      setSelectedEmployee(emp);
+                      setShowEmployeePicker(false);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.pickerRowBody}>
+                      <Text style={styles.pickerRowName}>{emp.name}</Text>
+                    </View>
+                    {selectedEmployee?.id === emp.id ? (
                       <Ionicons name="checkmark" size={18} color={colors.primary} />
                     ) : null}
                   </TouchableOpacity>
@@ -476,6 +599,7 @@ const styles = StyleSheet.create({
     ...shadow.sm,
   },
   selectorEmpty: { borderColor: colors.gray200 },
+  selectorDisabled: { borderColor: colors.gray200, opacity: 0.5 },
   selectorText: { flex: 1, fontSize: 15, color: colors.onSurface },
   selectorPlaceholder: { color: colors.gray400 },
   footer: {

@@ -10,7 +10,7 @@ export interface AppointmentResponse {
   productName: string;
   productCategoryId: string;
   employeeId: string | null;
-  employeeName: string | null;
+  employeeName?: string | null;
   status: AppointmentStatus;
   startTime: string;
   endTime: string;

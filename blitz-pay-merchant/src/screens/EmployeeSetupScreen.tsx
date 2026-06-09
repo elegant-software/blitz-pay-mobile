@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Modal,
   Alert,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -115,7 +116,7 @@ export default function EmployeeSetupScreen() {
   }
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <KeyboardAvoidingView style={[styles.container, { paddingTop: insets.top }]} behavior="padding">
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
@@ -215,6 +216,7 @@ export default function EmployeeSetupScreen() {
         animationType="slide"
         onRequestClose={() => setShowAddModal(false)}
       >
+        <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalSheet, { paddingBottom: insets.bottom + spacing.lg }]}>
             <Text style={styles.modalTitle}>{t('employee_setup_add')}</Text>
@@ -256,6 +258,7 @@ export default function EmployeeSetupScreen() {
             </TouchableOpacity>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Rename Modal */}
@@ -265,6 +268,7 @@ export default function EmployeeSetupScreen() {
         animationType="slide"
         onRequestClose={() => setRenameTarget(null)}
       >
+        <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalSheet, { paddingBottom: insets.bottom + spacing.lg }]}>
             <Text style={styles.modalTitle}>{renameTarget?.name ?? ''}</Text>
@@ -306,8 +310,9 @@ export default function EmployeeSetupScreen() {
             </TouchableOpacity>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 

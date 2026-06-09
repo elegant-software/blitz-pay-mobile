@@ -8,6 +8,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   Switch,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,21 +25,25 @@ import {
   fetchEmployeeServiceAssignments,
   addEmployeeServiceAssignment,
   removeEmployeeServiceAssignment,
+  fetchProductCategories,
   fetchWeeklyAvailability,
-  setWeeklyAvailability,
+  addWeeklyAvailabilitySlot,
+  removeWeeklyAvailabilitySlot,
   fetchAvailabilityExceptions,
   addAvailabilityException,
   removeAvailabilityException,
   type WeeklyAvailabilitySlot,
+  type DayOfWeek,
   type AvailabilityException,
 } from '../features/appointments/services/employeeService';
+import { fetchMerchantBranches } from '../lib/merchantBranches';
 
 type RouteProps = RouteProp<RootStackParamList, 'EmployeeDetail'>;
 
-const DAYS_OF_WEEK: WeeklyAvailabilitySlot['dayOfWeek'][] = [
+const DAYS_OF_WEEK: DayOfWeek[] = [
   'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY',
 ];
-const DAY_LABELS: Record<WeeklyAvailabilitySlot['dayOfWeek'], string> = {
+const DAY_LABELS: Record<DayOfWeek, string> = {
   MONDAY: 'Mon', TUESDAY: 'Tue', WEDNESDAY: 'Wed', THURSDAY: 'Thu',
   FRIDAY: 'Fri', SATURDAY: 'Sat', SUNDAY: 'Sun',
 };
@@ -55,7 +60,6 @@ export default function EmployeeDetailScreen() {
   const branchId = activeBranchScope?.branchId ?? null;
 
   // ─── Branch Assignments ─────────────────────────────────────────────────────
-  const [newBranchId, setNewBranchId] = useState('');
   const [branchError, setBranchError] = useState<string | null>(null);
 
   const branchAssignments = useQuery({
@@ -64,10 +68,39 @@ export default function EmployeeDetailScreen() {
     staleTime: 30_000,
   });
 
+  const merchantBranches = useQuery({
+    queryKey: ['merchant_branches', merchantId],
+    queryFn: () => fetchMerchantBranches(merchantId),
+    staleTime: 60_000,
+  });
+
+  const branchNameMap: Record<string, string> = React.useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const b of merchantBranches.data ?? []) map[b.branchId] = b.name;
+    return map;
+  }, [merchantBranches.data]);
+
+  const productCategories = useQuery({
+    queryKey: ['product_categories', merchantId],
+    queryFn: () => fetchProductCategories(merchantId),
+    staleTime: 60_000,
+  });
+
+  const categoryNameMap: Record<string, string> = React.useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const c of productCategories.data ?? []) map[c.id] = c.name;
+    return map;
+  }, [productCategories.data]);
+
+  const categoryCodeMap: Record<string, string> = React.useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const c of productCategories.data ?? []) map[c.id] = c.code;
+    return map;
+  }, [productCategories.data]);
+
   const addBranchMutation = useMutation({
-    mutationFn: () => addEmployeeBranchAssignment(merchantId, employeeId, newBranchId.trim()),
+    mutationFn: (bId: string) => addEmployeeBranchAssignment(merchantId, employeeId, bId),
     onSuccess: () => {
-      setNewBranchId('');
       setBranchError(null);
       void queryClient.invalidateQueries({ queryKey: ['employee_branch_assignments', merchantId, employeeId] });
     },
@@ -81,7 +114,6 @@ export default function EmployeeDetailScreen() {
   });
 
   // ─── Service Assignments ────────────────────────────────────────────────────
-  const [newProductId, setNewProductId] = useState('');
   const [serviceError, setServiceError] = useState<string | null>(null);
 
   const serviceAssignments = useQuery({
@@ -91,9 +123,8 @@ export default function EmployeeDetailScreen() {
   });
 
   const addServiceMutation = useMutation({
-    mutationFn: () => addEmployeeServiceAssignment(merchantId, employeeId, newProductId.trim()),
+    mutationFn: (pId: string) => addEmployeeServiceAssignment(merchantId, employeeId, pId),
     onSuccess: () => {
-      setNewProductId('');
       setServiceError(null);
       void queryClient.invalidateQueries({ queryKey: ['employee_service_assignments', merchantId, employeeId] });
     },
@@ -107,8 +138,9 @@ export default function EmployeeDetailScreen() {
   });
 
   // ─── Weekly Availability ────────────────────────────────────────────────────
-  const [localSlots, setLocalSlots] = useState<WeeklyAvailabilitySlot[]>([]);
-  const [availabilityLoaded, setAvailabilityLoaded] = useState(false);
+  const [newSlot, setNewSlot] = useState<Omit<WeeklyAvailabilitySlot, 'id'>>({
+    dayOfWeek: 'MONDAY', startTime: '09:00', endTime: '17:00',
+  });
   const [availError, setAvailError] = useState<string | null>(null);
 
   const weeklyAvailability = useQuery({
@@ -116,47 +148,27 @@ export default function EmployeeDetailScreen() {
     queryFn: () => fetchWeeklyAvailability(merchantId, employeeId, branchId!),
     enabled: !!branchId,
     staleTime: 60_000,
-    select: (data) => data,
   });
 
-  React.useEffect(() => {
-    if (weeklyAvailability.data && !availabilityLoaded) {
-      setLocalSlots(weeklyAvailability.data);
-      setAvailabilityLoaded(true);
-    }
-  }, [weeklyAvailability.data]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const saveAvailabilityMutation = useMutation({
-    mutationFn: () => setWeeklyAvailability(merchantId, employeeId, branchId!, localSlots),
+  const addSlotMutation = useMutation({
+    mutationFn: () => addWeeklyAvailabilitySlot(merchantId, employeeId, branchId!, newSlot),
     onSuccess: () => {
       setAvailError(null);
-      void queryClient.invalidateQueries({
-        queryKey: ['employee_availability', merchantId, employeeId, branchId],
-      });
+      setNewSlot({ dayOfWeek: 'MONDAY', startTime: '09:00', endTime: '17:00' });
+      void queryClient.invalidateQueries({ queryKey: ['employee_availability', merchantId, employeeId, branchId] });
     },
-    onError: () => setAvailError(t('employee_detail_save_failed')),
+    onError: (e: Error) => setAvailError(e.message || t('employee_detail_save_failed')),
   });
 
-  function addAvailabilitySlot() {
-    setLocalSlots((prev) => [
-      ...prev,
-      { dayOfWeek: 'MONDAY', startTime: '09:00', endTime: '17:00' },
-    ]);
-  }
-
-  function removeAvailabilitySlot(index: number) {
-    setLocalSlots((prev) => prev.filter((_, i) => i !== index));
-  }
-
-  function updateSlot(index: number, field: keyof WeeklyAvailabilitySlot, value: string) {
-    setLocalSlots((prev) =>
-      prev.map((s, i) => (i === index ? { ...s, [field]: value } : s)),
-    );
-  }
+  const removeSlotMutation = useMutation({
+    mutationFn: (slotId: string) => removeWeeklyAvailabilitySlot(merchantId, employeeId, branchId!, slotId),
+    onSuccess: () =>
+      void queryClient.invalidateQueries({ queryKey: ['employee_availability', merchantId, employeeId, branchId] }),
+  });
 
   // ─── Exceptions ─────────────────────────────────────────────────────────────
   const [exceptionDate, setExceptionDate] = useState('');
-  const [exceptionUnavailable, setExceptionUnavailable] = useState(true);
+  const [exceptionType, setExceptionType] = useState<'BLOCKED' | 'EXTRA_WINDOW'>('BLOCKED');
   const [exceptionStart, setExceptionStart] = useState('');
   const [exceptionEnd, setExceptionEnd] = useState('');
   const [exceptionError, setExceptionError] = useState<string | null>(null);
@@ -172,13 +184,13 @@ export default function EmployeeDetailScreen() {
     mutationFn: () =>
       addAvailabilityException(merchantId, employeeId, branchId!, {
         date: exceptionDate.trim(),
-        unavailable: exceptionUnavailable,
-        startTime: !exceptionUnavailable && exceptionStart.trim() ? exceptionStart.trim() : null,
-        endTime: !exceptionUnavailable && exceptionEnd.trim() ? exceptionEnd.trim() : null,
+        type: exceptionType,
+        startTime: exceptionType === 'EXTRA_WINDOW' && exceptionStart.trim() ? exceptionStart.trim() : null,
+        endTime: exceptionType === 'EXTRA_WINDOW' && exceptionEnd.trim() ? exceptionEnd.trim() : null,
       }),
     onSuccess: () => {
       setExceptionDate('');
-      setExceptionUnavailable(true);
+      setExceptionType('BLOCKED');
       setExceptionStart('');
       setExceptionEnd('');
       setExceptionError(null);
@@ -199,7 +211,7 @@ export default function EmployeeDetailScreen() {
   });
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <KeyboardAvoidingView style={[styles.container, { paddingTop: insets.top }]} behavior="padding">
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
@@ -226,20 +238,19 @@ export default function EmployeeDetailScreen() {
             (branchAssignments.data ?? []).map((ba) => (
               <AssignmentRow
                 key={ba.branchId}
-                label={ba.branchId}
+                label={branchNameMap[ba.branchId] ?? t('employee_detail_unknown_branch')}
                 onRemove={() => void removeBranchMutation.mutateAsync(ba.branchId)}
                 removing={removeBranchMutation.isPending}
               />
             ))
           )}
           {branchError ? <ErrorText text={branchError} /> : null}
-          <AddRow
-            value={newBranchId}
+          <SelectRow
             placeholder={t('employee_detail_add_branch')}
-            onChange={setNewBranchId}
-            onAdd={() => {
-              if (newBranchId.trim()) void addBranchMutation.mutateAsync();
-            }}
+            options={(merchantBranches.data ?? [])
+              .filter((b) => !(branchAssignments.data ?? []).some((a) => a.branchId === b.branchId))
+              .map((b) => ({ label: b.name, value: b.branchId }))}
+            onSelect={(bId) => void addBranchMutation.mutateAsync(bId)}
             adding={addBranchMutation.isPending}
           />
         </Section>
@@ -253,24 +264,27 @@ export default function EmployeeDetailScreen() {
           ) : serviceAssignments.data && serviceAssignments.data.length === 0 ? (
             <EmptyText text={t('employee_detail_no_services')} />
           ) : (
-            (serviceAssignments.data ?? []).map((sa) => (
-              <AssignmentRow
-                key={sa.productId}
-                label={sa.productName || sa.productId}
-                sublabel={sa.productId}
-                onRemove={() => void removeServiceMutation.mutateAsync(sa.productId)}
-                removing={removeServiceMutation.isPending}
-              />
-            ))
+            (serviceAssignments.data ?? []).map((sa) => {
+              const displayName = sa.name || categoryNameMap[sa.productCategoryId] || sa.productCategoryId;
+              const displayCode = sa.code || categoryCodeMap[sa.productCategoryId];
+              return (
+                <AssignmentRow
+                  key={sa.productCategoryId}
+                  label={displayName}
+                  sublabel={displayCode || undefined}
+                  onRemove={() => void removeServiceMutation.mutateAsync(sa.productCategoryId)}
+                  removing={removeServiceMutation.isPending}
+                />
+              );
+            })
           )}
           {serviceError ? <ErrorText text={serviceError} /> : null}
-          <AddRow
-            value={newProductId}
+          <SelectRow
             placeholder={t('employee_detail_add_service')}
-            onChange={setNewProductId}
-            onAdd={() => {
-              if (newProductId.trim()) void addServiceMutation.mutateAsync();
-            }}
+            options={(productCategories.data ?? [])
+              .filter((c) => !(serviceAssignments.data ?? []).some((a) => a.productCategoryId === c.id))
+              .map((c) => ({ label: c.code ? `${c.name} (${c.code})` : c.name, value: c.id }))}
+            onSelect={(cId) => void addServiceMutation.mutateAsync(cId)}
             adding={addServiceMutation.isPending}
           />
         </Section>
@@ -283,87 +297,72 @@ export default function EmployeeDetailScreen() {
             <LoadingRow label={t('employee_detail_assignments_loading')} />
           ) : (
             <>
-              {localSlots.length === 0 ? (
+              {(weeklyAvailability.data ?? []).length === 0 ? (
                 <EmptyText text={t('employee_detail_no_availability')} />
               ) : (
-                localSlots.map((slot, idx) => (
-                  <View key={idx} style={styles.slotRow}>
-                    <View style={styles.slotDayPicker}>
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                        {DAYS_OF_WEEK.map((d) => (
-                          <TouchableOpacity
-                            key={d}
-                            style={[
-                              styles.dayChip,
-                              slot.dayOfWeek === d && styles.dayChipActive,
-                            ]}
-                            onPress={() => updateSlot(idx, 'dayOfWeek', d)}
-                            activeOpacity={0.8}
-                          >
-                            <Text
-                              style={[
-                                styles.dayChipText,
-                                slot.dayOfWeek === d && styles.dayChipTextActive,
-                              ]}
-                            >
-                              {DAY_LABELS[d]}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
-                      </ScrollView>
-                    </View>
-                    <View style={styles.slotTimes}>
-                      <TextInput
-                        style={styles.timeInput}
-                        value={slot.startTime}
-                        onChangeText={(v) => updateSlot(idx, 'startTime', v)}
-                        placeholder="09:00"
-                        placeholderTextColor={colors.gray400}
-                        keyboardType="numbers-and-punctuation"
-                      />
-                      <Text style={styles.timeSep}>–</Text>
-                      <TextInput
-                        style={styles.timeInput}
-                        value={slot.endTime}
-                        onChangeText={(v) => updateSlot(idx, 'endTime', v)}
-                        placeholder="17:00"
-                        placeholderTextColor={colors.gray400}
-                        keyboardType="numbers-and-punctuation"
-                      />
-                      <TouchableOpacity
-                        onPress={() => removeAvailabilitySlot(idx)}
-                        hitSlop={8}
-                        style={styles.slotRemoveBtn}
-                      >
-                        <Ionicons name="close-circle" size={20} color={colors.error} />
-                      </TouchableOpacity>
-                    </View>
+                (weeklyAvailability.data ?? []).map((slot) => (
+                  <View key={slot.id} style={styles.slotRow}>
+                    <Text style={styles.slotLabel}>
+                      {DAY_LABELS[slot.dayOfWeek]}{'  '}{slot.startTime} – {slot.endTime}
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => slot.id && void removeSlotMutation.mutateAsync(slot.id)}
+                      hitSlop={8}
+                      style={styles.slotRemoveBtn}
+                    >
+                      <Ionicons name="close-circle" size={20} color={colors.error} />
+                    </TouchableOpacity>
                   </View>
                 ))
               )}
-              <TouchableOpacity
-                style={styles.addSlotBtn}
-                onPress={addAvailabilitySlot}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="add" size={18} color={colors.primary} />
-                <Text style={styles.addSlotBtnText}>{t('employee_detail_availability_add_slot')}</Text>
-              </TouchableOpacity>
+
+              {/* Add new slot form */}
+              <View style={styles.newSlotForm}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  {DAYS_OF_WEEK.map((d) => (
+                    <TouchableOpacity
+                      key={d}
+                      style={[styles.dayChip, newSlot.dayOfWeek === d && styles.dayChipActive]}
+                      onPress={() => setNewSlot((s) => ({ ...s, dayOfWeek: d as DayOfWeek }))}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[styles.dayChipText, newSlot.dayOfWeek === d && styles.dayChipTextActive]}>
+                        {DAY_LABELS[d as DayOfWeek]}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+                <View style={styles.slotTimes}>
+                  <TextInput
+                    style={styles.timeInput}
+                    value={newSlot.startTime}
+                    onChangeText={(v) => setNewSlot((s) => ({ ...s, startTime: v }))}
+                    placeholder="09:00"
+                    placeholderTextColor={colors.gray400}
+                    keyboardType="numbers-and-punctuation"
+                  />
+                  <Text style={styles.timeSep}>–</Text>
+                  <TextInput
+                    style={styles.timeInput}
+                    value={newSlot.endTime}
+                    onChangeText={(v) => setNewSlot((s) => ({ ...s, endTime: v }))}
+                    placeholder="17:00"
+                    placeholderTextColor={colors.gray400}
+                    keyboardType="numbers-and-punctuation"
+                  />
+                </View>
+              </View>
               {availError ? <ErrorText text={availError} /> : null}
               <TouchableOpacity
-                style={[styles.saveBtn, saveAvailabilityMutation.isPending && styles.btnDisabled]}
-                onPress={() => void saveAvailabilityMutation.mutateAsync()}
-                disabled={saveAvailabilityMutation.isPending}
+                style={[styles.saveBtn, addSlotMutation.isPending && styles.btnDisabled]}
+                onPress={() => void addSlotMutation.mutateAsync()}
+                disabled={addSlotMutation.isPending}
                 activeOpacity={0.85}
               >
-                {saveAvailabilityMutation.isPending ? (
-                  <ActivityIndicator size="small" color={colors.black} />
-                ) : null}
-                <Text style={styles.saveBtnText}>
-                  {saveAvailabilityMutation.isPending
-                    ? t('employee_detail_availability_saving')
-                    : t('employee_detail_availability_save')}
-                </Text>
+                {addSlotMutation.isPending
+                  ? <ActivityIndicator size="small" color={colors.black} />
+                  : null}
+                <Text style={styles.saveBtnText}>{t('employee_detail_availability_add_slot')}</Text>
               </TouchableOpacity>
             </>
           )}
@@ -402,13 +401,13 @@ export default function EmployeeDetailScreen() {
                 <View style={styles.exceptionToggleRow}>
                   <Text style={styles.exceptionToggleLabel}>{t('employee_detail_exception_unavailable')}</Text>
                   <Switch
-                    value={exceptionUnavailable}
-                    onValueChange={setExceptionUnavailable}
+                    value={exceptionType === 'BLOCKED'}
+                    onValueChange={(v) => setExceptionType(v ? 'BLOCKED' : 'EXTRA_WINDOW')}
                     trackColor={{ false: colors.gray300, true: `${colors.primary}80` }}
-                    thumbColor={exceptionUnavailable ? colors.primary : colors.gray500}
+                    thumbColor={exceptionType === 'BLOCKED' ? colors.primary : colors.gray500}
                   />
                 </View>
-                {!exceptionUnavailable ? (
+                {exceptionType === 'EXTRA_WINDOW' ? (
                   <View style={styles.exceptionTimeRow}>
                     <TextInput
                       style={[styles.exceptionInput, { flex: 1 }]}
@@ -432,15 +431,11 @@ export default function EmployeeDetailScreen() {
                 {exceptionError ? <ErrorText text={exceptionError} /> : null}
                 <TouchableOpacity
                   style={[styles.saveBtn, (!exceptionDate.trim() || addExceptionMutation.isPending) && styles.btnDisabled]}
-                  onPress={() => {
-                    if (exceptionDate.trim()) void addExceptionMutation.mutateAsync();
-                  }}
+                  onPress={() => { if (exceptionDate.trim()) void addExceptionMutation.mutateAsync(); }}
                   disabled={!exceptionDate.trim() || addExceptionMutation.isPending}
                   activeOpacity={0.85}
                 >
-                  {addExceptionMutation.isPending ? (
-                    <ActivityIndicator size="small" color={colors.black} />
-                  ) : null}
+                  {addExceptionMutation.isPending ? <ActivityIndicator size="small" color={colors.black} /> : null}
                   <Text style={styles.saveBtnText}>{t('employee_detail_exception_add')}</Text>
                 </TouchableOpacity>
               </View>
@@ -448,7 +443,7 @@ export default function EmployeeDetailScreen() {
           )}
         </Section>
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -521,43 +516,54 @@ function AssignmentRow({
   );
 }
 
-function AddRow({
-  value,
+function SelectRow({
   placeholder,
-  onChange,
-  onAdd,
+  options,
+  onSelect,
   adding,
 }: {
-  value: string;
   placeholder: string;
-  onChange: (v: string) => void;
-  onAdd: () => void;
+  options: { label: string; value: string }[];
+  onSelect: (value: string) => void;
   adding: boolean;
 }) {
+  const [open, setOpen] = useState(false);
+
+  if (options.length === 0) return null;
+
   return (
-    <View style={styles.addRow}>
-      <TextInput
-        style={styles.addRowInput}
-        value={value}
-        onChangeText={onChange}
-        placeholder={placeholder}
-        placeholderTextColor={colors.gray400}
-        autoCapitalize="none"
-        returnKeyType="done"
-        onSubmitEditing={onAdd}
-      />
+    <View style={styles.selectRow}>
       <TouchableOpacity
-        style={[styles.addRowBtn, (!value.trim() || adding) && styles.btnDisabled]}
-        onPress={onAdd}
-        disabled={!value.trim() || adding}
+        style={[styles.selectTrigger, adding && styles.btnDisabled]}
+        onPress={() => setOpen((o) => !o)}
+        disabled={adding}
         activeOpacity={0.8}
       >
         {adding ? (
-          <ActivityIndicator size="small" color={colors.black} />
+          <ActivityIndicator size="small" color={colors.primary} />
         ) : (
-          <Ionicons name="add" size={18} color={colors.black} />
+          <Ionicons name="add" size={16} color={colors.primary} />
         )}
+        <Text style={styles.selectTriggerText}>{placeholder}</Text>
+        <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={16} color={colors.gray500} />
       </TouchableOpacity>
+      {open && (
+        <View style={styles.selectList}>
+          {options.map((opt) => (
+            <TouchableOpacity
+              key={opt.value}
+              style={styles.selectOption}
+              onPress={() => {
+                setOpen(false);
+                onSelect(opt.value);
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.selectOptionText}>{opt.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
     </View>
   );
 }
@@ -572,7 +578,7 @@ function ExceptionRow({
   removing: boolean;
 }) {
   const { t } = useLanguage();
-  const label = exception.unavailable
+  const label = exception.type === 'BLOCKED'
     ? `${exception.date} — full day`
     : `${exception.date} ${exception.startTime ?? ''} – ${exception.endTime ?? ''}`;
   return (
@@ -614,28 +620,33 @@ const styles = StyleSheet.create({
     backgroundColor: `${colors.error}10`,
   },
   removeBtnText: { fontSize: 12, fontWeight: '600', color: colors.error },
-  addRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.xs },
-  addRowInput: {
-    flex: 1,
-    backgroundColor: colors.surface,
+  selectRow: { marginTop: spacing.xs },
+  selectTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: spacing.sm,
+  },
+  selectTriggerText: { flex: 1, fontSize: 13, fontWeight: '600', color: colors.primary },
+  selectList: {
     borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.gray200,
+    overflow: 'hidden',
+    marginTop: 2,
+  },
+  selectOption: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    fontSize: 14,
-    color: colors.onSurface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray100,
+    backgroundColor: colors.white,
   },
-  addRowBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  selectOptionText: { fontSize: 14, color: colors.onSurface },
   btnDisabled: { opacity: 0.45 },
-  slotRow: { gap: spacing.xs },
+  slotRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  slotLabel: { fontSize: 14, color: colors.onSurface, flex: 1 },
+  newSlotForm: { gap: spacing.xs, marginTop: spacing.sm },
   slotDayPicker: {},
   dayChip: {
     paddingHorizontal: spacing.sm,

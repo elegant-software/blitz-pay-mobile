@@ -106,6 +106,34 @@ export function addDays(date: Date, days: number): Date {
   return d;
 }
 
+export function groupAppointmentsByEmployee(
+  appointments: AppointmentResponse[],
+  employeeNameMap?: ReadonlyMap<string, string>,
+): Map<string, { name: string; appointments: AppointmentResponse[] }> {
+  const map = new Map<string, { name: string; appointments: AppointmentResponse[] }>();
+
+  for (const appt of appointments) {
+    const key = appt.employeeId ?? '__unassigned__';
+    if (!map.has(key)) {
+      const name =
+        appt.employeeName ??
+        (appt.employeeId ? employeeNameMap?.get(appt.employeeId) : undefined) ??
+        'Unassigned';
+      map.set(key, { name, appointments: [] });
+    }
+    map.get(key)!.appointments.push(appt);
+  }
+
+  // Sort each employee's appointments by start time
+  for (const [, entry] of map) {
+    entry.appointments.sort(
+      (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
+    );
+  }
+
+  return map;
+}
+
 export function groupAppointmentsByDay(
   appointments: AppointmentResponse[],
   from: Date,

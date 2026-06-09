@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -295,7 +294,7 @@ export default function AppearancesScreen() {
   return (
     <KeyboardAvoidingView
       style={[styles.container, { paddingTop: insets.top }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior="padding"
     >
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -305,7 +304,7 @@ export default function AppearancesScreen() {
           <Text style={styles.title}>{t('merchant_appearances')}</Text>
           <Text style={styles.subtitle}>
             {activeBranchScope?.branchId
-              ? `${t('merchant_branch_scope_authorized')}: ${activeBranchScope.branchName ?? activeBranchScope.branchId}`
+              ? `${t('merchant_branch_scope_authorized')}: ${activeBranchScope.branchName ?? ''}`
               : t('merchant_branch_scope_pending')}
           </Text>
         </View>

@@ -21,6 +21,7 @@ interface StoredSession {
 
 export interface UserProfile {
   id: string;
+  username: string;
   email: string;
   name: string;
   emailVerified: boolean;
@@ -66,6 +67,7 @@ function parseUser(idToken: string): UserProfile | null {
   if (!c.sub) return null;
   return {
     id: c.sub as string,
+    username: (c.preferred_username as string) ?? '',
     email: (c.email as string) ?? '',
     name: (c.name as string) ?? (c.preferred_username as string) ?? '',
     emailVerified: (c.email_verified as boolean) ?? false,
@@ -112,6 +114,7 @@ async function refreshAccessToken(refreshToken: string): Promise<StoredSession |
 
 const BYPASS_USER: UserProfile = {
   id: 'dev-bypass',
+  username: 'dev-bypass',
   email: 'dev@blitzpay.local',
   name: 'Dev User',
   emailVerified: true,

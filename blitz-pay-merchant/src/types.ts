@@ -48,6 +48,7 @@ export type RootStackParamList = {
     employeeName: string;
   };
   AppointmentPolicy: undefined;
+  BranchOpeningHours: undefined;
 };
 
 export type TabParamList = {

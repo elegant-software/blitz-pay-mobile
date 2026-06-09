@@ -136,7 +136,7 @@ export type RootStackParamList = {
 
 export type TabParamList = {
   Explore: undefined;
-  Assistant: undefined;
+  Appointments: undefined;
   Vault: undefined;
   Account: undefined;
 };

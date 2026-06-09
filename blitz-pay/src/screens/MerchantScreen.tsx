@@ -397,16 +397,18 @@ export default function MerchantScreen() {
         </View>
       </ScrollView>
 
-      <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 12 }]}>
-        <TouchableOpacity
-          style={styles.payNowLargeBtn}
-          onPress={handleCheckout}
-          activeOpacity={0.85}
-        >
-          <Ionicons name="flash" size={18} color={colors.black} />
-          <Text style={styles.payNowLargeBtnText}>{t('proceed_to_checkout')}</Text>
-        </TouchableOpacity>
-      </View>
+      {!appointmentsEnabled ? (
+        <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 12 }]}>
+          <TouchableOpacity
+            style={styles.payNowLargeBtn}
+            onPress={handleCheckout}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="flash" size={18} color={colors.black} />
+            <Text style={styles.payNowLargeBtnText}>{t('proceed_to_checkout')}</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
     </View>
   );
 }

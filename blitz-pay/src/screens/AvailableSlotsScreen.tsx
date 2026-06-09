@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -69,12 +69,31 @@ export default function AvailableSlotsScreen() {
   const { branchId, productId, productCategoryId, productName, merchantName, branchName, rescheduleAppointmentId } = route.params;
 
   const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date()));
-  const [slots, setSlots] = useState<BookableSlot[]>([]);
+  const [allSlots, setAllSlots] = useState<BookableSlot[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
+  const [showEmployeePicker, setShowEmployeePicker] = useState(false);
 
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+
+  // Unique employees extracted from loaded slots
+  const eligibleEmployees = useMemo(() => {
+    const seen = new Set<string>();
+    const result: { employeeId: string; employeeName: string }[] = [];
+    for (const slot of allSlots) {
+      if (!seen.has(slot.employeeId)) {
+        seen.add(slot.employeeId);
+        result.push({ employeeId: slot.employeeId, employeeName: slot.employeeName });
+      }
+    }
+    return result;
+  }, [allSlots]);
+
+  const slots = selectedEmployeeId
+    ? allSlots.filter((s) => s.employeeId === selectedEmployeeId)
+    : allSlots;
 
   const loadSlots = useCallback(async (from: Date) => {
     setLoading(true);
@@ -87,7 +106,7 @@ export default function AvailableSlotsScreen() {
         from: from.toISOString(),
         to: to.toISOString(),
       });
-      setSlots(result);
+      setAllSlots(result);
     } catch {
       setError('available_slots_load_failed');
     } finally {
@@ -142,6 +161,25 @@ export default function AvailableSlotsScreen() {
           <Text style={styles.serviceBranch}>{branchName} · {merchantName}</Text>
         </View>
       </View>
+
+      {/* Employee filter — dropdown, only when slots have loaded and there are employees */}
+      {eligibleEmployees.length > 0 && (
+        <View style={styles.employeeFilter}>
+          <TouchableOpacity
+            style={styles.employeeSelector}
+            onPress={() => setShowEmployeePicker(true)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="person-outline" size={16} color={colors.secondary} />
+            <Text style={styles.employeeSelectorText} numberOfLines={1}>
+              {selectedEmployeeId
+                ? (eligibleEmployees.find((e) => e.employeeId === selectedEmployeeId)?.employeeName ?? t('slot_any_employee'))
+                : t('slot_any_employee')}
+            </Text>
+            <Ionicons name="chevron-down" size={16} color={colors.gray500} />
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Week navigation */}
       <View style={styles.weekNav}>
@@ -260,6 +298,48 @@ export default function AvailableSlotsScreen() {
           )}
         </ScrollView>
       )}
+
+      {/* Employee picker bottom sheet */}
+      {showEmployeePicker ? (
+        <View style={styles.pickerOverlay}>
+          <View style={[styles.pickerSheet, { paddingBottom: insets.bottom + spacing.lg }]}>
+            <View style={styles.pickerHeader}>
+              <Text style={styles.pickerTitle}>{t('slot_select_employee')}</Text>
+              <TouchableOpacity onPress={() => setShowEmployeePicker(false)} hitSlop={8}>
+                <Ionicons name="close" size={22} color={colors.onSurface} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {/* "Any" only when more than one employee */}
+              {eligibleEmployees.length > 1 ? (
+                <TouchableOpacity
+                  style={[styles.pickerRow, selectedEmployeeId === null && styles.pickerRowSelected]}
+                  onPress={() => { setSelectedEmployeeId(null); setShowEmployeePicker(false); }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.pickerRowName}>{t('slot_any_employee')}</Text>
+                  {selectedEmployeeId === null ? (
+                    <Ionicons name="checkmark" size={18} color={colors.secondary} />
+                  ) : null}
+                </TouchableOpacity>
+              ) : null}
+              {eligibleEmployees.map((emp) => (
+                <TouchableOpacity
+                  key={emp.employeeId}
+                  style={[styles.pickerRow, selectedEmployeeId === emp.employeeId && styles.pickerRowSelected]}
+                  onPress={() => { setSelectedEmployeeId(emp.employeeId); setShowEmployeePicker(false); }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.pickerRowName}>{emp.employeeName}</Text>
+                  {selectedEmployeeId === emp.employeeId ? (
+                    <Ionicons name="checkmark" size={18} color={colors.secondary} />
+                  ) : null}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -304,6 +384,62 @@ const styles = StyleSheet.create({
   },
   serviceName: { fontSize: 15, fontWeight: '700', color: colors.onSurface },
   serviceBranch: { fontSize: 12, color: colors.gray600, marginTop: 2 },
+  employeeFilter: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray200,
+    backgroundColor: colors.white,
+  },
+  employeeSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: colors.surface,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.gray200,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+    alignSelf: 'flex-start',
+  },
+  employeeSelectorText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.onSurface,
+    maxWidth: 200,
+  },
+  pickerOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
+    zIndex: 20,
+  },
+  pickerSheet: {
+    backgroundColor: colors.white,
+    borderTopLeftRadius: radius.xxl,
+    borderTopRightRadius: radius.xxl,
+    paddingTop: spacing.lg,
+    paddingHorizontal: spacing.md,
+    maxHeight: '60%',
+  },
+  pickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  pickerTitle: { fontSize: 17, fontWeight: '700', color: colors.onSurface },
+  pickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray100,
+  },
+  pickerRowSelected: { backgroundColor: `${colors.secondary}08` },
+  pickerRowName: { fontSize: 15, fontWeight: '600', color: colors.onSurface, flex: 1 },
   weekNav: {
     flexDirection: 'row',
     alignItems: 'center',

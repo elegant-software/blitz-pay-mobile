@@ -32,6 +32,17 @@ function ensureNumber(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 }
 
+export async function fetchMerchantBranches(
+  merchantId: string,
+): Promise<{ branchId: string; name: string }[]> {
+  const response = await authedFetch(buildPath(`/merchants/${merchantId}/branches`), { method: 'GET' });
+  if (!response.ok) return [];
+  const rows = await response.json() as BranchResponse[];
+  return rows
+    .filter((row): row is BranchResponse & { id: string; name: string } => !!row.id && !!row.name)
+    .map((row) => ({ branchId: row.id, name: row.name }));
+}
+
 export async function fetchMerchantBranchDetails(
   merchantId: string,
   branchId: string,

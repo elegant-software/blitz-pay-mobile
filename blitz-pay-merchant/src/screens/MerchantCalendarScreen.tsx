@@ -23,6 +23,7 @@ import {
   formatDateHeading,
   formatWeekRange,
   groupAppointmentsByDay,
+  groupAppointmentsByEmployee,
   startOfDay,
   endOfDay,
   startOfWeek,
@@ -31,7 +32,7 @@ import {
   isSameDay,
 } from '../features/appointments/appointmentPresentation';
 
-type ViewMode = 'day' | 'week';
+type ViewMode = 'day' | 'week' | 'staff';
 
 export default function MerchantCalendarScreen() {
   const { t } = useLanguage();
@@ -48,19 +49,24 @@ export default function MerchantCalendarScreen() {
   });
 
   const { from, to } = useMemo(() => {
-    if (viewMode === 'day') {
-      return { from: startOfDay(selectedDate), to: endOfDay(selectedDate) };
+    if (viewMode === 'week') {
+      return { from: startOfWeek(selectedDate), to: endOfWeek(selectedDate) };
     }
-    return { from: startOfWeek(selectedDate), to: endOfWeek(selectedDate) };
+    return { from: startOfDay(selectedDate), to: endOfDay(selectedDate) };
   }, [viewMode, selectedDate]);
 
   const merchantId = activeBranchScope?.merchantId ?? null;
 
-  const { appointments, loading, error, reload } = useMerchantAppointments(merchantId, from, to);
+  const { appointments, employeeNameMap, loading, error, reload } = useMerchantAppointments(merchantId, from, to);
 
   const grouped = useMemo(
     () => groupAppointmentsByDay(appointments, from, to),
     [appointments, from, to],
+  );
+
+  const staffGrouped = useMemo(
+    () => groupAppointmentsByEmployee(appointments, employeeNameMap),
+    [appointments, employeeNameMap],
   );
 
   const dayKeys = useMemo(
@@ -73,11 +79,11 @@ export default function MerchantCalendarScreen() {
   const visibleDayKeys = dayKeys.length > 0 ? dayKeys : [selectedDate.toDateString()];
 
   function navigatePrev() {
-    setSelectedDate((d) => addDays(d, viewMode === 'day' ? -1 : -7));
+    setSelectedDate((d) => addDays(d, viewMode === 'week' ? -7 : -1));
   }
 
   function navigateNext() {
-    setSelectedDate((d) => addDays(d, viewMode === 'day' ? 1 : 7));
+    setSelectedDate((d) => addDays(d, viewMode === 'week' ? 7 : 1));
   }
 
   function goToday() {
@@ -89,52 +95,62 @@ export default function MerchantCalendarScreen() {
   const isToday = isSameDay(selectedDate, new Date());
 
   const headingLabel =
-    viewMode === 'day'
-      ? formatDateHeading(selectedDate)
-      : formatWeekRange(from, to);
+    viewMode === 'week'
+      ? formatWeekRange(from, to)
+      : formatDateHeading(selectedDate);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerTop}>
-          <View style={styles.headerLeft}>
-            <Text style={styles.title}>{t('appointments_merchant_title')}</Text>
-            <Text style={styles.subtitle}>
-              {activeBranchScope?.branchName ?? activeBranchScope?.merchantId ?? ''}
-            </Text>
-          </View>
-          <View style={styles.headerActions}>
-            {isManager ? (
-              <>
-                <TouchableOpacity
-                  style={styles.myScheduleBtn}
-                  onPress={() => navigation.navigate('EmployeeSetup')}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="people-outline" size={15} color={colors.primary} />
-                  <Text style={styles.myScheduleBtnText}>Staff</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.myScheduleBtn}
-                  onPress={() => navigation.navigate('AppointmentPolicy')}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="settings-outline" size={15} color={colors.primary} />
-                  <Text style={styles.myScheduleBtnText}>Policy</Text>
-                </TouchableOpacity>
-              </>
-            ) : null}
-            <TouchableOpacity
-              style={styles.myScheduleBtn}
-              onPress={() => navigation.navigate('EmployeeCalendar')}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="person-outline" size={15} color={colors.primary} />
-              <Text style={styles.myScheduleBtnText}>My Schedule</Text>
-            </TouchableOpacity>
-          </View>
+          <Text style={styles.title}>{t('appointments_merchant_title')}</Text>
+          <Text style={styles.subtitle}>
+            {activeBranchScope?.branchName ?? ''}
+          </Text>
         </View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.headerActions}
+        >
+          {isManager ? (
+            <>
+              <TouchableOpacity
+                style={styles.myScheduleBtn}
+                onPress={() => navigation.navigate('EmployeeSetup')}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="people-outline" size={15} color={colors.primary} />
+                <Text style={styles.myScheduleBtnText}>Staff</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.myScheduleBtn}
+                onPress={() => navigation.navigate('BranchOpeningHours')}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="time-outline" size={15} color={colors.primary} />
+                <Text style={styles.myScheduleBtnText}>{t('branch_hours_btn')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.myScheduleBtn}
+                onPress={() => navigation.navigate('AppointmentPolicy')}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="settings-outline" size={15} color={colors.primary} />
+                <Text style={styles.myScheduleBtnText}>Policy</Text>
+              </TouchableOpacity>
+            </>
+          ) : null}
+          <TouchableOpacity
+            style={styles.myScheduleBtn}
+            onPress={() => navigation.navigate('EmployeeCalendar')}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="person-outline" size={15} color={colors.primary} />
+            <Text style={styles.myScheduleBtnText}>My Schedule</Text>
+          </TouchableOpacity>
+        </ScrollView>
 
         {/* View mode toggle */}
         <View style={styles.toggleRow}>
@@ -157,6 +173,17 @@ export default function MerchantCalendarScreen() {
                 {t('appointments_week')}
               </Text>
             </TouchableOpacity>
+            {isManager ? (
+              <TouchableOpacity
+                style={[styles.toggleBtn, viewMode === 'staff' && styles.toggleBtnActive]}
+                onPress={() => setViewMode('staff')}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.toggleBtnText, viewMode === 'staff' && styles.toggleBtnTextActive]}>
+                  {t('appointments_staff')}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
           </View>
           {!isToday ? (
             <TouchableOpacity style={styles.todayBtn} onPress={goToday} activeOpacity={0.8}>
@@ -210,7 +237,59 @@ export default function MerchantCalendarScreen() {
             <Text style={styles.retryBtnText}>{t('retry')}</Text>
           </TouchableOpacity>
         </View>
+      ) : viewMode === 'staff' ? (
+        /* ── Staff grid view ─────────────────────────────────────────── */
+        <ScrollView
+          contentContainerStyle={{
+            paddingHorizontal: spacing.md,
+            paddingBottom: 100 + insets.bottom,
+            paddingTop: spacing.sm,
+          }}
+          showsVerticalScrollIndicator={false}
+        >
+          {staffGrouped.size === 0 ? (
+            <View style={styles.centerState}>
+              <Ionicons name="people-outline" size={48} color={colors.gray300} />
+              <Text style={styles.centerTitle}>{t('appointments_staff_empty_title')}</Text>
+              <Text style={styles.centerText}>{t('appointments_empty_body')}</Text>
+            </View>
+          ) : (
+            Array.from(staffGrouped.entries()).map(([employeeId, entry]) => {
+              const accentColor = getEmployeeColor(employeeId === '__unassigned__' ? null : employeeId);
+              return (
+                <View key={employeeId} style={styles.staffSection}>
+                  {/* Employee header */}
+                  <View style={[styles.staffHeader, { borderLeftColor: accentColor }]}>
+                    <View style={[styles.staffDot, { backgroundColor: accentColor }]} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.staffName}>{entry.name}</Text>
+                      <Text style={styles.staffMeta}>
+                        {entry.appointments.length} appointment{entry.appointments.length !== 1 ? 's' : ''}
+                      </Text>
+                    </View>
+                  </View>
+                  {/* Appointment list for this employee */}
+                  {entry.appointments.map((appt) => (
+                    <AppointmentCard
+                      key={appt.id}
+                      appointment={appt}
+                      colorBy="status"
+                      onPress={() =>
+                        navigation.navigate('AppointmentDetail', {
+                          appointmentId: appt.id,
+                          merchantId: appt.merchantId,
+                          scope: 'merchant',
+                        })
+                      }
+                    />
+                  ))}
+                </View>
+              );
+            })
+          )}
+        </ScrollView>
       ) : (
+        /* ── Day / Week list view ────────────────────────────────────── */
         <ScrollView
           contentContainerStyle={{
             paddingHorizontal: spacing.md,
@@ -263,6 +342,7 @@ export default function MerchantCalendarScreen() {
                         key={appt.id}
                         appointment={appt}
                         colorBy="employee"
+                        employeeNameMap={employeeNameMap}
                         onPress={() =>
                           navigation.navigate('AppointmentDetail', {
                             appointmentId: appt.id,
@@ -285,12 +365,19 @@ export default function MerchantCalendarScreen() {
 function AppointmentCard({
   appointment,
   colorBy,
+  employeeNameMap,
   onPress,
 }: {
   appointment: AppointmentResponse;
   colorBy: 'employee' | 'status';
+  employeeNameMap?: ReadonlyMap<string, string>;
   onPress: () => void;
 }) {
+  const resolvedEmployeeName =
+    appointment.employeeName ??
+    (appointment.employeeId ? employeeNameMap?.get(appointment.employeeId) : undefined) ??
+    null;
+
   const accentColor =
     colorBy === 'employee'
       ? getEmployeeColor(appointment.employeeId)
@@ -333,7 +420,7 @@ function AppointmentCard({
         <Text style={styles.cardProduct} numberOfLines={1}>
           {appointment.productName}
         </Text>
-        {appointment.employeeName ? (
+        {resolvedEmployeeName ? (
           <View style={styles.cardEmployeeRow}>
             <View
               style={[
@@ -342,7 +429,7 @@ function AppointmentCard({
               ]}
             />
             <Text style={styles.cardEmployee} numberOfLines={1}>
-              {appointment.employeeName}
+              {resolvedEmployeeName}
             </Text>
           </View>
         ) : null}
@@ -361,19 +448,16 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.sm,
   },
   headerTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
     paddingTop: spacing.sm,
+    paddingBottom: spacing.xs,
   },
-  headerLeft: { flex: 1 },
   title: { fontSize: 22, fontWeight: '800', color: colors.onSurface },
   subtitle: { fontSize: 13, color: colors.gray600, marginTop: 2 },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-    marginLeft: spacing.sm,
+    paddingVertical: spacing.xs,
   },
   myScheduleBtn: {
     flexDirection: 'row',
@@ -516,6 +600,32 @@ const styles = StyleSheet.create({
   },
   cardEmployeeDot: { width: 8, height: 8, borderRadius: 4 },
   cardEmployee: { fontSize: 12, color: colors.gray600, flex: 1 },
+  staffSection: {
+    marginBottom: spacing.lg,
+  },
+  staffHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    borderLeftWidth: 3,
+    paddingLeft: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  staffDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  staffName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.onSurface,
+  },
+  staffMeta: {
+    fontSize: 12,
+    color: colors.gray500,
+    marginTop: 1,
+  },
   fab: {
     position: 'absolute',
     right: spacing.lg,

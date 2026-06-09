@@ -17,6 +17,7 @@ import type { RootStackNav } from '../types';
 const INVOICES = [
   {
     id: 'INV-2026-001',
+    invoiceNumber: 'INV-2026-001',
     from: 'Berlin Energy GmbH',
     amount: 142.5,
     dueDate: '2026-04-02',
@@ -27,6 +28,7 @@ const INVOICES = [
   },
   {
     id: 'INV-2026-002',
+    invoiceNumber: 'INV-2026-002',
     from: 'Cloud Systems EU',
     amount: 89.0,
     dueDate: '2026-04-10',
@@ -78,7 +80,7 @@ export default function InvoicesScreen() {
               </View>
               <View style={styles.invoiceInfo}>
                 <Text style={styles.invoiceFrom}>{invoice.from}</Text>
-                <Text style={styles.invoiceId}>{t('invoice_no')} {invoice.id}</Text>
+                <Text style={styles.invoiceId}>{t('invoice_no')} {invoice.invoiceNumber}</Text>
                 <View style={styles.dueDateRow}>
                   <Ionicons name="calendar-outline" size={12} color={colors.warning} />
                   <Text style={styles.dueDate}>{t('due')} {invoice.dueDate}</Text>
@@ -111,7 +113,7 @@ export default function InvoicesScreen() {
                 <View style={styles.invoiceMetaGrid}>
                   <View style={styles.invoiceMetaItem}>
                     <Text style={styles.invoiceMetaLabel}>{t('invoice_no')}</Text>
-                    <Text style={styles.invoiceMetaValue}>{selectedInvoice.id}</Text>
+                    <Text style={styles.invoiceMetaValue}>{selectedInvoice.invoiceNumber}</Text>
                   </View>
                   <View style={styles.invoiceMetaItem}>
                     <Text style={styles.invoiceMetaLabel}>{t('due_date')}</Text>

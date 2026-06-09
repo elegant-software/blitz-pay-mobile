@@ -7,7 +7,20 @@ export interface EmployeeResponse {
   id: string;
   merchantId: string;
   name: string;
-  active: boolean;
+  active: boolean;   // derived from backend 'status' field ("ACTIVE" / "INACTIVE")
+}
+
+interface EmployeeRaw {
+  id: string;
+  merchantId: string;
+  name: string;
+  status: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+function rawToEmployee(raw: EmployeeRaw): EmployeeResponse {
+  return { id: raw.id, merchantId: raw.merchantId, name: raw.name, active: raw.status === 'ACTIVE' };
 }
 
 export interface BranchAssignment {
@@ -15,22 +28,52 @@ export interface BranchAssignment {
 }
 
 export interface ServiceAssignment {
-  productId: string;
-  productName: string;
+  productCategoryId: string;
+  name: string;
+  code: string;
 }
 
+export interface ProductCategory {
+  id: string;
+  name: string;
+  code: string;
+  estimatedDurationMinutes: number | null;
+}
+
+export type DayOfWeek = 'MONDAY' | 'TUESDAY' | 'WEDNESDAY' | 'THURSDAY' | 'FRIDAY' | 'SATURDAY' | 'SUNDAY';
+
 export interface WeeklyAvailabilitySlot {
-  dayOfWeek: 'MONDAY' | 'TUESDAY' | 'WEDNESDAY' | 'THURSDAY' | 'FRIDAY' | 'SATURDAY' | 'SUNDAY';
-  startTime: string; // HH:MM
-  endTime: string;   // HH:MM
+  id?: string;        // present for saved slots
+  dayOfWeek: DayOfWeek;
+  startTime: string;  // HH:MM
+  endTime: string;    // HH:MM
+}
+
+// Backend uses 1=Mon…7=Sun (ISO DayOfWeek)
+const DAY_TO_INT: Record<DayOfWeek, number> = {
+  MONDAY: 1, TUESDAY: 2, WEDNESDAY: 3, THURSDAY: 4,
+  FRIDAY: 5, SATURDAY: 6, SUNDAY: 7,
+};
+const INT_TO_DAY: Record<number, DayOfWeek> = {
+  1: 'MONDAY', 2: 'TUESDAY', 3: 'WEDNESDAY', 4: 'THURSDAY',
+  5: 'FRIDAY', 6: 'SATURDAY', 7: 'SUNDAY',
+};
+
+function parseTime(value: unknown): string {
+  if (typeof value === 'string') return value.slice(0, 5); // "09:00:00" → "09:00"
+  if (Array.isArray(value)) {
+    const [h, m] = value as number[];
+    return `${String(h).padStart(2, '0')}:${String(m ?? 0).padStart(2, '0')}`;
+  }
+  return '00:00';
 }
 
 export interface AvailabilityException {
   id: string;
-  date: string; // YYYY-MM-DD
+  date: string;           // YYYY-MM-DD
+  type: 'BLOCKED' | 'EXTRA_WINDOW';
   startTime: string | null;
   endTime: string | null;
-  unavailable: boolean;
 }
 
 export interface AppointmentPolicy {
@@ -78,9 +121,9 @@ export async function fetchEmployees(merchantId: string): Promise<EmployeeRespon
     observability.error('employees_fetch_failed', { merchantId, status: response.status, reason });
     throw new Error('employees_load_failed');
   }
-  const data = (await response.json()) as EmployeeResponse[];
+  const data = (await response.json()) as EmployeeRaw[];
   observability.info('employees_fetch_succeeded', { merchantId, count: data.length });
-  return data;
+  return data.map(rawToEmployee);
 }
 
 export async function createEmployee(merchantId: string, name: string): Promise<EmployeeResponse> {
@@ -98,9 +141,9 @@ export async function createEmployee(merchantId: string, name: string): Promise<
     observability.error('employee_create_failed', { merchantId, status: response.status, reason });
     throw new Error('employee_create_failed');
   }
-  const data = (await response.json()) as EmployeeResponse;
+  const data = (await response.json()) as EmployeeRaw;
   observability.info('employee_create_succeeded', { merchantId, employeeId: data.id });
-  return data;
+  return rawToEmployee(data);
 }
 
 export async function renameEmployee(
@@ -122,9 +165,9 @@ export async function renameEmployee(
     observability.error('employee_rename_failed', { merchantId, employeeId, status: response.status, reason });
     throw new Error('employee_rename_failed');
   }
-  const data = (await response.json()) as EmployeeResponse;
+  const data = (await response.json()) as EmployeeRaw;
   observability.info('employee_rename_succeeded', { merchantId, employeeId });
-  return data;
+  return rawToEmployee(data);
 }
 
 export async function activateEmployee(
@@ -141,9 +184,9 @@ export async function activateEmployee(
     observability.error('employee_activate_failed', { merchantId, employeeId, status: response.status, reason });
     throw new Error('employee_activate_failed');
   }
-  const data = (await response.json()) as EmployeeResponse;
+  const data = (await response.json()) as EmployeeRaw;
   observability.info('employee_activate_succeeded', { merchantId, employeeId });
-  return data;
+  return rawToEmployee(data);
 }
 
 export async function deactivateEmployee(
@@ -166,9 +209,9 @@ export async function deactivateEmployee(
     if (response.status === 409) throw new Error('employee_deactivate_has_future_bookings');
     throw new Error('employee_deactivate_failed');
   }
-  const data = (await response.json()) as EmployeeResponse;
+  const data = (await response.json()) as EmployeeRaw;
   observability.info('employee_deactivate_succeeded', { merchantId, employeeId });
-  return data;
+  return rawToEmployee(data);
 }
 
 // ─── Branch Assignments ───────────────────────────────────────────────────────
@@ -210,12 +253,8 @@ export async function removeEmployeeBranchAssignment(
   branchId: string,
 ): Promise<void> {
   const response = await authedFetch(
-    `/v1/merchants/${encodeURIComponent(merchantId)}/employees/${encodeURIComponent(employeeId)}/branch-assignments`,
-    {
-      method: 'DELETE',
-      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ branchId }),
-    },
+    `/v1/merchants/${encodeURIComponent(merchantId)}/employees/${encodeURIComponent(employeeId)}/branch-assignments/${encodeURIComponent(branchId)}`,
+    { method: 'DELETE', headers: { Accept: 'application/json' } },
   );
   if (!response.ok) {
     const reason = await readError(response);
@@ -234,20 +273,30 @@ export async function fetchEmployeeServiceAssignments(
     { method: 'GET', headers: { Accept: 'application/json' } },
   );
   if (!response.ok) throw new Error('service_assignments_load_failed');
-  return (await response.json()) as ServiceAssignment[];
+  const data = await response.json() as { productCategoryId: string; categoryName?: string; categoryCode?: string }[];
+  return data.map((item) => ({ productCategoryId: item.productCategoryId, name: item.categoryName ?? '', code: item.categoryCode ?? '' }));
+}
+
+export async function fetchProductCategories(merchantId: string): Promise<ProductCategory[]> {
+  const response = await authedFetch(
+    `/v1/merchants/${encodeURIComponent(merchantId)}/product-categories`,
+    { method: 'GET', headers: { Accept: 'application/json' } },
+  );
+  if (!response.ok) throw new Error('product_categories_load_failed');
+  return (await response.json()) as ProductCategory[];
 }
 
 export async function addEmployeeServiceAssignment(
   merchantId: string,
   employeeId: string,
-  productId: string,
+  productCategoryId: string,
 ): Promise<void> {
   const response = await authedFetch(
     `/v1/merchants/${encodeURIComponent(merchantId)}/employees/${encodeURIComponent(employeeId)}/service-assignments`,
     {
       method: 'POST',
       headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ productId }),
+      body: JSON.stringify({ productCategoryId }),
     },
   );
   if (!response.ok) {
@@ -259,15 +308,11 @@ export async function addEmployeeServiceAssignment(
 export async function removeEmployeeServiceAssignment(
   merchantId: string,
   employeeId: string,
-  productId: string,
+  productCategoryId: string,
 ): Promise<void> {
   const response = await authedFetch(
-    `/v1/merchants/${encodeURIComponent(merchantId)}/employees/${encodeURIComponent(employeeId)}/service-assignments`,
-    {
-      method: 'DELETE',
-      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ productId }),
-    },
+    `/v1/merchants/${encodeURIComponent(merchantId)}/employees/${encodeURIComponent(employeeId)}/service-assignments/${encodeURIComponent(productCategoryId)}`,
+    { method: 'DELETE', headers: { Accept: 'application/json' } },
   );
   if (!response.ok) {
     const reason = await readError(response);
@@ -287,36 +332,54 @@ export async function fetchWeeklyAvailability(
     { method: 'GET', headers: { Accept: 'application/json' } },
   );
   if (!response.ok) throw new Error('availability_load_failed');
-  return (await response.json()) as WeeklyAvailabilitySlot[];
+  const data = await response.json() as { id: string; dayOfWeek: number; startTime: unknown; endTime: unknown }[];
+  return data.map((item) => ({
+    id: item.id,
+    dayOfWeek: INT_TO_DAY[item.dayOfWeek] ?? 'MONDAY',
+    startTime: parseTime(item.startTime),
+    endTime: parseTime(item.endTime),
+  }));
 }
 
-export async function setWeeklyAvailability(
+export async function addWeeklyAvailabilitySlot(
   merchantId: string,
   employeeId: string,
   branchId: string,
-  slots: WeeklyAvailabilitySlot[],
-): Promise<void> {
+  slot: Omit<WeeklyAvailabilitySlot, 'id'>,
+): Promise<WeeklyAvailabilitySlot> {
   const response = await authedFetch(
     `/v1/merchants/${encodeURIComponent(merchantId)}/employees/${encodeURIComponent(employeeId)}/branches/${encodeURIComponent(branchId)}/availability`,
     {
       method: 'POST',
       headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-      body: JSON.stringify(slots),
+      body: JSON.stringify({
+        dayOfWeek: DAY_TO_INT[slot.dayOfWeek],
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+      }),
     },
   );
   if (!response.ok) {
     const reason = await readError(response);
     throw new Error(reason);
   }
+  const item = await response.json() as { id: string; dayOfWeek: number; startTime: unknown; endTime: unknown };
+  return {
+    id: item.id,
+    dayOfWeek: INT_TO_DAY[item.dayOfWeek] ?? slot.dayOfWeek,
+    startTime: parseTime(item.startTime),
+    endTime: parseTime(item.endTime),
+  };
 }
 
-export async function clearWeeklyAvailability(
+export async function removeWeeklyAvailabilitySlot(
   merchantId: string,
   employeeId: string,
   branchId: string,
+  slotId: string,
 ): Promise<void> {
   const response = await authedFetch(
-    `/v1/merchants/${encodeURIComponent(merchantId)}/employees/${encodeURIComponent(employeeId)}/branches/${encodeURIComponent(branchId)}/availability`,
+    `/v1/merchants/${encodeURIComponent(merchantId)}/employees/${encodeURIComponent(employeeId)}/branches/${encodeURIComponent(branchId)}/availability/${encodeURIComponent(slotId)}`,
     { method: 'DELETE', headers: { Accept: 'application/json' } },
   );
   if (!response.ok) {
@@ -368,12 +431,8 @@ export async function removeAvailabilityException(
   exceptionId: string,
 ): Promise<void> {
   const response = await authedFetch(
-    `/v1/merchants/${encodeURIComponent(merchantId)}/employees/${encodeURIComponent(employeeId)}/branches/${encodeURIComponent(branchId)}/availability/exceptions`,
-    {
-      method: 'DELETE',
-      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: exceptionId }),
-    },
+    `/v1/merchants/${encodeURIComponent(merchantId)}/employees/${encodeURIComponent(employeeId)}/branches/${encodeURIComponent(branchId)}/availability/exceptions/${encodeURIComponent(exceptionId)}`,
+    { method: 'DELETE', headers: { Accept: 'application/json' } },
   );
   if (!response.ok) {
     const reason = await readError(response);
@@ -397,6 +456,147 @@ export async function fetchAppointmentPolicy(merchantId: string): Promise<Appoin
   const data = (await response.json()) as AppointmentPolicy;
   observability.info('appointment_policy_fetch_succeeded', { merchantId });
   return data;
+}
+
+// ─── Branch Opening Hours ─────────────────────────────────────────────────────
+
+export interface BranchOpeningWindow {
+  id: string;
+  branchId: string;
+  dayOfWeek: number;   // 1=Mon…7=Sun
+  startTime: string;   // HH:MM
+  endTime: string;     // HH:MM
+}
+
+export interface BranchOpeningException {
+  id: string;
+  branchId: string;
+  date: string;        // YYYY-MM-DD
+  type: 'CLOSED' | 'EXTRA_WINDOW';
+  startTime: string | null;
+  endTime: string | null;
+}
+
+export async function fetchBranchOpeningHours(
+  merchantId: string,
+  branchId: string,
+): Promise<BranchOpeningWindow[]> {
+  const response = await authedFetch(
+    `/v1/merchants/${encodeURIComponent(merchantId)}/branches/${encodeURIComponent(branchId)}/opening-hours`,
+    { method: 'GET', headers: { Accept: 'application/json' } },
+  );
+  if (!response.ok) throw new Error('opening_hours_load_failed');
+  const data = await response.json() as { id: string; branchId: string; dayOfWeek: number; startTime: unknown; endTime: unknown }[];
+  return data.map((item) => ({
+    id: item.id,
+    branchId: item.branchId,
+    dayOfWeek: item.dayOfWeek,
+    startTime: parseTime(item.startTime),
+    endTime: parseTime(item.endTime),
+  }));
+}
+
+export async function addBranchOpeningWindow(
+  merchantId: string,
+  branchId: string,
+  slot: { dayOfWeek: number; startTime: string; endTime: string },
+): Promise<BranchOpeningWindow> {
+  const response = await authedFetch(
+    `/v1/merchants/${encodeURIComponent(merchantId)}/branches/${encodeURIComponent(branchId)}/opening-hours`,
+    {
+      method: 'POST',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify(slot),
+    },
+  );
+  if (!response.ok) {
+    const reason = await readError(response);
+    throw new Error(reason);
+  }
+  const item = await response.json() as { id: string; branchId: string; dayOfWeek: number; startTime: unknown; endTime: unknown };
+  return { id: item.id, branchId: item.branchId, dayOfWeek: item.dayOfWeek, startTime: parseTime(item.startTime), endTime: parseTime(item.endTime) };
+}
+
+export async function removeBranchOpeningWindow(
+  merchantId: string,
+  branchId: string,
+  windowId: string,
+): Promise<void> {
+  const response = await authedFetch(
+    `/v1/merchants/${encodeURIComponent(merchantId)}/branches/${encodeURIComponent(branchId)}/opening-hours/${encodeURIComponent(windowId)}`,
+    { method: 'DELETE', headers: { Accept: 'application/json' } },
+  );
+  if (!response.ok) {
+    const reason = await readError(response);
+    throw new Error(reason);
+  }
+}
+
+export async function fetchBranchOpeningExceptions(
+  merchantId: string,
+  branchId: string,
+): Promise<BranchOpeningException[]> {
+  const response = await authedFetch(
+    `/v1/merchants/${encodeURIComponent(merchantId)}/branches/${encodeURIComponent(branchId)}/opening-hours/exceptions`,
+    { method: 'GET', headers: { Accept: 'application/json' } },
+  );
+  if (!response.ok) throw new Error('opening_exceptions_load_failed');
+  return (await response.json()) as BranchOpeningException[];
+}
+
+export async function addBranchOpeningException(
+  merchantId: string,
+  branchId: string,
+  exception: Omit<BranchOpeningException, 'id' | 'branchId'>,
+): Promise<BranchOpeningException> {
+  const response = await authedFetch(
+    `/v1/merchants/${encodeURIComponent(merchantId)}/branches/${encodeURIComponent(branchId)}/opening-hours/exceptions`,
+    {
+      method: 'POST',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify(exception),
+    },
+  );
+  if (!response.ok) {
+    const reason = await readError(response);
+    throw new Error(reason);
+  }
+  return (await response.json()) as BranchOpeningException;
+}
+
+export async function removeBranchOpeningException(
+  merchantId: string,
+  branchId: string,
+  exceptionId: string,
+): Promise<void> {
+  const response = await authedFetch(
+    `/v1/merchants/${encodeURIComponent(merchantId)}/branches/${encodeURIComponent(branchId)}/opening-hours/exceptions/${encodeURIComponent(exceptionId)}`,
+    { method: 'DELETE', headers: { Accept: 'application/json' } },
+  );
+  if (!response.ok) {
+    const reason = await readError(response);
+    throw new Error(reason);
+  }
+}
+
+export async function updateProductCategory(
+  merchantId: string,
+  categoryId: string,
+  name: string,
+  estimatedDurationMinutes: number | null,
+): Promise<void> {
+  const response = await authedFetch(
+    `/v1/merchants/${encodeURIComponent(merchantId)}/product-categories/${encodeURIComponent(categoryId)}`,
+    {
+      method: 'PUT',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, estimatedDurationMinutes }),
+    },
+  );
+  if (!response.ok) {
+    const reason = await readError(response);
+    throw new Error(reason);
+  }
 }
 
 export async function patchAppointmentPolicy(

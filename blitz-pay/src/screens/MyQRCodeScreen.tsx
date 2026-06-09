@@ -28,7 +28,7 @@ export default function MyQRCodeScreen() {
   useEffect(() => {
     const generate = () => {
       const ts = Date.now();
-      setQrValue(`blitzpay://pay/${user?.id ?? 'user'}?ts=${ts}&nonce=${Math.random().toString(36).slice(2)}`);
+      setQrValue(`blitzpay://pay/${user?.username ?? 'user'}?ts=${ts}&nonce=${Math.random().toString(36).slice(2)}`);
       setCountdown(60);
     };
     generate();
@@ -80,7 +80,7 @@ export default function MyQRCodeScreen() {
           </View>
           <View>
             <Text style={styles.profileName}>{user?.name ?? 'BlitzPay User'}</Text>
-            <Text style={styles.profileId}>{t('personal_id')} · BP{user?.id?.slice(-6).toUpperCase() ?? '000000'}</Text>
+            <Text style={styles.profileId}>{t('personal_id')} · {user?.username ?? '—'}</Text>
           </View>
         </View>
 

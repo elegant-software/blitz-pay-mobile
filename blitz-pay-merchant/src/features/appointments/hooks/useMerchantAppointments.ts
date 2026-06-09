@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useFocusEffect } from '@react-navigation/native';
 import {
@@ -8,6 +8,7 @@ import {
   rescheduleAppointment,
   overrideAppointment,
 } from '../services/appointmentService';
+import { fetchEmployees } from '../services/employeeService';
 import type { RescheduleAppointmentRequest, OverrideAppointmentRequest } from '../types/appointment';
 
 const APPOINTMENTS_STALE_TIME = 30_000;
@@ -30,6 +31,19 @@ export function useMerchantAppointments(
     enabled: !!merchantId,
     staleTime: APPOINTMENTS_STALE_TIME,
   });
+
+  const { data: employees } = useQuery({
+    queryKey: merchantId ? ['employees', merchantId] : ['employees', null],
+    queryFn: () => fetchEmployees(merchantId!),
+    enabled: !!merchantId,
+    staleTime: 5 * 60_000,
+  });
+
+  const employeeNameMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const emp of employees ?? []) m.set(emp.id, emp.name);
+    return m;
+  }, [employees]);
 
   useFocusEffect(
     useCallback(() => {
@@ -85,6 +99,7 @@ export function useMerchantAppointments(
 
   return {
     appointments: data ?? [],
+    employeeNameMap,
     loading: isLoading,
     error: errorKey,
     reload: refetch,

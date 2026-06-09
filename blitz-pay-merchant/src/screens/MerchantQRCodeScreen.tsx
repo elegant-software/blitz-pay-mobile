@@ -36,7 +36,7 @@ export default function MerchantQRCodeScreen() {
   const [copied, setCopied] = useState(false);
 
   const amount = Number(amountStr) || undefined;
-  const qrValue = buildPaymentUrl(user?.id ?? 'merchant', amount, label || undefined);
+  const qrValue = buildPaymentUrl(user?.username ?? 'merchant', amount, label || undefined);
 
   const handleCopy = async () => {
     await Clipboard.setStringAsync(qrValue);

@@ -40,6 +40,7 @@ export type MerchantUserRole = 'MANAGER' | 'EMPLOYEE';
 
 export interface UserProfile {
   id: string;
+  username: string;
   merchantId: string | null;
   email: string;
   name: string;
@@ -80,6 +81,9 @@ const BRANCH_GROUP_PATTERNS = [
   /^\/merchant_([^/]+)\/branch_([^/]+)$/,
   /^\/([^/]+)\/branches\/([^/]+)$/,
 ];
+
+// Role groups that are valid but not branch memberships — exclude from invalidCount.
+const ROLE_GROUP_PREFIX = '/merchant-app-users';
 
 function decodeJwt(token: string): Record<string, unknown> {
   try {
@@ -171,7 +175,8 @@ function parseBranchMemberships(
         .find((result) => result != null);
 
       if (!match) {
-        if (groupPath.includes('merchant') || groupPath.includes('branch')) invalidCount += 1;
+        const isRoleGroup = groupPath === ROLE_GROUP_PREFIX || groupPath.startsWith(ROLE_GROUP_PREFIX + '/');
+        if (!isRoleGroup && (groupPath.includes('merchant') || groupPath.includes('branch'))) invalidCount += 1;
         continue;
       }
 
@@ -231,7 +236,12 @@ function resolveMerchantUserRole(
       ...readStringArrayClaim(claims, 'access_groups'),
       ...readNestedStringArrayClaim(claims, 'realm_access', 'roles'),
     ];
-    if (roles.some((r) => r.toLowerCase().includes('merchant_manager') || r.toLowerCase().includes('manager'))) {
+    if (roles.some((r) => {
+      const lower = r.toLowerCase();
+      return lower === 'merchant_manager'
+        || lower.endsWith('/merchant_manager')
+        || lower === 'manager';
+    })) {
       return 'MANAGER';
     }
   }
@@ -302,6 +312,7 @@ function parseUser(accessToken: string, idToken: string, preferredActiveBranchId
   return {
     profile: {
       id: profileClaims.sub as string,
+      username: (profileClaims.preferred_username as string) ?? '',
       merchantId,
       email: (profileClaims.email as string) ?? '',
       name: (profileClaims.name as string) ?? (profileClaims.preferred_username as string) ?? '',
@@ -372,6 +383,7 @@ async function enrichBranchScope(scope: ActiveBranchScope | null): Promise<Activ
 
 const BYPASS_USER: UserProfile = {
   id: 'dev-bypass',
+  username: 'demo-merchant',
   merchantId: 'dev-bypass-merchant',
   email: 'merchant@blitzpay.local',
   name: 'Demo Merchant',

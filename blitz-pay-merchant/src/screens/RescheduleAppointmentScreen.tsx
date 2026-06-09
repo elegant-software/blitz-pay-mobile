@@ -7,7 +7,6 @@ import {
   TextInput,
   StyleSheet,
   ActivityIndicator,
-  Platform,
   KeyboardAvoidingView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,6 +18,7 @@ import { useLanguage } from '../lib/LanguageContext';
 import { colors, spacing, radius, shadow } from '../lib/theme';
 import type { RootStackParamList, RootStackNav } from '../types';
 import { rescheduleAppointment } from '../features/appointments/services/appointmentService';
+import { fetchEmployees, type EmployeeResponse } from '../features/appointments/services/employeeService';
 import { fetchBranchProducts } from '../lib/merchantProducts';
 import type { Product } from '../types';
 
@@ -64,9 +64,10 @@ export default function RescheduleAppointmentScreen() {
   // Pre-fill from existing values
   const [date, setDate] = useState(toDateString(currentStartTime));
   const [time, setTime] = useState(toTimeString(currentStartTime));
-  const [employeeId, setEmployeeId] = useState(currentEmployeeId ?? '');
+  const [selectedEmployee, setSelectedEmployee] = useState<EmployeeResponse | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showProductPicker, setShowProductPicker] = useState(false);
+  const [showEmployeePicker, setShowEmployeePicker] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -78,6 +79,24 @@ export default function RescheduleAppointmentScreen() {
     enabled: !!merchantId && !!branchId,
     staleTime: 5 * 60_000,
   });
+
+  const { data: allEmployees } = useQuery({
+    queryKey: ['employees', merchantId],
+    queryFn: () => fetchEmployees(merchantId),
+    enabled: !!merchantId,
+    staleTime: 60_000,
+  });
+
+  const activeEmployees = (allEmployees ?? []).filter((e) => e.active);
+
+  // Pre-select the employee once the list loads
+  React.useEffect(() => {
+    if (!selectedEmployee && currentEmployeeId && activeEmployees.length > 0) {
+      const found = activeEmployees.find((e) => e.id === currentEmployeeId);
+      if (found) setSelectedEmployee(found);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeEmployees.length]);
 
   const activeProducts = (products ?? []).filter((p) => p.active);
 
@@ -111,7 +130,7 @@ export default function RescheduleAppointmentScreen() {
         newProductId: selectedProduct!.id,
         newProductCategoryId: selectedProduct!.categoryId ?? currentProductCategoryId,
         newStartTime: buildISODateTime(date, time),
-        newEmployeeId: employeeId.trim() || null,
+        newEmployeeId: selectedEmployee?.id ?? null,
       });
 
       void queryClient.invalidateQueries({
@@ -137,7 +156,7 @@ export default function RescheduleAppointmentScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior="padding"
     >
       <View style={[styles.safeTop, { paddingTop: insets.top }]} />
 
@@ -183,7 +202,11 @@ export default function RescheduleAppointmentScreen() {
                 ]}
                 numberOfLines={1}
               >
-                {selectedProduct?.name ?? t('new_appointment_select_product')}
+                {selectedProduct
+                  ? selectedProduct.productCode != null
+                    ? `${selectedProduct.name} · #${selectedProduct.productCode}`
+                    : selectedProduct.name
+                  : t('new_appointment_select_product')}
               </Text>
               <Ionicons name="chevron-down" size={16} color={colors.gray500} />
             </TouchableOpacity>
@@ -221,15 +244,19 @@ export default function RescheduleAppointmentScreen() {
         {/* Employee */}
         <View style={styles.field}>
           <Text style={styles.fieldLabel}>{t('reschedule_appointment_new_employee')}</Text>
-          <TextInput
-            style={styles.input}
-            value={employeeId}
-            onChangeText={setEmployeeId}
-            placeholder={t('new_appointment_select_employee')}
-            placeholderTextColor={colors.gray400}
-            autoCapitalize="none"
-            returnKeyType="done"
-          />
+          <TouchableOpacity
+            style={[styles.selector, !selectedEmployee && styles.selectorEmpty]}
+            onPress={() => setShowEmployeePicker(true)}
+            activeOpacity={0.8}
+          >
+            <Text
+              style={[styles.selectorText, !selectedEmployee && styles.selectorPlaceholder]}
+              numberOfLines={1}
+            >
+              {selectedEmployee?.name ?? t('new_appointment_any_employee')}
+            </Text>
+            <Ionicons name="chevron-down" size={16} color={colors.gray500} />
+          </TouchableOpacity>
         </View>
       </ScrollView>
 
@@ -253,6 +280,45 @@ export default function RescheduleAppointmentScreen() {
           </Text>
         </TouchableOpacity>
       </View>
+
+      {/* Employee picker */}
+      {showEmployeePicker ? (
+        <View style={styles.pickerOverlay}>
+          <View style={[styles.pickerSheet, { paddingBottom: insets.bottom + spacing.lg }]}>
+            <View style={styles.pickerHeader}>
+              <Text style={styles.pickerTitle}>{t('reschedule_appointment_new_employee')}</Text>
+              <TouchableOpacity onPress={() => setShowEmployeePicker(false)} hitSlop={8}>
+                <Ionicons name="close" size={22} color={colors.onSurface} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <TouchableOpacity
+                style={[styles.pickerRow, !selectedEmployee && styles.pickerRowSelected]}
+                onPress={() => { setSelectedEmployee(null); setShowEmployeePicker(false); }}
+                activeOpacity={0.7}
+              >
+                <View style={styles.pickerRowBody}>
+                  <Text style={styles.pickerRowName}>{t('new_appointment_any_employee')}</Text>
+                </View>
+                {!selectedEmployee ? <Ionicons name="checkmark" size={18} color={colors.primary} /> : null}
+              </TouchableOpacity>
+              {activeEmployees.map((emp) => (
+                <TouchableOpacity
+                  key={emp.id}
+                  style={[styles.pickerRow, selectedEmployee?.id === emp.id && styles.pickerRowSelected]}
+                  onPress={() => { setSelectedEmployee(emp); setShowEmployeePicker(false); }}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.pickerRowBody}>
+                    <Text style={styles.pickerRowName}>{emp.name}</Text>
+                  </View>
+                  {selectedEmployee?.id === emp.id ? <Ionicons name="checkmark" size={18} color={colors.primary} /> : null}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      ) : null}
 
       {/* Product picker */}
       {showProductPicker ? (
@@ -279,7 +345,9 @@ export default function RescheduleAppointmentScreen() {
                   activeOpacity={0.7}
                 >
                   <View style={styles.pickerRowBody}>
-                    <Text style={styles.pickerRowName}>{product.name}</Text>
+                    <Text style={styles.pickerRowName}>
+                      {product.name}{product.productCode != null ? ` · #${product.productCode}` : ''}
+                    </Text>
                     {product.categoryName ? (
                       <Text style={styles.pickerRowCategory}>{product.categoryName}</Text>
                     ) : null}

@@ -161,7 +161,7 @@ export default function AppointmentDetailScreen() {
         <View style={[styles.statusBanner, { backgroundColor: `${STATUS_COLORS[appointment.status]}15` }]}>
           <View style={[styles.statusDot, { backgroundColor: STATUS_COLORS[appointment.status] }]} />
           <Text style={[styles.statusText, { color: STATUS_COLORS[appointment.status] }]}>
-            {t(`appointment_status_${appointment.status}` as TranslationKeys)}
+            {t(`appointment_status_${appointment.status}` as TranslationKey)}
           </Text>
         </View>
 
