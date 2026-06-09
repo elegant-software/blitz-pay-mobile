@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 import { storage } from './storage';
 import { config } from './config';
 import { observability } from './observability';
+import { unregisterShopperPushToken } from './notifications/shopperPushRegistration';
 
 // expo-local-authentication is native-only — not available on web
 const LocalAuthentication = Platform.OS !== 'web'
@@ -20,6 +21,7 @@ interface StoredSession {
 
 export interface UserProfile {
   id: string;
+  username: string;
   email: string;
   name: string;
   emailVerified: boolean;
@@ -65,6 +67,7 @@ function parseUser(idToken: string): UserProfile | null {
   if (!c.sub) return null;
   return {
     id: c.sub as string,
+    username: (c.preferred_username as string) ?? '',
     email: (c.email as string) ?? '',
     name: (c.name as string) ?? (c.preferred_username as string) ?? '',
     emailVerified: (c.email_verified as boolean) ?? false,
@@ -111,6 +114,7 @@ async function refreshAccessToken(refreshToken: string): Promise<StoredSession |
 
 const BYPASS_USER: UserProfile = {
   id: 'dev-bypass',
+  username: 'dev-bypass',
   email: 'dev@blitzpay.local',
   name: 'Dev User',
   emailVerified: true,
@@ -374,6 +378,7 @@ export function AuthProvider({ children, onSessionExpired }: AuthProviderProps) 
   };
 
   const logout = async (): Promise<void> => {
+    void unregisterShopperPushToken();
     await clearSessionState();
   };
 

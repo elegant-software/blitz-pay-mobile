@@ -104,11 +104,39 @@ export type RootStackParamList = {
     preferredMethod?: CheckoutPaymentMethod;
     checkoutIntent?: CheckoutIntent;
   };
+  AvailableSlots: {
+    branchId: string;
+    productId: string;
+    productCategoryId: string;
+    productName: string;
+    merchantName: string;
+    branchName: string;
+    /** Present when rescheduling an existing appointment. */
+    rescheduleAppointmentId?: string;
+  };
+  BookingConfirmation: {
+    branchId: string;
+    productId: string;
+    productCategoryId: string;
+    productName: string;
+    merchantName: string;
+    branchName: string;
+    startTime: string;
+    endTime: string;
+    employeeId: string;
+    employeeName: string;
+    /** Present when rescheduling an existing appointment. */
+    rescheduleAppointmentId?: string;
+  };
+  MyAppointments: undefined;
+  AppointmentDetail: {
+    appointmentId: string;
+  };
 };
 
 export type TabParamList = {
   Explore: undefined;
-  Assistant: undefined;
+  Appointments: undefined;
   Vault: undefined;
   Account: undefined;
 };

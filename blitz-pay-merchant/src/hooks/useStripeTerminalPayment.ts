@@ -22,6 +22,7 @@ export function useStripeTerminalPayment() {
     connectReader,
     retrievePaymentIntent,
     processPaymentIntent,
+    cancelPaymentIntent,
     connectedReader,
   } = useStripeTerminal({
     onUpdateDiscoveredReaders: (readers) => {
@@ -91,6 +92,11 @@ export function useStripeTerminalPayment() {
 
       const { error: processError } = await processPaymentIntent({ paymentIntent });
       if (processError) {
+        // Explicitly cancel the PaymentIntent on Stripe so the backend receives
+        // payment_intent.canceled and reverts the order status. Without this,
+        // dismissing the native sheet leaves the PI in requires_payment_method
+        // and no webhook fires.
+        await cancelPaymentIntent({ paymentIntent }).catch(() => null);
         throw new Error(processError.message);
       }
 
@@ -102,7 +108,7 @@ export function useStripeTerminalPayment() {
       setErrorMessage(message);
       return { succeeded: false, error: message };
     }
-  }, [initialize, connectedReader, discoverReaders, connectReader, retrievePaymentIntent, processPaymentIntent]);
+  }, [initialize, connectedReader, discoverReaders, connectReader, retrievePaymentIntent, processPaymentIntent, cancelPaymentIntent]);
 
   const reset = useCallback(() => {
     setStatus('idle');

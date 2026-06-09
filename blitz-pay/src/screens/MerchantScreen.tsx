@@ -31,9 +31,10 @@ type ProductRowProps = {
   onPress: () => void;
   onDecrement: () => void;
   onIncrement: () => void;
+  onBookAppointment?: () => void;
 };
 
-function ProductRow({ product, quantity, token, merchantId, branch, onPress, onDecrement, onIncrement }: ProductRowProps) {
+function ProductRow({ product, quantity, token, merchantId, branch, onPress, onDecrement, onIncrement, onBookAppointment }: ProductRowProps) {
   const productImage = resolveImageUri(product.imageUrl);
   const imageMeta = summarizeImageUri(productImage?.uri);
   return (
@@ -97,15 +98,21 @@ function ProductRow({ product, quantity, token, merchantId, branch, onPress, onD
           <Text style={styles.productPrice}>€{product.unitPrice.toFixed(2)}</Text>
         </View>
       </View>
-      <View style={styles.quantityBox}>
-        <TouchableOpacity style={styles.quantityButton} onPress={onDecrement}>
-          <Ionicons name="remove" size={18} color={colors.onSurface} />
+      {onBookAppointment ? (
+        <TouchableOpacity style={styles.bookBtn} onPress={onBookAppointment} hitSlop={4}>
+          <Ionicons name="calendar-outline" size={16} color={colors.secondary} />
         </TouchableOpacity>
-        <Text style={styles.quantityValue}>{quantity}</Text>
-        <TouchableOpacity style={styles.quantityButton} onPress={onIncrement}>
-          <Ionicons name="add" size={18} color={colors.onSurface} />
-        </TouchableOpacity>
-      </View>
+      ) : (
+        <View style={styles.quantityBox}>
+          <TouchableOpacity style={styles.quantityButton} onPress={onDecrement}>
+            <Ionicons name="remove" size={18} color={colors.onSurface} />
+          </TouchableOpacity>
+          <Text style={styles.quantityValue}>{quantity}</Text>
+          <TouchableOpacity style={styles.quantityButton} onPress={onIncrement}>
+            <Ionicons name="add" size={18} color={colors.onSurface} />
+          </TouchableOpacity>
+        </View>
+      )}
     </TouchableOpacity>
   );
 }
@@ -138,7 +145,7 @@ export default function MerchantScreen() {
   const preferredBranchName = route.params?.branchName;
   const initialMerchantLogoUrl = route.params?.merchantLogoUrl;
   const merchantDistance = route.params?.distanceMeters;
-  const { loading, errorKey, branch, merchantLogoUrl, products, retry } = useMerchantCatalog({
+  const { loading, errorKey, branch, merchantLogoUrl, appointmentsEnabled, products, retry } = useMerchantCatalog({
     merchantId,
     merchantName,
     preferredBranchId,
@@ -308,6 +315,16 @@ export default function MerchantScreen() {
                         (quantityByProductId[product.productId] ?? 0) + 1,
                       );
                     }}
+                    onBookAppointment={appointmentsEnabled && product.categoryId && branch ? () => {
+                      navigation.navigate('AvailableSlots', {
+                        branchId: branch.branchId,
+                        productId: product.productId,
+                        productCategoryId: product.categoryId!,
+                        productName: product.name,
+                        merchantName,
+                        branchName: branch.name,
+                      });
+                    } : undefined}
                   />
                 ))}
               </View>
@@ -355,6 +372,16 @@ export default function MerchantScreen() {
                     (quantityByProductId[product.productId] ?? 0) + 1,
                   );
                 }}
+                onBookAppointment={appointmentsEnabled && product.categoryId && branch ? () => {
+                  navigation.navigate('AvailableSlots', {
+                    branchId: branch.branchId,
+                    productId: product.productId,
+                    productCategoryId: product.categoryId!,
+                    productName: product.name,
+                    merchantName,
+                    branchName: branch.name,
+                  });
+                } : undefined}
               />
             ))}
           </View>
@@ -370,16 +397,18 @@ export default function MerchantScreen() {
         </View>
       </ScrollView>
 
-      <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 12 }]}>
-        <TouchableOpacity
-          style={styles.payNowLargeBtn}
-          onPress={handleCheckout}
-          activeOpacity={0.85}
-        >
-          <Ionicons name="flash" size={18} color={colors.black} />
-          <Text style={styles.payNowLargeBtnText}>{t('proceed_to_checkout')}</Text>
-        </TouchableOpacity>
-      </View>
+      {!appointmentsEnabled ? (
+        <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 12 }]}>
+          <TouchableOpacity
+            style={styles.payNowLargeBtn}
+            onPress={handleCheckout}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="flash" size={18} color={colors.black} />
+            <Text style={styles.payNowLargeBtnText}>{t('proceed_to_checkout')}</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -522,6 +551,16 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: colors.onSurface,
+  },
+  bookBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.full,
+    backgroundColor: `${colors.secondary}15`,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: `${colors.secondary}30`,
   },
   basketCard: {
     backgroundColor: colors.surface,

@@ -3,7 +3,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet,
-  KeyboardAvoidingView, Platform, ActivityIndicator, Image, Alert, Switch, Modal, FlatList,
+  KeyboardAvoidingView, ActivityIndicator, Image, Alert, Switch, Modal, FlatList,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,6 +20,10 @@ import {
   MerchantProductError,
   updateMerchantProduct,
 } from '../lib/merchantProducts';
+import {
+  fetchProductCategories,
+  updateProductCategory,
+} from '../features/appointments/services/employeeService';
 import type { Product, RootStackParamList } from '../types';
 
 type RouteProps = RouteProp<RootStackParamList, 'ProductEdit'>;
@@ -33,6 +37,7 @@ type FormState = {
   imageUri: string;
   categoryId: string;
   category: string;
+  categoryDurationMinutes: string;
   productCode: string;
   active: boolean;
 };
@@ -40,6 +45,7 @@ type FormState = {
 type CategoryOption = {
   id: string;
   name: string;
+  estimatedDurationMinutes: number | null;
 };
 
 
@@ -61,6 +67,7 @@ export default function ProductEditScreen() {
     imageUri: '',
     categoryId: '',
     category: '',
+    categoryDurationMinutes: '',
     productCode: '',
     active: true,
   });
@@ -85,31 +92,24 @@ export default function ProductEditScreen() {
         }
         if (!active) return;
 
-        // Load existing categories from branch products for the dropdown
-        fetchBranchProducts(activeBranchScope.merchantId, activeBranchScope.branchId)
-          .then((products) => {
-            const seen = new Set<string>();
-            const cats: CategoryOption[] = [];
-            for (const p of products) {
-              if (p.categoryId && p.categoryName && !seen.has(p.categoryId)) {
-                seen.add(p.categoryId);
-                cats.push({ id: p.categoryId, name: p.categoryName });
-              }
-            }
-            if (active) setCategories(cats.sort((a, b) => a.name.localeCompare(b.name)));
-          })
-          .catch(() => {}); // non-critical, dropdown just shows no options
+        // Load categories (with duration) for the dropdown — awaited so duration pre-fills on edit
+        const loadedCats = await fetchProductCategories(activeBranchScope.merchantId).catch(() => []);
+        const mappedCats: CategoryOption[] = loadedCats
+          .map((c) => ({ id: c.id, name: c.name, estimatedDurationMinutes: c.estimatedDurationMinutes }))
+          .sort((a, b) => a.name.localeCompare(b.name));
+        if (active) setCategories(mappedCats);
 
         if (!isEdit || !route.params.productId) {
           setForm({
             branchId: activeBranchScope.branchId,
-            branchName: activeBranchScope.branchName ?? activeBranchScope.branchId,
+            branchName: activeBranchScope.branchName ?? '',
             name: '',
             description: '',
             price: '',
             imageUri: '',
             categoryId: '',
             category: '',
+            categoryDurationMinutes: '',
             productCode: '',
             active: true,
           });
@@ -123,7 +123,7 @@ export default function ProductEditScreen() {
           route.params.productId,
         );
         if (!active) return;
-        hydrateForm(product, activeBranchScope.branchName ?? activeBranchScope.branchId);
+        hydrateForm(product, activeBranchScope.branchName ?? '', mappedCats);
         setLoading(false);
       } catch (error) {
         if (!active) return;
@@ -144,7 +144,8 @@ export default function ProductEditScreen() {
     };
   }, [activeBranchScope, branchScopeError, isEdit, route.params.productId]);
 
-  function hydrateForm(product: Product, currentBranchName: string) {
+  function hydrateForm(product: Product, currentBranchName: string, cats: CategoryOption[]) {
+    const matchedCat = product.categoryId ? cats.find((c) => c.id === product.categoryId) : undefined;
     setForm({
       branchId: product.branchId ?? '',
       branchName: currentBranchName,
@@ -154,6 +155,9 @@ export default function ProductEditScreen() {
       imageUri: product.imageUrl ?? '',
       categoryId: product.categoryId ?? '',
       category: product.categoryName ?? '',
+      categoryDurationMinutes: matchedCat?.estimatedDurationMinutes != null
+        ? String(matchedCat.estimatedDurationMinutes)
+        : '',
       productCode: product.productCode != null ? String(product.productCode) : '',
       active: product.active,
     });
@@ -216,7 +220,28 @@ export default function ProductEditScreen() {
       void queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.products(activeBranchScope.merchantId, activeBranchScope.branchId),
       });
-      navigation.goBack();
+
+      // Update category duration if a category is selected and duration is provided
+      const parsedDuration = form.categoryDurationMinutes.trim()
+        ? parseInt(form.categoryDurationMinutes.trim(), 10)
+        : null;
+      let durationSaveFailed = false;
+      if (form.categoryId && (parsedDuration === null || (Number.isFinite(parsedDuration) && parsedDuration > 0 && parsedDuration <= 480))) {
+        await updateProductCategory(
+          activeBranchScope.merchantId,
+          form.categoryId,
+          form.category,
+          parsedDuration,
+        ).catch(() => {
+          durationSaveFailed = true;
+        });
+      }
+
+      if (durationSaveFailed) {
+        setErrorKey('product_category_duration_save_failed');
+      } else {
+        navigation.goBack();
+      }
     } catch (error) {
       setErrorKey(error instanceof MerchantProductError ? error.key : 'merchant_product_save_failed');
     } finally {
@@ -279,7 +304,7 @@ export default function ProductEditScreen() {
   };
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.container}>
+    <KeyboardAvoidingView behavior="padding" style={styles.container}>
       <View style={{ paddingTop: insets.top }}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
@@ -334,6 +359,21 @@ export default function ProductEditScreen() {
                 <Ionicons name="chevron-down" size={16} color={colors.gray400} />
               </TouchableOpacity>
             </Field>
+
+            {form.categoryId ? (
+              <Field label={t('product_service_duration')}>
+                <TextInput
+                  style={styles.input}
+                  value={form.categoryDurationMinutes}
+                  onChangeText={(v) => handleChange('categoryDurationMinutes', v)}
+                  placeholder={t('product_service_duration_placeholder')}
+                  placeholderTextColor={colors.gray400}
+                  keyboardType="number-pad"
+                  returnKeyType="done"
+                />
+                <Text style={styles.fieldHint}>{t('product_service_duration_hint')}</Text>
+              </Field>
+            ) : null}
 
             <Field label={t('product_code')}>
               <TextInput
@@ -419,6 +459,9 @@ export default function ProductEditScreen() {
                   onPress={() => {
                     handleChange('categoryId', item.id);
                     handleChange('category', item.name);
+                    handleChange('categoryDurationMinutes',
+                      item.estimatedDurationMinutes != null ? String(item.estimatedDurationMinutes) : ''
+                    );
                     setCategoryModalVisible(false);
                   }}
                 >
@@ -438,6 +481,7 @@ export default function ProductEditScreen() {
                 onPress={() => {
                   handleChange('categoryId', '');
                   handleChange('category', '');
+                  handleChange('categoryDurationMinutes', '');
                   setCategoryModalVisible(false);
                 }}
               >
@@ -554,6 +598,7 @@ const styles = StyleSheet.create({
   },
   imagePickerText: { flex: 1, fontSize: 15, color: colors.onSurface },
   previewImage: { width: '100%', height: 180, borderRadius: radius.lg, backgroundColor: colors.surface, marginTop: spacing.sm },
+  fieldHint: { marginTop: 4, fontSize: 11, color: colors.gray500 },
   errorText: { marginTop: spacing.md, fontSize: 12, color: colors.error },
   retryInline: { marginTop: spacing.xs, fontSize: 13, fontWeight: '700', color: colors.primary },
 });

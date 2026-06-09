@@ -36,14 +36,19 @@ export interface ActiveBranchScope {
   status: 'resolved';
 }
 
+export type MerchantUserRole = 'MANAGER' | 'EMPLOYEE';
+
 export interface UserProfile {
   id: string;
+  username: string;
   merchantId: string | null;
   email: string;
   name: string;
   emailVerified: boolean;
   branchMemberships: BranchMembership[];
   activeBranchId: string | null;
+  /** Resolved from Keycloak realm roles: MANAGER if 'merchant_manager' role present, else EMPLOYEE */
+  role: MerchantUserRole;
 }
 
 export interface AuthState {
@@ -76,6 +81,9 @@ const BRANCH_GROUP_PATTERNS = [
   /^\/merchant_([^/]+)\/branch_([^/]+)$/,
   /^\/([^/]+)\/branches\/([^/]+)$/,
 ];
+
+// Role groups that are valid but not branch memberships — exclude from invalidCount.
+const ROLE_GROUP_PREFIX = '/merchant-app-users';
 
 function decodeJwt(token: string): Record<string, unknown> {
   try {
@@ -167,7 +175,8 @@ function parseBranchMemberships(
         .find((result) => result != null);
 
       if (!match) {
-        if (groupPath.includes('merchant') || groupPath.includes('branch')) invalidCount += 1;
+        const isRoleGroup = groupPath === ROLE_GROUP_PREFIX || groupPath.startsWith(ROLE_GROUP_PREFIX + '/');
+        if (!isRoleGroup && (groupPath.includes('merchant') || groupPath.includes('branch'))) invalidCount += 1;
         continue;
       }
 
@@ -217,6 +226,28 @@ function buildBranchScope(
   };
 }
 
+function resolveMerchantUserRole(
+  ...claimSets: Record<string, unknown>[]
+): MerchantUserRole {
+  for (const claims of claimSets) {
+    const roles = [
+      ...readStringArrayClaim(claims, 'groups'),
+      ...readStringArrayClaim(claims, 'access_group'),
+      ...readStringArrayClaim(claims, 'access_groups'),
+      ...readNestedStringArrayClaim(claims, 'realm_access', 'roles'),
+    ];
+    if (roles.some((r) => {
+      const lower = r.toLowerCase();
+      return lower === 'merchant_manager'
+        || lower.endsWith('/merchant_manager')
+        || lower === 'manager';
+    })) {
+      return 'MANAGER';
+    }
+  }
+  return 'EMPLOYEE';
+}
+
 function parseUser(accessToken: string, idToken: string, preferredActiveBranchId: string | null): {
   profile: UserProfile | null;
   activeBranchScope: ActiveBranchScope | null;
@@ -262,6 +293,7 @@ function parseUser(accessToken: string, idToken: string, preferredActiveBranchId
     resolveMerchantId(profileClaims) ??
     memberships[0]?.merchantId ??
     null;
+  const role = resolveMerchantUserRole(accessClaims, idClaims);
   const errorKey = invalidCount > 0 && memberships.length === 0 ? 'merchant_branch_access_invalid' : branchScope.errorKey;
 
   observability.info('merchant_branch_memberships_parsed', {
@@ -280,12 +312,14 @@ function parseUser(accessToken: string, idToken: string, preferredActiveBranchId
   return {
     profile: {
       id: profileClaims.sub as string,
+      username: (profileClaims.preferred_username as string) ?? '',
       merchantId,
       email: (profileClaims.email as string) ?? '',
       name: (profileClaims.name as string) ?? (profileClaims.preferred_username as string) ?? '',
       emailVerified: (profileClaims.email_verified as boolean) ?? false,
       branchMemberships: memberships,
       activeBranchId: branchScope.activeBranchId,
+      role,
     },
     activeBranchScope: branchScope.activeBranchScope,
     errorKey,
@@ -349,6 +383,7 @@ async function enrichBranchScope(scope: ActiveBranchScope | null): Promise<Activ
 
 const BYPASS_USER: UserProfile = {
   id: 'dev-bypass',
+  username: 'demo-merchant',
   merchantId: 'dev-bypass-merchant',
   email: 'merchant@blitzpay.local',
   name: 'Demo Merchant',
@@ -361,6 +396,7 @@ const BYPASS_USER: UserProfile = {
     },
   ],
   activeBranchId: 'branch_demo',
+  role: 'MANAGER',
 };
 
 const BYPASS_BRANCH_SCOPE: ActiveBranchScope = {

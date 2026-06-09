@@ -9,6 +9,17 @@ BlitzPay is split into two React Native / Expo mobile apps that share the same d
 
 ---
 
+## Related Repositories
+
+| Repository | Description |
+|---|---|
+| blitz-pay (backend) | Spring Boot / Kotlin backend — payments, merchants, orders |
+| blitzpay-admin-dashboard | Angular admin dashboard |
+| blitz-pay-merchant | React Native merchant app |
+| blitz-pay (shopper app) | React Native shopper app |
+
+---
+
 ## blitz-pay (Consumer App)
 
 **Prerequisites:** Node.js, npm, Android/iOS device or simulator

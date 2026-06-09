@@ -13,6 +13,7 @@ import type {
 } from '../types/order';
 
 interface RawOrderItem {
+  itemId?: string;
   lineId?: string;
   productId?: string;
   name?: string;
@@ -83,7 +84,7 @@ function mapCheckoutPaymentMethod(method: unknown): 'BANK_ACCOUNT' | 'CARD' | 'P
 
 function parseItems(items: RawOrderItem[] | undefined, orderId: string): MerchantOrderItem[] {
   return (items ?? []).map((item, index) => ({
-    lineId: item.lineId ?? `${orderId}-${item.productId ?? 'line'}-${index}`,
+    lineId: item.itemId ?? item.lineId ?? `${orderId}-${item.productId ?? 'line'}-${index}`,
     productId: item.productId ?? '',
     name: item.name ?? '',
     quantity: item.quantity ?? 0,
@@ -225,10 +226,10 @@ export async function createMerchantOrder(
   items: CreateMerchantOrderItem[],
 ): Promise<MerchantOrderDetail> {
   observability.info('merchant_order_create_started', { merchantId, branchId, itemCount: items.length });
-  const response = await authedFetch('/v1/orders', {
+  const response = await authedFetch('/v1/merchant/orders', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ branchId, orderType: 'PRE_ORDER', usesDeferredPayment: false, items }),
+    body: JSON.stringify({ merchantId, branchId, orderType: 'PRE_ORDER', usesDeferredPayment: false, items }),
   });
 
   if (!response.ok) {
@@ -288,7 +289,7 @@ export async function fetchMerchantOrderDetail(orderId: string, activeBranchScop
     merchantId: activeBranchScope.merchantId,
     branchId: activeBranchScope.branchId,
   });
-  const response = await authedFetch(`/v1/orders/${encodeURIComponent(orderId)}`, {
+  const response = await authedFetch(`/v1/merchant/orders/${encodeURIComponent(orderId)}`, {
     method: 'GET',
     headers: { Accept: 'application/json' },
   });
@@ -333,7 +334,7 @@ export async function fetchMerchantOrderDetail(orderId: string, activeBranchScop
 
 export async function addMerchantOrderItem(orderId: string, input: MerchantAddOrderItemInput): Promise<MerchantOrderDetail> {
   observability.info('merchant_order_add_item_started', { orderId, productId: input.productId, quantity: input.quantity });
-  return mutateOrder(orderId, `/v1/orders/${encodeURIComponent(orderId)}/items`, 'POST', input);
+  return mutateOrder(orderId, `/v1/merchant/orders/${encodeURIComponent(orderId)}/items`, 'POST', input);
 }
 
 export async function updateMerchantOrderLineQuantity(
@@ -345,19 +346,19 @@ export async function updateMerchantOrderLineQuantity(
     lineId: input.lineId,
     quantity: input.quantity,
   });
-  return mutateOrder(orderId, `/v1/orders/${encodeURIComponent(orderId)}/items/${encodeURIComponent(input.lineId)}`, 'PATCH', {
+  return mutateOrder(orderId, `/v1/merchant/orders/${encodeURIComponent(orderId)}/items/${encodeURIComponent(input.lineId)}`, 'PATCH', {
     quantity: input.quantity,
   });
 }
 
 export async function removeMerchantOrderLine(orderId: string, lineId: string): Promise<MerchantOrderDetail> {
   observability.info('merchant_order_remove_line_started', { orderId, lineId });
-  return mutateOrder(orderId, `/v1/orders/${encodeURIComponent(orderId)}/items/${encodeURIComponent(lineId)}`, 'DELETE');
+  return mutateOrder(orderId, `/v1/merchant/orders/${encodeURIComponent(orderId)}/items/${encodeURIComponent(lineId)}`, 'DELETE');
 }
 
 export async function cancelMerchantOrder(orderId: string): Promise<MerchantOrderDetail> {
   observability.info('merchant_order_cancel_started', { orderId });
-  return mutateOrder(orderId, `/v1/orders/${encodeURIComponent(orderId)}/cancel`, 'POST');
+  return mutateOrder(orderId, `/v1/merchant/orders/${encodeURIComponent(orderId)}/cancel`, 'POST');
 }
 
 export async function overrideMerchantOrderLinePrice(
@@ -371,8 +372,8 @@ export async function overrideMerchantOrderLinePrice(
   });
   return mutateOrder(
     orderId,
-    `/v1/orders/${encodeURIComponent(orderId)}/items/${encodeURIComponent(input.lineId)}/price`,
-    'POST',
+    `/v1/merchant/orders/${encodeURIComponent(orderId)}/items/${encodeURIComponent(input.lineId)}/price`,
+    'PATCH',
     { unitPriceMinor: input.unitPriceMinor },
   );
 }

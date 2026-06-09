@@ -24,11 +24,37 @@ export type RootStackParamList = {
   Notifications: undefined;
   Appearances: undefined;
   CreateOrder: undefined;
+  EmployeeCalendar: undefined;
+  MerchantCalendar: undefined;
+  AppointmentDetail: {
+    appointmentId: string;
+    merchantId: string;
+    /** 'employee' scope allows only complete/cancel; 'merchant' also allows reschedule */
+    scope: 'employee' | 'merchant';
+  };
+  NewAppointment: undefined;
+  RescheduleAppointment: {
+    appointmentId: string;
+    merchantId: string;
+    currentProductId: string;
+    currentProductCategoryId: string;
+    currentStartTime: string;
+    currentEmployeeId: string | null;
+  };
+  EmployeeSetup: undefined;
+  EmployeeDetail: {
+    employeeId: string;
+    merchantId: string;
+    employeeName: string;
+  };
+  AppointmentPolicy: undefined;
+  BranchOpeningHours: undefined;
 };
 
 export type TabParamList = {
   Dashboard: undefined;
   Orders: undefined;
+  Appointments: undefined;
   Products: undefined;
   Account: undefined;
 };

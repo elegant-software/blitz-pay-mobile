@@ -24,6 +24,10 @@ import StripeCheckoutReturnScreen from '../screens/StripeCheckoutReturnScreen';
 import InvoicePdfPreviewScreen from '../screens/InvoicePdfPreviewScreen';
 import ProductDetailScreen from '../screens/ProductDetailScreen';
 import OrderDetailScreen from '../screens/OrderDetailScreen';
+import AvailableSlotsScreen from '../screens/AvailableSlotsScreen';
+import BookingConfirmationScreen from '../screens/BookingConfirmationScreen';
+import MyAppointmentsScreen from '../screens/MyAppointmentsScreen';
+import AppointmentDetailScreen from '../screens/AppointmentDetailScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -87,6 +91,10 @@ export default function AppNavigator() {
           <Stack.Screen name="InvoicePdfPreview" component={InvoicePdfPreviewScreen} />
           <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
           <Stack.Screen name="OrderDetail" component={OrderDetailScreen} />
+          <Stack.Screen name="AvailableSlots" component={AvailableSlotsScreen} />
+          <Stack.Screen name="BookingConfirmation" component={BookingConfirmationScreen} />
+          <Stack.Screen name="MyAppointments" component={MyAppointmentsScreen} />
+          <Stack.Screen name="AppointmentDetail" component={AppointmentDetailScreen} />
         </>
       )}
     </Stack.Navigator>

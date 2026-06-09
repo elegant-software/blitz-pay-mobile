@@ -16,10 +16,13 @@ import { useAuth } from '../lib/auth';
 import { useGeofence } from '../hooks/useGeofence';
 import { colors, spacing, radius, shadow } from '../lib/theme';
 import type { Language } from '../lib/translations';
+import { useNavigation } from '@react-navigation/native';
+import type { RootStackNav } from '../types';
 
 export default function AccountScreen() {
   const { t, language, setLanguage } = useLanguage();
   const { user, logout, isBiometricAvailable, biometricEnrolled, enrollBiometric, unenrollBiometric } = useAuth();
+  const navigation = useNavigation<RootStackNav>();
   const insets = useSafeAreaInsets();
 
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -71,6 +74,17 @@ export default function AccountScreen() {
   };
 
   const settingsSections = [
+    {
+      title: t('my_appointments'),
+      rows: [
+        {
+          icon: 'calendar-outline',
+          label: t('my_appointments'),
+          onPress: () => navigation.navigate('MyAppointments'),
+          showArrow: true,
+        },
+      ],
+    },
     {
       title: t('security'),
       rows: [
