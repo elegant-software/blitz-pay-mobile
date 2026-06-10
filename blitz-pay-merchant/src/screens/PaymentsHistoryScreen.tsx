@@ -68,7 +68,7 @@ export default function PaymentsHistoryScreen() {
               <Ionicons name={METHOD_ICONS[payment.method]} size={20} color={STATUS_COLORS[payment.status]} />
             </View>
             <View style={styles.paymentInfo}>
-              <Text style={styles.paymentOrderId}>{payment.orderId ? `Order #${payment.orderId}` : payment.id.toUpperCase()}</Text>
+              <Text style={styles.paymentOrderId}>{payment.orderId ? `Order #${payment.orderId}` : 'Payment'}</Text>
               <Text style={styles.paymentDate}>{formatDate(payment.createdAt)}</Text>
               <Text style={styles.paymentMethod}>via {payment.method.replace('_', ' ')}</Text>
             </View>

@@ -10,6 +10,7 @@ import { useAuth } from '../lib/auth';
 import { useLanguage } from '../lib/LanguageContext';
 import { listMerchantAppearances, MerchantAppearanceError } from '../lib/merchantAppearances';
 import { colors, spacing, radius, shadow } from '../lib/theme';
+import { useSettlementSummary } from '../features/reporting/hooks/useSettlementSummary';
 import type { RootStackNav, Order, OrderStatus } from '../types';
 
 const MOCK_STATS = {
@@ -60,6 +61,9 @@ export default function DashboardScreen() {
   const [appearanceErrorKey, setAppearanceErrorKey] = useState<string | null>(null);
   const [activeCount, setActiveCount] = useState(0);
   const [upcomingCount, setUpcomingCount] = useState(0);
+
+  const { summary: settlementSummary, loading: settlementLoading, error: settlementError } =
+    useSettlementSummary(activeBranchScope?.merchantId ?? null);
 
   const loadAppearanceSummary = useCallback(async () => {
     if (!activeBranchScope) {
@@ -139,6 +143,52 @@ export default function DashboardScreen() {
           <StatCard label={t('pending_orders')} value={String(MOCK_STATS.pendingOrders)} icon="time-outline" color={colors.warning} />
           <StatCard label={t('completed_orders')} value={String(MOCK_STATS.completedOrders)} icon="checkmark-circle-outline" color={colors.success} />
           <StatCard label={t('total_products')} value={String(MOCK_STATS.totalProducts)} icon="grid-outline" color={colors.secondary} />
+        </View>
+
+        {/* Settlement summary widget */}
+        <View style={styles.section}>
+          <View style={[styles.settlementCard, shadow.sm]}>
+            <View style={styles.settlementHeader}>
+              <View style={styles.settlementIcon}>
+                <Ionicons name="card-outline" size={20} color={colors.primary} />
+              </View>
+              <Text style={styles.settlementTitle}>{t('settlements_this_month')}</Text>
+            </View>
+            {settlementLoading ? (
+              <ActivityIndicator color={colors.primary} style={styles.settlementLoader} />
+            ) : settlementError ? (
+              <Text style={styles.settlementError}>{t('settlements_summary_load_failed')}</Text>
+            ) : (
+              <View style={styles.settlementRow}>
+                <View style={styles.settlementStat}>
+                  <Text style={styles.settlementStatLabel}>{t('settlements_transactions')}</Text>
+                  <Text style={styles.settlementStatValue}>
+                    {String(settlementSummary?.transactionCount ?? 0)}
+                  </Text>
+                </View>
+                <View style={styles.settlementDivider} />
+                <View style={styles.settlementStat}>
+                  <Text style={styles.settlementStatLabel}>{t('settlements_gross')}</Text>
+                  <Text style={styles.settlementStatValue}>
+                    {formatCurrency(
+                      (settlementSummary?.grossAmountMinor ?? 0) / 100,
+                      settlementSummary?.currency ?? 'EUR',
+                    )}
+                  </Text>
+                </View>
+                <View style={styles.settlementDivider} />
+                <View style={styles.settlementStat}>
+                  <Text style={styles.settlementStatLabel}>{t('settlements_net')}</Text>
+                  <Text style={[styles.settlementStatValue, styles.settlementNetValue]}>
+                    {formatCurrency(
+                      (settlementSummary?.netAmountMinor ?? 0) / 100,
+                      settlementSummary?.currency ?? 'EUR',
+                    )}
+                  </Text>
+                </View>
+              </View>
+            )}
+          </View>
         </View>
 
         <View style={styles.section}>
@@ -303,6 +353,34 @@ const styles = StyleSheet.create({
   appearanceSummaryLabel: { fontSize: 11, color: colors.gray500, fontWeight: '600' },
   appearanceSummaryValue: { marginTop: 4, fontSize: 18, fontWeight: '800', color: colors.onSurface },
   appearanceSummaryText: { marginTop: spacing.md, fontSize: 13, color: colors.gray600 },
+  settlementCard: {
+    backgroundColor: colors.white,
+    borderRadius: radius.xl,
+    padding: spacing.md,
+  },
+  settlementHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  settlementIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.md,
+    backgroundColor: `${colors.primary}15`,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  settlementTitle: { fontSize: 15, fontWeight: '700', color: colors.onSurface },
+  settlementLoader: { marginVertical: spacing.sm },
+  settlementError: { fontSize: 13, color: colors.error },
+  settlementRow: { flexDirection: 'row', alignItems: 'center' },
+  settlementStat: { flex: 1, alignItems: 'center' },
+  settlementStatLabel: { fontSize: 11, color: colors.gray500, fontWeight: '600', marginBottom: 4 },
+  settlementStatValue: { fontSize: 16, fontWeight: '700', color: colors.onSurface },
+  settlementNetValue: { color: colors.success },
+  settlementDivider: { width: 1, height: 32, backgroundColor: colors.surface },
   orderRow: {
     backgroundColor: colors.white, borderRadius: radius.xl,
     padding: spacing.md, marginBottom: spacing.sm,

@@ -82,7 +82,6 @@ export default function OrderDetailScreen() {
             <View style={styles.summaryTop}>
               <View style={styles.summaryIdentity}>
                 <Text style={styles.orderNum}>{t('order_number')}{order.orderId}</Text>
-                <Text style={styles.orderId}>ID: {order.orderId}</Text>
               </View>
               <View style={[styles.statusPill, { backgroundColor: `${STATUS_COLORS[order.status]}15` }]}>
                 <Ionicons
@@ -339,7 +338,6 @@ const styles = StyleSheet.create({
   summaryTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: spacing.md },
   summaryIdentity: { flex: 1, minWidth: 0 },
   orderNum: { fontSize: 18, fontWeight: '700', color: colors.onSurface },
-  orderId: { fontSize: 12, color: colors.gray500, marginTop: 2 },
   statusPill: {
     maxWidth: '46%',
     minHeight: 30,

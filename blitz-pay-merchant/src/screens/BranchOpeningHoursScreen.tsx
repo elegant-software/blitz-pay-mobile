@@ -134,7 +134,7 @@ export default function BranchOpeningHoursScreen() {
         {/* ── Branch info ── */}
         <View style={[styles.infoCard, shadow.sm]}>
           <Ionicons name="storefront-outline" size={18} color={colors.primary} />
-          <Text style={styles.infoText}>{activeBranchScope?.branchName ?? branchId}</Text>
+          <Text style={styles.infoText}>{activeBranchScope?.branchName ?? t('branch_fallback_name')}</Text>
         </View>
 
         {/* ── Weekly opening hours ── */}

@@ -7,12 +7,15 @@ export const STALE_TIMES = {
   ORDER_DETAIL: 15_000,
   PRODUCTS: 5 * 60_000,
   BRANCH_NAMES: 10 * 60_000,
+  SETTLEMENT_SUMMARY: 5 * 60_000,
 } as const;
 
 export const QUERY_KEYS = {
   ordersList: (branchId: string | null) => ['orders', branchId] as const,
   orderDetail: (orderId: string) => ['order', orderId] as const,
   products: (merchantId: string, branchId: string) => ['products', merchantId, branchId] as const,
+  settlementSummary: (merchantId: string, from: string, to: string) =>
+    ['settlements', 'summary', merchantId, from, to] as const,
 };
 
 export const queryClient = new QueryClient({
