@@ -230,6 +230,24 @@ export default function DashboardScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* KPI Dashboard shortcut */}
+        <View style={styles.section}>
+          <TouchableOpacity
+            style={[styles.kpiShortcutCard, shadow.sm]}
+            onPress={() => navigation.navigate('MerchantKpiDashboard')}
+            activeOpacity={0.8}
+          >
+            <View style={styles.kpiShortcutIcon}>
+              <Ionicons name="analytics-outline" size={20} color={colors.primary} />
+            </View>
+            <View style={styles.kpiShortcutContent}>
+              <Text style={styles.kpiShortcutTitle}>{t('kpi_dashboard_title')}</Text>
+              <Text style={styles.kpiShortcutSubtitle}>{t('kpi_scope_merchant')}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.gray500} />
+          </TouchableOpacity>
+        </View>
+
         {/* Recent orders */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -381,6 +399,25 @@ const styles = StyleSheet.create({
   settlementStatValue: { fontSize: 16, fontWeight: '700', color: colors.onSurface },
   settlementNetValue: { color: colors.success },
   settlementDivider: { width: 1, height: 32, backgroundColor: colors.surface },
+  kpiShortcutCard: {
+    backgroundColor: colors.white,
+    borderRadius: radius.xl,
+    padding: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  kpiShortcutIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: `${colors.primary}15`,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  kpiShortcutContent: { flex: 1 },
+  kpiShortcutTitle: { fontSize: 16, fontWeight: '700', color: colors.onSurface },
+  kpiShortcutSubtitle: { marginTop: 2, fontSize: 12, color: colors.gray600 },
   orderRow: {
     backgroundColor: colors.white, borderRadius: radius.xl,
     padding: spacing.md, marginBottom: spacing.sm,

@@ -49,6 +49,7 @@ export type RootStackParamList = {
   };
   AppointmentPolicy: undefined;
   BranchOpeningHours: undefined;
+  MerchantKpiDashboard: undefined;
 };
 
 export type TabParamList = {

@@ -227,7 +227,11 @@ export default function AccountScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <ScrollView contentContainerStyle={{ paddingBottom: 90 + insets.bottom }} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={{ paddingBottom: spacing.md }}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Profile */}
         <View style={styles.profileSection}>
           <View style={styles.avatarLarge}>
@@ -267,13 +271,14 @@ export default function AccountScreen() {
           </View>
         ))}
 
-        <View style={styles.section}>
-          <TouchableOpacity style={styles.logoutBtn} onPress={() => setShowLogoutModal(true)} activeOpacity={0.8}>
-            <Ionicons name="log-out-outline" size={18} color={colors.error} />
-            <Text style={styles.logoutText}>{t('logout')}</Text>
-          </TouchableOpacity>
-        </View>
       </ScrollView>
+
+      <View style={styles.logoutFooter}>
+        <TouchableOpacity style={styles.logoutBtn} onPress={() => setShowLogoutModal(true)} activeOpacity={0.8}>
+          <Ionicons name="log-out-outline" size={18} color={colors.error} />
+          <Text style={styles.logoutText}>{t('logout')}</Text>
+        </TouchableOpacity>
+      </View>
 
       <Modal visible={showLogoutModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
@@ -297,6 +302,7 @@ export default function AccountScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+  scrollView: { flex: 1 },
   profileSection: {
     alignItems: 'center', paddingVertical: spacing.xl,
     borderBottomWidth: 1, borderBottomColor: colors.gray200,
@@ -341,6 +347,14 @@ const styles = StyleSheet.create({
   langText: { fontSize: 12, fontWeight: '700', color: colors.gray600 },
   langTextActive: { color: colors.black },
   settingsLink: { fontSize: 12, fontWeight: '600', color: colors.primary },
+  logoutFooter: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.sm,
+    backgroundColor: colors.background,
+    borderTopWidth: 1,
+    borderTopColor: colors.gray200,
+  },
   logoutBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     backgroundColor: `${colors.error}10`, borderRadius: radius.xl,
