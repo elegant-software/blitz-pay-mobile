@@ -24,12 +24,12 @@ if (isFireOS) {
 const MOCK_LAT = process.env.EXPO_PUBLIC_MOCK_LAT;
 const MOCK_LNG = process.env.EXPO_PUBLIC_MOCK_LNG;
 
-function getCurrentPositionNative(): Promise<{ latitude: number; longitude: number }> {
+function getCurrentPositionNative(maximumAge = 30000): Promise<{ latitude: number; longitude: number }> {
   return new Promise((resolve, reject) => {
     Geolocation.getCurrentPosition(
       (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
       (err) => reject(new Error(err.message)),
-      { enableHighAccuracy: false, timeout: 15000, maximumAge: 30000 },
+      { enableHighAccuracy: false, timeout: 15000, maximumAge },
     );
   });
 }
@@ -72,4 +72,26 @@ export async function resolveCurrentCoordinates(): Promise<{ latitude: number; l
   }
 
   throw new MerchantProductError('merchant_location_unavailable', 'location_unavailable');
+}
+
+export async function resolveFreshCoordinates(): Promise<{ latitude: number; longitude: number }> {
+  if (MOCK_LAT && MOCK_LNG) {
+    const latitude = parseFloat(MOCK_LAT);
+    const longitude = parseFloat(MOCK_LNG);
+    if (Number.isFinite(latitude) && Number.isFinite(longitude)) return { latitude, longitude };
+  }
+  if (isFireOS) return getCurrentPositionNative(0);
+  const { status } = await Location.requestForegroundPermissionsAsync();
+  if (status !== Location.PermissionStatus.GRANTED) {
+    throw new MerchantProductError('merchant_location_permission_required', `location_permission_${status}`);
+  }
+  const current = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+  return { latitude: current.coords.latitude, longitude: current.coords.longitude };
+}
+
+export async function reverseGeocodeCoordinates(latitude: number, longitude: number): Promise<string | null> {
+  const results = await Location.reverseGeocodeAsync({ latitude, longitude }).catch(() => []);
+  const place = results[0];
+  if (!place) return null;
+  return [place.name, place.street, place.city, place.region, place.country].filter(Boolean).join(', ') || null;
 }

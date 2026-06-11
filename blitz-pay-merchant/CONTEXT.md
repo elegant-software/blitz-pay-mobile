@@ -12,9 +12,21 @@ _Avoid_: Merchant, account, member
 The operational branch whose orders, products, and related data are managed in the merchant portal.
 _Avoid_: Store, shop, location
 
+**Mobile Merchant**:
+A Merchant whose business operates through changing physical locations; the classification applies to every Merchant Branch.
+_Avoid_: Mobile branch, mixed merchant
+
+**Merchant Manager**:
+A Merchant User authorized to configure merchant-wide capabilities and public shopper-discovery behavior.
+_Avoid_: Employee, branch member
+
 **Appearance**:
-A scheduled, time-bounded live presence of one **Merchant Branch** that a **Merchant User** can create or cancel.
+A scheduled, time-bounded live presence of one **Merchant Branch** belonging to a **Mobile Merchant** that a **Merchant User** can create or cancel.
 _Avoid_: Live toggle, nearby merchant, branch location
+
+**Appearance History**:
+The record of completed or cancelled Appearances, including their branch, location, time window, and status.
+_Avoid_: Movement history, GPS trace
 
 **Branch Membership**:
 The authorization of a Merchant User to access one Merchant Branch, derived from a branch group in the access token.
@@ -52,6 +64,10 @@ _Avoid_: Customer name display, shopper profile visibility, identity lookup from
 - **Stripe Connect Onboarding** configures exactly one **Merchant Payment Account**
 - **Shopper Identity Withholding** applies across the entire merchant portal UI within one **Merchant Branch**
 - An **Appearance** belongs to exactly one **Merchant Branch**
+- A Merchant is either mobile or fixed; its **Merchant Branches** cannot mix classifications
+- Only a **Mobile Merchant** may have **Appearances**
+- Only a **Merchant Manager** may view, create, or cancel **Appearances**
+- **Appearance History** contains completed or cancelled **Appearances**, not individual location movements
 
 ## Example dialogue
 

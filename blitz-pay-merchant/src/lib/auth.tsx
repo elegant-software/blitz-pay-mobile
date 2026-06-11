@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 import { storage } from './storage';
 import { config } from './config';
 import { observability } from './observability';
-import { fetchMerchantBranches, fetchMerchantName } from './merchantProducts';
+import { fetchMerchantBranches, fetchMerchantDetails, fetchMerchantName } from './merchantProducts';
 import { fetchMerchantBranchDetails } from './merchantBranches';
 
 const LocalAuthentication = Platform.OS !== 'web'
@@ -28,6 +28,7 @@ export interface ActiveBranchScope {
   branchId: string;
   branchName: string | null;
   merchantName: string | null;
+  merchantMobility: 'BRICK_AND_MORTAR' | 'MOBILE' | null;
   branchStatus?: string | null;
   latitude?: number;
   longitude?: number;
@@ -219,6 +220,7 @@ function buildBranchScope(
       branchId: selectedMembership.branchId,
       branchName: null,
       merchantName: null,
+      merchantMobility: null,
       source: 'branch_membership',
       status: 'resolved',
     },
@@ -355,14 +357,17 @@ async function refreshAccessToken(refreshToken: string): Promise<StoredSession |
 async function enrichBranchScope(scope: ActiveBranchScope | null): Promise<ActiveBranchScope | null> {
   if (!scope) return null;
 
-  const details = await fetchMerchantBranchDetails(scope.merchantId, scope.branchId).catch(() => null);
+  const [details, merchantDetails] = await Promise.all([
+    fetchMerchantBranchDetails(scope.merchantId, scope.branchId).catch(() => null),
+    fetchMerchantDetails(scope.merchantId).catch(() => null),
+  ]);
   if (!details) {
     observability.warn('merchant_branch_scope_enrichment_failed', {
       merchantId: scope.merchantId,
       branchId: scope.branchId,
       reason: 'branch_details_unavailable',
     });
-    return scope;
+    return { ...scope, merchantMobility: merchantDetails?.mobility ?? null };
   }
 
   observability.info('merchant_branch_scope_enrichment_succeeded', {
@@ -373,6 +378,8 @@ async function enrichBranchScope(scope: ActiveBranchScope | null): Promise<Activ
 
   return {
     ...scope,
+    merchantName: merchantDetails?.name ?? scope.merchantName,
+    merchantMobility: merchantDetails?.mobility ?? null,
     branchName: details.name,
     branchStatus: details.status ?? null,
     latitude: details.latitude,
@@ -404,6 +411,7 @@ const BYPASS_BRANCH_SCOPE: ActiveBranchScope = {
   branchId: 'branch_demo',
   branchName: 'Demo Branch',
   merchantName: 'Demo Merchant',
+  merchantMobility: 'MOBILE',
   source: 'branch_membership',
   status: 'resolved',
 };

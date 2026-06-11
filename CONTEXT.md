@@ -458,7 +458,7 @@ A merchant returned for a shopper's position because it has at least one active 
 _Avoid_: Live branch, appearance, happening now item
 
 **Appearance**:
-A time-bounded live presence of a mobile Merchant Branch that is happening now or scheduled for later.
+A time-bounded live presence of a Merchant Branch belonging to a Mobile Merchant that is happening now or scheduled for later.
 _Avoid_: Nearby merchant, event, branch location
 
 **Active Appearance**:
@@ -473,6 +473,7 @@ _Avoid_: Nearest branch fallback
 
 - A **Nearby Merchant** has one or more **Merchant Branches**
 - An **Appearance** belongs to exactly one **Merchant Branch**
+- Only a Mobile Merchant may have **Appearances**
 - An **Active Appearance** is one currently active **Appearance**
 - **Appearance Branch Selection** chooses exactly one **Merchant Branch** from the tapped **Active Appearance**
 

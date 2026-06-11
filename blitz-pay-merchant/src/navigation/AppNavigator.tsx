@@ -15,6 +15,7 @@ import MerchantQRCodeScreen from '../screens/MerchantQRCodeScreen';
 import PaymentsHistoryScreen from '../screens/PaymentsHistoryScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import AppearancesScreen from '../screens/AppearancesScreen';
+import CreateAppearanceScreen from '../screens/CreateAppearanceScreen';
 import CreateOrderScreen from '../screens/CreateOrderScreen';
 import EmployeeCalendarScreen from '../screens/EmployeeCalendarScreen';
 import AppointmentDetailScreen from '../screens/AppointmentDetailScreen';
@@ -61,6 +62,7 @@ export default function AppNavigator() {
           <Stack.Screen name="PaymentsHistory" component={PaymentsHistoryScreen} />
           <Stack.Screen name="Notifications" component={NotificationsScreen} />
           <Stack.Screen name="Appearances" component={AppearancesScreen} />
+          <Stack.Screen name="CreateAppearance" component={CreateAppearanceScreen} />
           <Stack.Screen name="CreateOrder" component={CreateOrderScreen} />
           <Stack.Screen name="EmployeeCalendar" component={EmployeeCalendarScreen} />
           <Stack.Screen name="AppointmentDetail" component={AppointmentDetailScreen} />

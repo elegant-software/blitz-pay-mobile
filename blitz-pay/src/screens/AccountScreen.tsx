@@ -192,7 +192,11 @@ export default function AccountScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <ScrollView contentContainerStyle={{ paddingBottom: 90 + insets.bottom }} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={{ paddingBottom: 90 + insets.bottom }}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Profile */}
         <View style={styles.profileSection}>
           <View style={styles.avatarLarge}>
@@ -271,6 +275,7 @@ export default function AccountScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+  scrollView: { flex: 1 },
   profileSection: {
     alignItems: 'center',
     paddingVertical: spacing.xl,

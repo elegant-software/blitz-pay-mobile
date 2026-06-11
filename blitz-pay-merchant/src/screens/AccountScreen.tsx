@@ -16,7 +16,7 @@ const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreCl
 
 export default function AccountScreen() {
   const { t, language, setLanguage } = useLanguage();
-  const { user, logout, isBiometricAvailable, biometricEnrolled, enrollBiometric, unenrollBiometric } = useAuth();
+  const { user, activeBranchScope, logout, isBiometricAvailable, biometricEnrolled, enrollBiometric, unenrollBiometric } = useAuth();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
 
@@ -108,6 +108,12 @@ export default function AccountScreen() {
     {
       title: 'Merchant',
       rows: [
+        ...(activeBranchScope?.merchantMobility === 'MOBILE' ? [{
+          icon: 'radio-outline' as const,
+          label: t('merchant_appearances'),
+          onPress: () => navigation.navigate('Appearances' as never),
+          showArrow: true,
+        }] : []),
         {
           icon: 'qr-code-outline' as const,
           label: t('merchant_qr'),

@@ -4,7 +4,7 @@ PODS:
   - EXConstants (55.0.15):
     - ExpoModulesCore
   - EXJSONUtils (55.0.2)
-  - EXManifests (55.0.16):
+  - EXManifests (55.0.17):
     - ExpoModulesCore
   - Expo (55.0.18):
     - ExpoModulesCore
@@ -31,15 +31,15 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
-  - expo-dev-client (55.0.28):
+  - expo-dev-client (55.0.35):
     - EXManifests
     - expo-dev-launcher
     - expo-dev-menu
     - expo-dev-menu-interface
     - EXUpdatesInterface
-  - expo-dev-launcher (55.0.29):
+  - expo-dev-launcher (55.0.36):
     - EXManifests
-    - expo-dev-launcher/Main (= 55.0.29)
+    - expo-dev-launcher/Main (= 55.0.36)
     - expo-dev-menu
     - expo-dev-menu-interface
     - ExpoModulesCore
@@ -68,7 +68,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
-  - expo-dev-launcher/Main (55.0.29):
+  - expo-dev-launcher/Main (55.0.36):
     - EXManifests
     - expo-dev-launcher/Unsafe
     - expo-dev-menu
@@ -99,7 +99,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
-  - expo-dev-launcher/Unsafe (55.0.29):
+  - expo-dev-launcher/Unsafe (55.0.36):
     - EXManifests
     - expo-dev-menu
     - expo-dev-menu-interface
@@ -129,8 +129,8 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
-  - expo-dev-menu (55.0.24):
-    - expo-dev-menu/Main (= 55.0.24)
+  - expo-dev-menu (55.0.30):
+    - expo-dev-menu/Main (= 55.0.30)
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -153,7 +153,7 @@ PODS:
     - ReactNativeDependencies
     - Yoga
   - expo-dev-menu-interface (55.0.2)
-  - expo-dev-menu/Main (55.0.24):
+  - expo-dev-menu/Main (55.0.30):
     - EXManifests
     - expo-dev-menu-interface
     - ExpoModulesCore
@@ -2240,6 +2240,30 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
+  - stripe-terminal-react-native (0.0.1-beta.31):
+    - hermes-engine
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-Core-prebuilt
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - ReactNativeDependencies
+    - StripeTerminal (~> 5.5.0)
+    - Yoga
+  - StripeTerminal (5.5.0)
   - UMAppLoader (55.0.5)
   - Yoga (0.0.0)
   - ZXingObjC/Core (3.6.9)
@@ -2359,11 +2383,13 @@ DEPENDENCIES:
   - RNGestureHandler (from `../node_modules/react-native-gesture-handler`)
   - RNScreens (from `../node_modules/react-native-screens`)
   - RNSVG (from `../node_modules/react-native-svg`)
+  - "stripe-terminal-react-native (from `../node_modules/@stripe/stripe-terminal-react-native`)"
   - UMAppLoader (from `../node_modules/unimodules-app-loader/ios`)
   - Yoga (from `../node_modules/react-native/ReactCommon/yoga`)
 
 SPEC REPOS:
   trunk:
+    - StripeTerminal
     - ZXingObjC
 
 EXTERNAL SOURCES:
@@ -2586,6 +2612,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native-screens"
   RNSVG:
     :path: "../node_modules/react-native-svg"
+  stripe-terminal-react-native:
+    :path: "../node_modules/@stripe/stripe-terminal-react-native"
   UMAppLoader:
     :path: "../node_modules/unimodules-app-loader/ios"
   Yoga:
@@ -2595,11 +2623,11 @@ SPEC CHECKSUMS:
   EXApplication: ab5a9ca485adce8be81309a5172d1565e9d7467f
   EXConstants: 5caf448ff399f60be9d1053e77aed32e39411900
   EXJSONUtils: 04bc3807d351331a5fe154ce1da596ec15d99169
-  EXManifests: f4e50a54115948e206f4c2391bdea755a1aa74ec
+  EXManifests: 35b26ca30c8a6bd427d1cba20348cd3c43684bb2
   Expo: 78ab86e6cf5d123b23e8e697b5c7112eebd276a8
-  expo-dev-client: 6802a357b6ee3b36669c4c9e9622be55b3cd4494
-  expo-dev-launcher: e7b80352aa5e11e696c1f939c9eafa8ad33a5779
-  expo-dev-menu: 8d6cf955ad15b1f33b73aec853a9ec02afc39c04
+  expo-dev-client: f65f51def820b8c6d4b249942c98538fc42a68b4
+  expo-dev-launcher: f61d325756363aa4622b09d189955659f1afe297
+  expo-dev-menu: ff595953daf028b6bd9f0fa9b77bf58fbc41fa66
   expo-dev-menu-interface: 833795f4c98a674d36cbc12b11b21756c38e01e8
   ExpoAsset: f56ed740b6a127da2bfd90832cf688ae309d4410
   ExpoCamera: 0ed88db61b7dc54712a98b8baaf415a3be88b76b
@@ -2701,6 +2729,8 @@ SPEC CHECKSUMS:
   RNGestureHandler: 0ea8153746a92b3744d4eaadade647debedf646e
   RNScreens: 14243fa0d9842ffa7f8bb2d00b6c3cfd3ca817e8
   RNSVG: 0bd149b873018bc6e0e3321e2f6435bdba294460
+  stripe-terminal-react-native: 9185ab5c829317d7d3a38536c863ffeac6903e30
+  StripeTerminal: e9c7e64089beeed2188e6e6afe8779c01945d13c
   UMAppLoader: 045699ef1cc6afda399a5c78bde728f23bcce213
   Yoga: e41d64347f52d634dd8c2f6bac33f95081959fd3
   ZXingObjC: 8898711ab495761b2dbbdec76d90164a6d7e14c5

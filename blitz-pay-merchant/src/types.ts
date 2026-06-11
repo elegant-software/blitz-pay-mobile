@@ -23,6 +23,7 @@ export type RootStackParamList = {
   PaymentsHistory: undefined;
   Notifications: undefined;
   Appearances: undefined;
+  CreateAppearance: undefined;
   CreateOrder: undefined;
   EmployeeCalendar: undefined;
   MerchantCalendar: undefined;
