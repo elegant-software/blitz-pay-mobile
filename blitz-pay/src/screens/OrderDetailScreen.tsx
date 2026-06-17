@@ -7,6 +7,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
+  Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -28,6 +29,7 @@ import { fetchMerchantStripeConnectStatus } from '../features/merchant-catalog/s
 import type { PaymentChannel } from '../features/merchant-catalog/types/catalog';
 import { observability } from '../lib/observability';
 import type { RootStackNav, RootStackParamList } from '../types';
+import { fetchOrderInvoice } from '../lib/api/shopperInvoice';
 
 const METHODS: Array<{
   key: CheckoutPaymentMethod;
@@ -77,6 +79,8 @@ export default function OrderDetailScreen() {
   );
   const [submitting, setSubmitting] = useState(false);
   const [activePaymentChannels, setActivePaymentChannels] = useState<PaymentChannel[]>([]);
+  const [invoiceUrl, setInvoiceUrl] = useState<string | null>(null);
+  const [invoiceChecked, setInvoiceChecked] = useState(false);
   const session = orderPaymentStore.getSession(route.params.orderId);
 
   useEffect(() => {
@@ -100,6 +104,16 @@ export default function OrderDetailScreen() {
       active = false;
     };
   }, [refreshOrder, route.params.orderId]);
+
+  useEffect(() => {
+    if (order?.status !== 'PAID') return;
+    const orderId = order.orderId;
+    setInvoiceChecked(false);
+    void fetchOrderInvoice(orderId)
+      .then((inv) => { setInvoiceUrl(inv?.url ?? null); })
+      .catch(() => { setInvoiceUrl(null); })
+      .finally(() => { setInvoiceChecked(true); });
+  }, [order?.status, order?.orderId]);
 
   useEffect(() => {
     let active = true;
@@ -305,6 +319,22 @@ export default function OrderDetailScreen() {
             ))}
           </View>
 
+          {order?.status === 'PAID' && !invoiceChecked ? (
+            <View style={styles.invoiceButton}>
+              <ActivityIndicator size="small" color={colors.gray400} />
+              <Text style={[styles.invoiceButtonText, { color: colors.gray400 }]}>Checking for invoice…</Text>
+            </View>
+          ) : invoiceUrl ? (
+            <TouchableOpacity
+              style={styles.invoiceButton}
+              onPress={() => void Linking.openURL(invoiceUrl)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="document-text-outline" size={18} color={colors.onSurface} />
+              <Text style={styles.invoiceButtonText}>View Invoice</Text>
+            </TouchableOpacity>
+          ) : null}
+
           {canResume ? (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>{t('resume_payment')}</Text>
@@ -474,4 +504,17 @@ const styles = StyleSheet.create({
   resumeButton: { backgroundColor: colors.primary, borderRadius: radius.full, padding: spacing.md, alignItems: 'center' },
   resumeButtonDisabled: { opacity: 0.5 },
   resumeButtonText: { color: colors.black, fontSize: 15, fontWeight: '700' },
+  invoiceButton: {
+    marginTop: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.white,
+    borderRadius: radius.xl,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.gray200,
+  },
+  invoiceButtonText: { fontSize: 15, fontWeight: '600', color: colors.onSurface },
 });

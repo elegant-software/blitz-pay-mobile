@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   Switch,
   Modal,
   Alert,
+  TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,6 +20,12 @@ import { colors, spacing, radius, shadow } from '../lib/theme';
 import type { Language } from '../lib/translations';
 import { useNavigation } from '@react-navigation/native';
 import type { RootStackNav } from '../types';
+import {
+  fetchShopperProfile,
+  upsertShopperProfile,
+  deleteShopperProfile,
+  type ShopperProfileResponse,
+} from '../lib/api/shopperProfile';
 
 export default function AccountScreen() {
   const { t, language, setLanguage } = useLanguage();
@@ -29,6 +37,82 @@ export default function AccountScreen() {
   const [biometricEnabled, setBiometricEnabled] = useState(biometricEnrolled);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const { isMonitoring, isPolling, enable: enableGeofence, disable: disableGeofence, enablePolling, disablePolling, needsSettingsForBackground, openSettings } = useGeofence();
+
+  const [profile, setProfile] = useState<ShopperProfileResponse | null>(null);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [invoiceSaving, setInvoiceSaving] = useState(false);
+  const [invoiceForm, setInvoiceForm] = useState({ name: '', street: '', zip: '', city: '', country: '' });
+
+  const loadProfile = useCallback(async () => {
+    try {
+      setProfileLoading(true);
+      const p = await fetchShopperProfile();
+      setProfile(p);
+    } catch {
+      // silently ignore — profile section will show empty state
+    } finally {
+      setProfileLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void loadProfile(); }, [loadProfile]);
+
+  const openInvoiceEdit = () => {
+    setInvoiceForm({
+      name: profile?.name ?? '',
+      street: profile?.street ?? '',
+      zip: profile?.zip ?? '',
+      city: profile?.city ?? '',
+      country: profile?.country ?? '',
+    });
+    setShowInvoiceModal(true);
+  };
+
+  const saveInvoiceAddress = async () => {
+    if (!invoiceForm.name.trim() || !invoiceForm.street.trim() || !invoiceForm.zip.trim() || !invoiceForm.city.trim() || !invoiceForm.country.trim()) {
+      Alert.alert('Missing Fields', 'All fields are required.');
+      return;
+    }
+    try {
+      setInvoiceSaving(true);
+      const saved = await upsertShopperProfile({
+        name: invoiceForm.name.trim(),
+        street: invoiceForm.street.trim(),
+        zip: invoiceForm.zip.trim(),
+        city: invoiceForm.city.trim(),
+        country: invoiceForm.country.trim(),
+      });
+      setProfile(saved);
+      setShowInvoiceModal(false);
+    } catch {
+      Alert.alert('Error', 'Could not save invoice address. Please try again.');
+    } finally {
+      setInvoiceSaving(false);
+    }
+  };
+
+  const handleDeleteInvoiceAddress = () => {
+    Alert.alert(
+      'Remove Invoice Address',
+      'Your invoice address will be removed and invoices will no longer be generated for your orders.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteShopperProfile();
+              setProfile(null);
+            } catch {
+              Alert.alert('Error', 'Could not remove invoice address. Please try again.');
+            }
+          },
+        },
+      ],
+    );
+  };
 
   const handleGeofenceToggle = async (value: boolean) => {
     if (!value) { await disableGeofence(); return; }
@@ -82,6 +166,18 @@ export default function AccountScreen() {
           label: t('my_appointments'),
           onPress: () => navigation.navigate('MyAppointments'),
           showArrow: true,
+        },
+      ],
+    },
+    {
+      title: 'Account',
+      rows: [
+        {
+          icon: 'receipt-outline',
+          label: 'Invoice Address',
+          onPress: openInvoiceEdit,
+          showArrow: true,
+          right: undefined as React.ReactNode,
         },
       ],
     },
@@ -249,6 +345,60 @@ export default function AccountScreen() {
         </View>
       </ScrollView>
 
+      {/* Invoice Address edit modal */}
+      <Modal visible={showInvoiceModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { maxHeight: '85%' }]}>
+            <View style={styles.invoiceModalHeader}>
+              <Text style={styles.modalTitle}>Invoice Address</Text>
+              <TouchableOpacity onPress={() => setShowInvoiceModal(false)}>
+                <Ionicons name="close" size={22} color={colors.gray600} />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.modalDesc}>This address is used automatically for invoice generation on your paid orders.</Text>
+            <ScrollView showsVerticalScrollIndicator={false} style={{ flexGrow: 0 }}>
+              {(
+                [
+                  { key: 'name', label: 'Full Name', placeholder: 'Jane Doe' },
+                  { key: 'street', label: 'Street & Number', placeholder: '123 Main St' },
+                  { key: 'zip', label: 'Postcode', placeholder: '10115' },
+                  { key: 'city', label: 'City', placeholder: 'Berlin' },
+                  { key: 'country', label: 'Country', placeholder: 'DE' },
+                ] as const
+              ).map(({ key, label, placeholder }) => (
+                <View key={key} style={styles.invoiceFieldRow}>
+                  <Text style={styles.invoiceFieldLabel}>{label}</Text>
+                  <TextInput
+                    style={styles.invoiceFieldInput}
+                    value={invoiceForm[key]}
+                    onChangeText={(v) => setInvoiceForm((f) => ({ ...f, [key]: v }))}
+                    placeholder={placeholder}
+                    placeholderTextColor={colors.gray400}
+                    autoCorrect={false}
+                  />
+                </View>
+              ))}
+            </ScrollView>
+            <View style={[styles.modalActions, { marginTop: spacing.md }]}>
+              <TouchableOpacity style={styles.modalCancel} onPress={() => setShowInvoiceModal(false)}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalConfirm, { backgroundColor: colors.primary }, invoiceSaving && { opacity: 0.6 }]}
+                onPress={saveInvoiceAddress}
+                disabled={invoiceSaving}
+              >
+                {invoiceSaving ? (
+                  <ActivityIndicator size="small" color={colors.black} />
+                ) : (
+                  <Text style={[styles.modalConfirmText, { color: colors.black }]}>Save</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Logout confirmation modal */}
       <Modal visible={showLogoutModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
@@ -405,4 +555,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalConfirmText: { fontSize: 15, fontWeight: '600', color: colors.white },
+  invoiceModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  invoiceFieldRow: { marginBottom: spacing.sm },
+  invoiceFieldLabel: { fontSize: 12, fontWeight: '600', color: colors.gray600, marginBottom: 4 },
+  invoiceFieldInput: {
+    borderWidth: 1,
+    borderColor: colors.gray300,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+    fontSize: 15,
+    color: colors.onSurface,
+    backgroundColor: colors.surface,
+  },
 });
