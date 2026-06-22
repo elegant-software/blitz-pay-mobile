@@ -99,6 +99,12 @@ export interface OrderSummary {
   paidAt?: string;
   manualSettlementNote?: string;
   banner?: OrderUpdateBanner;
+  /** If set, this is an invoice order sent by a merchant to this shopper. */
+  targetShopperId?: string;
+  /** ISO date (e.g. "2026-07-01") — display-only due date for invoice orders. */
+  dueDate?: string;
+  /** True when the order uses deferred payment (PAY_LATER / invoice order). */
+  usesDeferredPayment?: boolean;
 }
 
 export interface RecentOrderSummary extends OrderSummary {

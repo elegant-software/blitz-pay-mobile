@@ -5,6 +5,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useLanguage } from '../lib/LanguageContext';
 import { useAuth } from '../lib/auth';
 import { colors, spacing, radius, shadow } from '../lib/theme';
@@ -13,6 +14,7 @@ import { getMerchantOrderStatusIcon, getMerchantOrderStatusLabelKey } from '../f
 import { useMerchantOrderDetail } from '../features/orders/hooks/useMerchantOrderDetail';
 import { useMerchantProducts } from '../features/products/hooks/useMerchantProducts';
 import { useStripeTerminalPayment } from '../hooks/useStripeTerminalPayment';
+import { fetchMerchantOrderInvoice } from '../features/orders/services/orderService';
 
 type RouteProps = RouteProp<RootStackParamList, 'OrderDetail'>;
 
@@ -31,7 +33,7 @@ function formatCurrency(amountMinor: number, currency = 'EUR') {
 export default function OrderDetailScreen() {
   const { t } = useLanguage();
   const { activeBranchScope, branchScopeError } = useAuth();
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProps>();
   const insets = useSafeAreaInsets();
   const {
@@ -51,9 +53,38 @@ export default function OrderDetailScreen() {
   const { status: terminalStatus, errorMessage: terminalError, collectPayment, reset: resetTerminal } = useStripeTerminalPayment();
   const [terminalReconciling, setTerminalReconciling] = React.useState(false);
   const [addItemVisible, setAddItemVisible] = React.useState(false);
+  const [invoiceUrl, setInvoiceUrl] = React.useState<string | null>(null);
+  const [invoiceChecked, setInvoiceChecked] = React.useState(false);
+  const isInvoiceOrder = order?.checkoutIntent === 'PAY_LATER';
   const terminalBusy = terminalReconciling || (terminalStatus !== 'idle' && terminalStatus !== 'succeeded' && terminalStatus !== 'failed');
   const existingProductIds = new Set(order?.items.map((item) => item.productId) ?? []);
   const availableProducts = products.filter((product) => product.active && !existingProductIds.has(product.id));
+
+  React.useEffect(() => {
+    if (!order?.orderId || !activeBranchScope) {
+      setInvoiceUrl(null);
+      setInvoiceChecked(false);
+      return;
+    }
+    let active = true;
+    setInvoiceChecked(false);
+    void fetchMerchantOrderInvoice(order.orderId, activeBranchScope)
+      .then((invoice) => {
+        if (!active) return;
+        setInvoiceUrl(invoice?.url ?? null);
+      })
+      .catch(() => {
+        if (!active) return;
+        setInvoiceUrl(null);
+      })
+      .finally(() => {
+        if (!active) return;
+        setInvoiceChecked(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [activeBranchScope, order?.orderId, order?.status]);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -203,6 +234,29 @@ export default function OrderDetailScreen() {
               ) : null}
             </View>
           </View>
+
+          {isInvoiceOrder ? (
+            !invoiceChecked ? (
+              <View style={styles.invoiceButton}>
+                <ActivityIndicator size="small" color={colors.gray400} />
+                <Text style={[styles.invoiceButtonText, { color: colors.gray400 }]}>{t('merchant_invoice_checking')}</Text>
+              </View>
+            ) : invoiceUrl ? (
+              <TouchableOpacity
+                style={styles.invoiceButton}
+                onPress={() => navigation.navigate('InvoicePdf', { url: invoiceUrl, title: t('merchant_invoice_view') })}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="document-text-outline" size={18} color={colors.onSurface} />
+                <Text style={styles.invoiceButtonText}>{t('merchant_invoice_view')}</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={[styles.invoiceButton, { opacity: 0.6 }]}>
+                <Ionicons name="time-outline" size={18} color={colors.gray500} />
+                <Text style={[styles.invoiceButtonText, { color: colors.gray500 }]}>{t('merchant_invoice_pending')}</Text>
+              </View>
+            )
+          ) : null}
 
           {(order.status === 'awaiting_payment' || order.status === 'payment_failed' || order.status === 'payment_in_progress') ? (
             <View style={styles.actions}>
@@ -400,6 +454,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm,
   },
   addItemButtonText: { fontSize: 14, fontWeight: '700', color: colors.primary },
+  invoiceButton: {
+    marginHorizontal: spacing.md,
+    marginTop: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.white,
+    borderRadius: radius.xl,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.gray200,
+  },
+  invoiceButtonText: { fontSize: 15, fontWeight: '600', color: colors.onSurface },
   modalOverlay: { flex: 1, backgroundColor: colors.overlayDark, justifyContent: 'flex-end' },
   modalSheet: {
     backgroundColor: colors.white, borderTopLeftRadius: radius.xxl, borderTopRightRadius: radius.xxl,

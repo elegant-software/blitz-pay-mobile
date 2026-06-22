@@ -6,6 +6,7 @@ import {
   StyleSheet,
   FlatList,
   ActivityIndicator,
+  TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,8 +21,11 @@ import { useMerchantProducts } from '../features/products/hooks/useMerchantProdu
 import {
   createMerchantOrder,
   fetchMerchantOrderDetail,
+  fetchBranchCustomers,
+  searchShopperByEmail,
   MerchantOrderError,
 } from '../features/orders/services/orderService';
+import type { BranchCustomer } from '../features/orders/types/order';
 import type { RootStackNav } from '../types';
 import type { Product } from '../types';
 
@@ -34,7 +38,12 @@ function formatCurrency(amount: number) {
   return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(amount);
 }
 
-type Mode = 'compose' | 'qr' | 'paid' | 'expired';
+function formatDate(iso: string) {
+  const d = new Date(iso);
+  return d.toLocaleDateString('de-DE', { year: 'numeric', month: '2-digit', day: '2-digit' });
+}
+
+type Mode = 'compose' | 'intent' | 'shopper' | 'qr' | 'paid' | 'expired' | 'invoice_sent';
 
 export default function CreateOrderScreen() {
   const { t } = useLanguage();
@@ -51,6 +60,17 @@ export default function CreateOrderScreen() {
   const [createError, setCreateError] = useState('');
   const [createdOrderId, setCreatedOrderId] = useState('');
   const [orderTotal, setOrderTotal] = useState(0);
+
+  // Invoice flow state
+  const [customers, setCustomers] = useState<BranchCustomer[]>([]);
+  const [customersLoading, setCustomersLoading] = useState(false);
+  const [customersError, setCustomersError] = useState('');
+  const [selectedShopper, setSelectedShopper] = useState<BranchCustomer | null>(null);
+  const [searchEmail, setSearchEmail] = useState('');
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState('');
+  const [searchResult, setSearchResult] = useState<BranchCustomer | null | undefined>(undefined);
+  const [dueDate, setDueDate] = useState('');
 
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -105,6 +125,25 @@ export default function CreateOrderScreen() {
     };
   }, [mode, createdOrderId, activeBranchScope]);
 
+  // Load past customers when entering shopper picker
+  useEffect(() => {
+    if (mode !== 'shopper' || !activeBranchScope) return;
+    let cancelled = false;
+    setCustomersLoading(true);
+    setCustomersError('');
+    void (async () => {
+      try {
+        const result = await fetchBranchCustomers(activeBranchScope.branchId);
+        if (!cancelled) setCustomers(result);
+      } catch {
+        if (!cancelled) setCustomersError(t('create_order_customers_load_failed'));
+      } finally {
+        if (!cancelled) setCustomersLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [mode, activeBranchScope, t]);
+
   const selectedCount = Object.values(quantities).filter((q) => q > 0).length;
   const runningTotal = activeProducts.reduce(
     (sum, p) => sum + p.unitPrice * (quantities[p.id] ?? 0),
@@ -125,7 +164,12 @@ export default function CreateOrderScreen() {
       return { ...q, [productId]: current - 1 };
     });
 
-  const handleCreate = async () => {
+  const handleProceed = () => {
+    if (selectedCount === 0) return;
+    setMode('intent');
+  };
+
+  const handleQrIntent = async () => {
     if (!activeBranchScope || selectedCount === 0) return;
     setCreating(true);
     setCreateError('');
@@ -149,15 +193,128 @@ export default function CreateOrderScreen() {
     }
   };
 
+  const handleInvoiceIntent = () => {
+    setSelectedShopper(null);
+    setSearchEmail('');
+    setSearchError('');
+    setSearchResult(undefined);
+    setDueDate('');
+    setMode('shopper');
+  };
+
+  const handleSearchShopper = async () => {
+    if (!searchEmail.trim()) return;
+    setSearching(true);
+    setSearchError('');
+    setSearchResult(undefined);
+    try {
+      const result = await searchShopperByEmail(searchEmail.trim());
+      setSearchResult(result);
+      if (!result) setSearchError(t('create_order_shopper_not_found'));
+    } catch {
+      setSearchError(t('create_order_shopper_not_found'));
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const handleSendInvoice = async () => {
+    if (!activeBranchScope || !selectedShopper || selectedCount === 0) return;
+    setCreating(true);
+    setCreateError('');
+    try {
+      const items = activeProducts
+        .filter((p) => (quantities[p.id] ?? 0) > 0)
+        .map((p) => ({ productId: p.id, quantity: quantities[p.id]! }));
+      const order = await createMerchantOrder(
+        activeBranchScope.merchantId,
+        activeBranchScope.branchId,
+        items,
+        {
+          targetShopperId: selectedShopper.shopperAccountId,
+          dueDate: dueDate || undefined,
+        },
+      );
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setCreatedOrderId(order.orderId);
+      setOrderTotal(runningTotal);
+      setMode('invoice_sent');
+    } catch (e) {
+      setCreateError(e instanceof MerchantOrderError ? e.detail : t('create_order_failed'));
+    } finally {
+      setCreating(false);
+    }
+  };
+
   const handleReset = () => {
     setMode('compose');
     setQuantities({});
     setCreatedOrderId('');
     setCreateError('');
     setOrderTotal(0);
+    setSelectedShopper(null);
+    setSearchEmail('');
+    setSearchError('');
+    setSearchResult(undefined);
+    setDueDate('');
+    setCustomers([]);
+    setCustomersError('');
   };
 
   const qrValue = `blitzpay://order/${createdOrderId}`;
+
+  // ---------- Result screens ----------
+
+  if (mode === 'invoice_sent') {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+        <View style={styles.header}>
+          <View style={{ width: 40 }} />
+          <Text style={styles.headerTitle}>{t('create_order')}</Text>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.closeBtn}>
+            <Ionicons name="close" size={22} color={colors.onSurface} />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.resultContainer}>
+          <View style={[styles.resultCard, shadow.lg]}>
+            <View style={[styles.resultIcon, styles.resultIconPaid]}>
+              <Ionicons name="paper-plane" size={48} color={colors.white} />
+            </View>
+            <Text style={styles.resultTitle}>{t('create_order_invoice_sent_title')}</Text>
+            <Text style={styles.resultSubtitle}>{t('create_order_invoice_sent_subtitle')}</Text>
+            <Text style={styles.resultAmount}>{formatCurrency(orderTotal)}</Text>
+            {selectedShopper ? (
+              <Text style={styles.resultOrderId}>{selectedShopper.name}</Text>
+            ) : null}
+            {dueDate ? (
+              <Text style={styles.resultOrderId}>{t('create_order_due_date')}: {formatDate(dueDate)}</Text>
+            ) : null}
+            <Text style={styles.resultOrderId}>#{createdOrderId}</Text>
+          </View>
+
+          <View style={styles.qrActions}>
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.secondaryBtn]}
+              onPress={() => navigation.navigate('OrderDetail', { orderId: createdOrderId })}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="receipt-outline" size={18} color={colors.primary} />
+              <Text style={styles.secondaryBtnText}>{t('create_order_view_order')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.primaryBtn]}
+              onPress={handleReset}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="add" size={18} color={colors.black} />
+              <Text style={styles.primaryBtnText}>{t('create_order_new')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    );
+  }
 
   if (mode === 'paid') {
     return (
@@ -308,6 +465,224 @@ export default function CreateOrderScreen() {
     );
   }
 
+  // ---------- Checkout intent selector ----------
+
+  if (mode === 'intent') {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => setMode('compose')} style={styles.closeBtn}>
+            <Ionicons name="arrow-back" size={22} color={colors.onSurface} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>{t('create_order')}</Text>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.closeBtn}>
+            <Ionicons name="close" size={22} color={colors.onSurface} />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.intentContainer}>
+          <Text style={styles.intentTitle}>{t('create_order_checkout_intent')}</Text>
+          <View style={styles.intentSummary}>
+            <Text style={styles.intentSummaryLabel}>{t('create_order_total')}</Text>
+            <Text style={styles.intentSummaryAmount}>{formatCurrency(runningTotal)}</Text>
+          </View>
+
+          {createError ? <Text style={styles.errorText}>{createError}</Text> : null}
+
+          <TouchableOpacity
+            style={[styles.intentCard, shadow.sm]}
+            onPress={() => void handleQrIntent()}
+            activeOpacity={0.85}
+            disabled={creating}
+          >
+            <View style={styles.intentCardIcon}>
+              <Ionicons name="qr-code-outline" size={28} color={colors.primary} />
+            </View>
+            <View style={styles.intentCardContent}>
+              <Text style={styles.intentCardTitle}>{t('create_order_intent_qr')}</Text>
+              <Text style={styles.intentCardDesc}>{t('create_order_intent_qr_desc')}</Text>
+            </View>
+            {creating ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <Ionicons name="chevron-forward" size={20} color={colors.gray400} />
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.intentCard, shadow.sm]}
+            onPress={handleInvoiceIntent}
+            activeOpacity={0.85}
+            disabled={creating}
+          >
+            <View style={styles.intentCardIcon}>
+              <Ionicons name="document-text-outline" size={28} color={colors.secondary} />
+            </View>
+            <View style={styles.intentCardContent}>
+              <Text style={styles.intentCardTitle}>{t('create_order_intent_invoice')}</Text>
+              <Text style={styles.intentCardDesc}>{t('create_order_intent_invoice_desc')}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.gray400} />
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  // ---------- Shopper picker ----------
+
+  if (mode === 'shopper') {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => setMode('intent')} style={styles.closeBtn}>
+            <Ionicons name="arrow-back" size={22} color={colors.onSurface} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>{t('create_order_select_customer')}</Text>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.closeBtn}>
+            <Ionicons name="close" size={22} color={colors.onSurface} />
+          </TouchableOpacity>
+        </View>
+
+        <FlatList
+          data={[]} // use ListHeaderComponent for content since list is heterogeneous
+          renderItem={null}
+          keyExtractor={() => ''}
+          contentContainerStyle={styles.shopperContent}
+          ListHeaderComponent={
+            <>
+              {/* Email search */}
+              <Text style={styles.sectionLabel}>{t('create_order_search_by_email')}</Text>
+              <View style={styles.searchRow}>
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder={t('create_order_search_email_placeholder')}
+                  placeholderTextColor={colors.gray400}
+                  value={searchEmail}
+                  onChangeText={setSearchEmail}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  returnKeyType="search"
+                  onSubmitEditing={() => void handleSearchShopper()}
+                />
+                <TouchableOpacity
+                  style={[styles.searchBtn, (!searchEmail.trim() || searching) && styles.searchBtnDisabled]}
+                  onPress={() => void handleSearchShopper()}
+                  disabled={!searchEmail.trim() || searching}
+                  activeOpacity={0.85}
+                >
+                  {searching ? (
+                    <ActivityIndicator size="small" color={colors.black} />
+                  ) : (
+                    <Text style={styles.searchBtnText}>{t('create_order_search')}</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+
+              {searchError ? <Text style={styles.searchErrorText}>{searchError}</Text> : null}
+
+              {searchResult ? (
+                <TouchableOpacity
+                  style={[
+                    styles.customerRow,
+                    selectedShopper?.shopperAccountId === searchResult.shopperAccountId && styles.customerRowSelected,
+                  ]}
+                  onPress={() => setSelectedShopper(searchResult)}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="person-circle-outline" size={32} color={colors.primary} />
+                  <View style={styles.customerInfo}>
+                    <Text style={styles.customerName}>{searchResult.name}</Text>
+                    <Text style={styles.customerMeta}>{searchEmail}</Text>
+                  </View>
+                  {selectedShopper?.shopperAccountId === searchResult.shopperAccountId ? (
+                    <Ionicons name="checkmark-circle" size={22} color={colors.primary} />
+                  ) : null}
+                </TouchableOpacity>
+              ) : null}
+
+              {/* Past customers */}
+              <Text style={[styles.sectionLabel, { marginTop: spacing.lg }]}>{t('create_order_past_customers')}</Text>
+
+              {customersLoading ? (
+                <View style={styles.centeredSmall}>
+                  <ActivityIndicator size="small" color={colors.primary} />
+                  <Text style={styles.loadingText}>{t('create_order_customers_loading')}</Text>
+                </View>
+              ) : customersError ? (
+                <Text style={styles.searchErrorText}>{customersError}</Text>
+              ) : customers.length === 0 ? (
+                <Text style={styles.emptyCustomersText}>{t('create_order_no_customers')}</Text>
+              ) : (
+                customers.map((customer) => (
+                  <TouchableOpacity
+                    key={customer.shopperAccountId}
+                    style={[
+                      styles.customerRow,
+                      selectedShopper?.shopperAccountId === customer.shopperAccountId && styles.customerRowSelected,
+                    ]}
+                    onPress={() => setSelectedShopper(customer)}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name="person-circle-outline" size={32} color={colors.gray600} />
+                    <View style={styles.customerInfo}>
+                      <Text style={styles.customerName}>{customer.name}</Text>
+                    </View>
+                    {selectedShopper?.shopperAccountId === customer.shopperAccountId ? (
+                      <Ionicons name="checkmark-circle" size={22} color={colors.primary} />
+                    ) : null}
+                  </TouchableOpacity>
+                ))
+              )}
+
+              {/* Due date */}
+              <Text style={[styles.sectionLabel, { marginTop: spacing.lg }]}>{t('create_order_due_date')}</Text>
+              <TextInput
+                style={styles.dateInput}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor={colors.gray400}
+                value={dueDate}
+                onChangeText={setDueDate}
+                keyboardType="default"
+                returnKeyType="done"
+              />
+            </>
+          }
+        />
+
+        <View style={[styles.bottomBar, { paddingBottom: insets.bottom + spacing.md }]}>
+          {createError ? <Text style={styles.errorText}>{createError}</Text> : null}
+          <View style={styles.totalRow}>
+            <View>
+              <Text style={styles.totalLabel}>{t('create_order_total')}</Text>
+              {selectedShopper ? (
+                <Text style={styles.selectedShopperLabel}>{selectedShopper.name}</Text>
+              ) : null}
+            </View>
+            <Text style={styles.totalAmount}>{formatCurrency(runningTotal)}</Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.generateBtn, styles.invoiceBtn, (!selectedShopper || creating) && styles.generateBtnDisabled]}
+            onPress={() => void handleSendInvoice()}
+            disabled={!selectedShopper || creating}
+            activeOpacity={0.85}
+          >
+            {creating ? (
+              <ActivityIndicator size="small" color={colors.black} />
+            ) : (
+              <Ionicons name="paper-plane-outline" size={18} color={colors.black} />
+            )}
+            <Text style={styles.generateBtnText}>
+              {creating ? t('create_order_sending_invoice') : t('create_order_send_invoice_cta')}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  // ---------- Compose (product selection) ----------
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
@@ -353,19 +728,13 @@ export default function CreateOrderScreen() {
               <Text style={styles.totalAmount}>{formatCurrency(runningTotal)}</Text>
             </View>
             <TouchableOpacity
-              style={[styles.generateBtn, (selectedCount === 0 || creating) && styles.generateBtnDisabled]}
-              onPress={() => void handleCreate()}
-              disabled={selectedCount === 0 || creating}
+              style={[styles.generateBtn, selectedCount === 0 && styles.generateBtnDisabled]}
+              onPress={handleProceed}
+              disabled={selectedCount === 0}
               activeOpacity={0.85}
             >
-              {creating ? (
-                <ActivityIndicator size="small" color={colors.black} />
-              ) : (
-                <Ionicons name="qr-code-outline" size={18} color={colors.black} />
-              )}
-              <Text style={styles.generateBtnText}>
-                {creating ? t('create_order_generating') : t('create_order_generate_cta')}
-              </Text>
+              <Ionicons name="arrow-forward" size={18} color={colors.black} />
+              <Text style={styles.generateBtnText}>{t('next')}</Text>
             </TouchableOpacity>
           </View>
         </>
@@ -436,6 +805,7 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 17, fontWeight: '700', color: colors.onSurface },
   closeBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: spacing.md, padding: spacing.xl },
+  centeredSmall: { alignItems: 'center', gap: spacing.sm, padding: spacing.md },
   emptyText: { fontSize: 15, color: colors.gray500, textAlign: 'center' },
   subtitle: { fontSize: 13, color: colors.gray600, marginBottom: spacing.sm },
   listContent: { padding: spacing.md, paddingBottom: 160 },
@@ -494,6 +864,7 @@ const styles = StyleSheet.create({
   },
   totalLabel: { fontSize: 15, color: colors.gray600, fontWeight: '600' },
   totalAmount: { fontSize: 20, fontWeight: '800', color: colors.onSurface },
+  selectedShopperLabel: { fontSize: 13, color: colors.primary, fontWeight: '600', marginTop: 2 },
   generateBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -502,6 +873,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     borderRadius: radius.full,
     paddingVertical: spacing.md,
+  },
+  invoiceBtn: {
+    // same as generateBtn — kept as a hook for future differentiation
   },
   generateBtnDisabled: { opacity: 0.45 },
   generateBtnText: { fontSize: 16, fontWeight: '700', color: colors.black },
@@ -571,4 +945,109 @@ const styles = StyleSheet.create({
   resultSubtitle: { fontSize: 14, color: colors.gray500, textAlign: 'center' },
   resultAmount: { fontSize: 32, fontWeight: '800', color: colors.onSurface },
   resultOrderId: { fontSize: 13, color: colors.gray500 },
+  // Intent selector
+  intentContainer: {
+    flex: 1,
+    padding: spacing.lg,
+    gap: spacing.md,
+  },
+  intentTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.onSurface,
+    textAlign: 'center',
+    marginBottom: spacing.sm,
+  },
+  intentSummary: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: colors.white,
+    borderRadius: radius.xl,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  intentSummaryLabel: { fontSize: 15, color: colors.gray600, fontWeight: '600' },
+  intentSummaryAmount: { fontSize: 20, fontWeight: '800', color: colors.onSurface },
+  intentCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.white,
+    borderRadius: radius.xl,
+    padding: spacing.md,
+    gap: spacing.md,
+  },
+  intentCardIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  intentCardContent: { flex: 1 },
+  intentCardTitle: { fontSize: 16, fontWeight: '700', color: colors.onSurface },
+  intentCardDesc: { fontSize: 13, color: colors.gray500, marginTop: 2 },
+  // Shopper picker
+  shopperContent: { padding: spacing.md, paddingBottom: 200 },
+  sectionLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.gray700,
+    marginBottom: spacing.sm,
+  },
+  searchRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    backgroundColor: colors.white,
+    borderRadius: radius.xl,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 2,
+    fontSize: 15,
+    color: colors.onSurface,
+    borderWidth: 1,
+    borderColor: colors.gray200,
+  },
+  searchBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.xl,
+    paddingHorizontal: spacing.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  searchBtnDisabled: { opacity: 0.45 },
+  searchBtnText: { fontSize: 14, fontWeight: '700', color: colors.black },
+  searchErrorText: { fontSize: 13, color: colors.error, marginBottom: spacing.sm },
+  customerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.white,
+    borderRadius: radius.xl,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+    gap: spacing.md,
+  },
+  customerRowSelected: {
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+  },
+  customerInfo: { flex: 1 },
+  customerName: { fontSize: 15, fontWeight: '600', color: colors.onSurface },
+  customerMeta: { fontSize: 12, color: colors.gray500, marginTop: 2 },
+  emptyCustomersText: { fontSize: 13, color: colors.gray500, textAlign: 'center', paddingVertical: spacing.md },
+  loadingText: { fontSize: 13, color: colors.gray500 },
+  dateInput: {
+    backgroundColor: colors.white,
+    borderRadius: radius.xl,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 2,
+    fontSize: 15,
+    color: colors.onSurface,
+    borderWidth: 1,
+    borderColor: colors.gray200,
+  },
 });

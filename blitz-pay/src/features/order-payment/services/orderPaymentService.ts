@@ -48,6 +48,9 @@ interface RawOrderResponse {
   manualSettlementNote?: string | null;
   lastUpdatedBy?: string | null;
   orderNumber?: string;
+  targetShopperId?: string | null;
+  dueDate?: string | null;
+  usesDeferredPayment?: boolean | null;
 }
 
 interface RawOrderListResponse {
@@ -163,6 +166,9 @@ function parseOrder(payload: RawOrderResponse): OrderSummary {
     paidAt: payload.paidAt ?? undefined,
     manualSettlementNote: payload.manualSettlementNote ?? undefined,
     banner: normalizeBanner(payload),
+    targetShopperId: payload.targetShopperId ?? undefined,
+    dueDate: payload.dueDate ?? undefined,
+    usesDeferredPayment: payload.usesDeferredPayment ?? undefined,
   };
 }
 
