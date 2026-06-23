@@ -53,7 +53,7 @@ export default function PaymentPendingScreen() {
       <View style={[styles.actions, { paddingBottom: insets.bottom + spacing.md }]}>
         <TouchableOpacity
           style={styles.primaryBtn}
-          onPress={() => navigation.navigate('Invoices')}
+          onPress={() => navigation.navigate('Main')}
           activeOpacity={0.85}
         >
           <Text style={styles.primaryBtnText}>{t('payment_pending_invoices_cta')}</Text>

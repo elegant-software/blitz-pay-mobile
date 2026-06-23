@@ -58,6 +58,18 @@ function formatMerchantLabel(order: RecentOrderSummary): string | null {
   return order.merchantName ?? order.branchName ?? null;
 }
 
+function isInvoiceOrder(order: RecentOrderSummary): boolean {
+  return order.usesDeferredPayment === true && order.targetShopperId != null;
+}
+
+function formatDueDate(iso: string): string {
+  return new Intl.DateTimeFormat('de-DE', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(new Date(iso));
+}
+
 export default function VaultScreen() {
   const { t } = useLanguage();
   const insets = useSafeAreaInsets();
@@ -120,10 +132,11 @@ export default function VaultScreen() {
             const resumable = isOrderResumable(order.status);
             const color = ORDER_STATUS_COLORS[order.status];
             const merchantLabel = formatMerchantLabel(order);
+            const invoice = isInvoiceOrder(order);
             return (
               <TouchableOpacity
                 key={order.orderId}
-                style={[styles.orderCard, shadow.sm]}
+                style={[styles.orderCard, invoice && styles.invoiceOrderCard, shadow.sm]}
                 activeOpacity={0.85}
                 onPress={() =>
                     navigation.navigate('OrderDetail', {
@@ -137,12 +150,26 @@ export default function VaultScreen() {
               >
                 <View style={styles.orderHeaderRow}>
                   <View style={styles.orderHeaderText}>
+                    {invoice ? (
+                      <View style={styles.invoiceBadgeRow}>
+                        <View style={styles.invoiceBadge}>
+                          <Ionicons name="document-text-outline" size={11} color={colors.secondary} />
+                          <Text style={styles.invoiceBadgeText}>{t('order_invoice_badge')}</Text>
+                        </View>
+                      </View>
+                    ) : null}
                     <Text style={styles.orderIdLabel}>{t('order_reference_label', { orderId: order.orderId })}</Text>
                     {merchantLabel ? (
                       <Text style={styles.orderMeta}>
                         {merchantLabel}
                         {order.merchantName && order.branchName ? ` · ${order.branchName}` : ''}
                       </Text>
+                    ) : null}
+                    {invoice && order.dueDate ? (
+                      <View style={styles.dueDateRow}>
+                        <Ionicons name="calendar-outline" size={12} color={colors.warning} />
+                        <Text style={styles.dueDateText}>{t('order_due_date', { date: formatDueDate(order.dueDate) })}</Text>
+                      </View>
                     ) : null}
                     <Text style={styles.orderMeta}>{formatDate(order.createdAt)}</Text>
                   </View>
@@ -217,4 +244,21 @@ const styles = StyleSheet.create({
     backgroundColor: `${colors.primary}20`,
   },
   resumePillText: { fontSize: 12, fontWeight: '700', color: colors.onSurface },
+  invoiceOrderCard: {
+    borderLeftWidth: 3,
+    borderLeftColor: colors.secondary,
+  },
+  invoiceBadgeRow: { flexDirection: 'row', marginBottom: 4 },
+  invoiceBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: `${colors.secondary}15`,
+    borderRadius: radius.full,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  invoiceBadgeText: { fontSize: 11, fontWeight: '700', color: colors.secondary },
+  dueDateRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
+  dueDateText: { fontSize: 12, fontWeight: '500', color: colors.warning },
 });

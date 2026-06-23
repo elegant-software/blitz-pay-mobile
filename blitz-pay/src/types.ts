@@ -36,8 +36,6 @@ export type RootStackParamList = {
   };
   MyQRCode: undefined;
   QRScanner: undefined;
-  Invoices: undefined;
-  SendInvoice: undefined;
   Notifications: undefined;
   PaymentProcessing: {
     paymentRequestId?: string;
@@ -76,10 +74,6 @@ export type RootStackParamList = {
   StripeCheckoutReturn: {
     orderId: string;
     status?: 'success' | 'cancelled';
-  };
-  InvoicePdfPreview: {
-    localUri: string;
-    invoiceNumber: string;
   };
   ProductDetail: {
     productId: string;
@@ -131,6 +125,10 @@ export type RootStackParamList = {
   MyAppointments: undefined;
   AppointmentDetail: {
     appointmentId: string;
+  };
+  InvoicePdf: {
+    url: string;
+    title?: string;
   };
 };
 

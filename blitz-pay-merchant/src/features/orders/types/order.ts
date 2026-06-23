@@ -74,3 +74,8 @@ export interface MerchantOverrideOrderLinePriceInput {
 export interface MerchantManualSettlementInput {
   note?: string;
 }
+
+export interface BranchCustomer {
+  shopperAccountId: string;
+  name: string;
+}

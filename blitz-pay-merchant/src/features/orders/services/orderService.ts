@@ -2,6 +2,7 @@ import { authedFetch } from '../../../lib/api';
 import { observability } from '../../../lib/observability';
 import type { ActiveBranchScope } from '../../../lib/auth';
 import type {
+  BranchCustomer,
   MerchantAddOrderItemInput,
   MerchantManualSettlementInput,
   MerchantOrderDetail,
@@ -174,6 +175,11 @@ export class MerchantOrderError extends Error {
   }
 }
 
+export interface InvoiceDownloadResponse {
+  url: string;
+  filename: string;
+}
+
 async function mutateOrder(
   orderId: string,
   path: string,
@@ -220,16 +226,32 @@ export interface CreateMerchantOrderItem {
   quantity: number;
 }
 
+export interface CreateMerchantOrderOptions {
+  targetShopperId?: string;
+  dueDate?: string;
+}
+
 export async function createMerchantOrder(
   merchantId: string,
   branchId: string,
   items: CreateMerchantOrderItem[],
+  options?: CreateMerchantOrderOptions,
 ): Promise<MerchantOrderDetail> {
-  observability.info('merchant_order_create_started', { merchantId, branchId, itemCount: items.length });
+  const isInvoice = !!options?.targetShopperId;
+  observability.info('merchant_order_create_started', { merchantId, branchId, itemCount: items.length, isInvoice });
+  const body: Record<string, unknown> = {
+    merchantId,
+    branchId,
+    orderType: isInvoice ? 'WALK_IN_ORDERING' : 'PRE_ORDER',
+    usesDeferredPayment: isInvoice,
+    items,
+  };
+  if (options?.targetShopperId) body.targetShopperId = options.targetShopperId;
+  if (options?.dueDate) body.dueDate = options.dueDate;
   const response = await authedFetch('/v1/merchant/orders', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ merchantId, branchId, orderType: 'PRE_ORDER', usesDeferredPayment: false, items }),
+    body: JSON.stringify(body),
   });
 
   if (!response.ok) {
@@ -332,6 +354,33 @@ export async function fetchMerchantOrderDetail(orderId: string, activeBranchScop
   return order;
 }
 
+export async function fetchMerchantOrderInvoice(
+  orderId: string,
+  activeBranchScope: ActiveBranchScope,
+): Promise<InvoiceDownloadResponse | null> {
+  const params = new URLSearchParams({
+    merchantId: activeBranchScope.merchantId,
+    branchId: activeBranchScope.branchId,
+  });
+  const response = await authedFetch(`/v1/merchant/orders/${encodeURIComponent(orderId)}/invoice?${params.toString()}`, {
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+  });
+  if (response.status === 404) return null;
+  if (!response.ok) {
+    const reason = await readError(response);
+    observability.warn('merchant_order_invoice_fetch_failed', {
+      orderId,
+      merchantId: activeBranchScope.merchantId,
+      branchId: activeBranchScope.branchId,
+      status: response.status,
+      reason,
+    });
+    throw new Error('merchant_order_invoice_load_failed');
+  }
+  return response.json() as Promise<InvoiceDownloadResponse>;
+}
+
 export async function addMerchantOrderItem(orderId: string, input: MerchantAddOrderItemInput): Promise<MerchantOrderDetail> {
   observability.info('merchant_order_add_item_started', { orderId, productId: input.productId, quantity: input.quantity });
   return mutateOrder(orderId, `/v1/merchant/orders/${encodeURIComponent(orderId)}/items`, 'POST', input);
@@ -394,4 +443,51 @@ export async function markMerchantOrderManuallyPaid(
   return mutateOrder(orderId, path, 'POST', {
     note: trimmedNote || undefined,
   });
+}
+
+export async function fetchBranchCustomers(branchId: string): Promise<BranchCustomer[]> {
+  observability.info('branch_customers_request_started', { branchId });
+  const response = await authedFetch(
+    `/v1/merchant/orders/branches/${encodeURIComponent(branchId)}/customers`,
+    { method: 'GET', headers: { Accept: 'application/json' } },
+  );
+
+  if (!response.ok) {
+    const reason = await readError(response);
+    observability.error('branch_customers_request_failed', { branchId, status: response.status, reason });
+    throw new MerchantOrderError('branch_customers_load_failed', reason, response.status);
+  }
+
+  const rows = (await response.json()) as Array<{ shopperAccountId?: string; name?: string }>;
+  const customers: BranchCustomer[] = rows
+    .filter((r) => r.shopperAccountId && r.name)
+    .map((r) => ({ shopperAccountId: r.shopperAccountId!, name: r.name! }));
+
+  observability.info('branch_customers_request_succeeded', { branchId, count: customers.length });
+  return customers;
+}
+
+export async function searchShopperByEmail(email: string): Promise<BranchCustomer | null> {
+  observability.info('shopper_search_started', { email });
+  const params = new URLSearchParams({ email });
+  const response = await authedFetch(
+    `/v1/merchant/orders/shoppers/search?${params.toString()}`,
+    { method: 'GET', headers: { Accept: 'application/json' } },
+  );
+
+  if (response.status === 404) {
+    observability.info('shopper_search_not_found', { email });
+    return null;
+  }
+  if (!response.ok) {
+    const reason = await readError(response);
+    observability.error('shopper_search_failed', { email, status: response.status, reason });
+    throw new MerchantOrderError('shopper_search_failed', reason, response.status);
+  }
+
+  const result = (await response.json()) as { shopperAccountId?: string; name?: string };
+  if (!result.shopperAccountId || !result.name) return null;
+
+  observability.info('shopper_search_succeeded', { email, shopperAccountId: result.shopperAccountId });
+  return { shopperAccountId: result.shopperAccountId, name: result.name };
 }

@@ -26,6 +26,7 @@ import EmployeeDetailScreen from '../screens/EmployeeDetailScreen';
 import AppointmentPolicyScreen from '../screens/AppointmentPolicyScreen';
 import BranchOpeningHoursScreen from '../screens/BranchOpeningHoursScreen';
 import MerchantKpiDashboardScreen from '../screens/MerchantKpiDashboardScreen';
+import InvoicePdfScreen from '../screens/InvoicePdfScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -73,6 +74,7 @@ export default function AppNavigator() {
           <Stack.Screen name="AppointmentPolicy" component={AppointmentPolicyScreen} />
           <Stack.Screen name="BranchOpeningHours" component={BranchOpeningHoursScreen} />
           <Stack.Screen name="MerchantKpiDashboard" component={MerchantKpiDashboardScreen} />
+          <Stack.Screen name="InvoicePdf" component={InvoicePdfScreen} />
         </>
       )}
     </Stack.Navigator>

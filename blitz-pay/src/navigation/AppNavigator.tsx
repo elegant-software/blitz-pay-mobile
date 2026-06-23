@@ -14,20 +14,18 @@ import MerchantScreen from '../screens/MerchantScreen';
 import CheckoutScreen from '../screens/CheckoutScreen';
 import MyQRCodeScreen from '../screens/MyQRCodeScreen';
 import QRScannerScreen from '../screens/QRScannerScreen';
-import InvoicesScreen from '../screens/InvoicesScreen';
-import SendInvoiceScreen from '../screens/SendInvoiceScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import PaymentProcessingScreen from '../screens/PaymentProcessingScreen';
 import PaymentResultScreen from '../screens/PaymentResultScreen';
 import PaymentPendingScreen from '../screens/PaymentPendingScreen';
 import StripeCheckoutReturnScreen from '../screens/StripeCheckoutReturnScreen';
-import InvoicePdfPreviewScreen from '../screens/InvoicePdfPreviewScreen';
 import ProductDetailScreen from '../screens/ProductDetailScreen';
 import OrderDetailScreen from '../screens/OrderDetailScreen';
 import AvailableSlotsScreen from '../screens/AvailableSlotsScreen';
 import BookingConfirmationScreen from '../screens/BookingConfirmationScreen';
 import MyAppointmentsScreen from '../screens/MyAppointmentsScreen';
 import AppointmentDetailScreen from '../screens/AppointmentDetailScreen';
+import InvoicePdfScreen from '../screens/InvoicePdfScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -65,8 +63,6 @@ export default function AppNavigator() {
           <Stack.Screen name="Checkout" component={CheckoutScreen} />
           <Stack.Screen name="MyQRCode" component={MyQRCodeScreen} />
           <Stack.Screen name="QRScanner" component={QRScannerScreen} />
-          <Stack.Screen name="Invoices" component={InvoicesScreen} />
-          <Stack.Screen name="SendInvoice" component={SendInvoiceScreen} />
           <Stack.Screen name="Notifications" component={NotificationsScreen} />
           <Stack.Screen
             name="PaymentProcessing"
@@ -88,13 +84,13 @@ export default function AppNavigator() {
             component={StripeCheckoutReturnScreen}
             options={{ gestureEnabled: false }}
           />
-          <Stack.Screen name="InvoicePdfPreview" component={InvoicePdfPreviewScreen} />
           <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
           <Stack.Screen name="OrderDetail" component={OrderDetailScreen} />
           <Stack.Screen name="AvailableSlots" component={AvailableSlotsScreen} />
           <Stack.Screen name="BookingConfirmation" component={BookingConfirmationScreen} />
           <Stack.Screen name="MyAppointments" component={MyAppointmentsScreen} />
           <Stack.Screen name="AppointmentDetail" component={AppointmentDetailScreen} />
+          <Stack.Screen name="InvoicePdf" component={InvoicePdfScreen} />
         </>
       )}
     </Stack.Navigator>

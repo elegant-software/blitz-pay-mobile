@@ -22,8 +22,7 @@ const APPEARANCE_CARD_COLORS = ['#0E7490', '#1D4ED8', '#C2410C'];
 const QUICK_ACTIONS = [
   { key: 'my_qr', icon: 'qr-code-outline', screen: 'MyQRCode' as const },
   { key: 'scan_qr', icon: 'scan-outline', screen: 'QRScanner' as const },
-  { key: 'invoices', icon: 'document-text-outline', screen: 'Invoices' as const },
-  { key: 'send_invoice', icon: 'send-outline', screen: 'SendInvoice' as const },
+  { key: 'notifications', icon: 'notifications-outline', screen: 'Notifications' as const },
 ];
 
 export default function ExploreScreen() {
@@ -101,7 +100,7 @@ export default function ExploreScreen() {
             <View style={styles.quickActionIcon}>
               <Ionicons name={action.icon as React.ComponentProps<typeof Ionicons>['name']} size={22} color={colors.primary} />
             </View>
-            <Text style={styles.quickActionLabel}>{t(action.key as 'my_qr' | 'scan_qr' | 'invoices' | 'send_invoice')}</Text>
+            <Text style={styles.quickActionLabel}>{t(action.key as 'my_qr' | 'scan_qr' | 'notifications')}</Text>
           </TouchableOpacity>
         ))}
       </View>

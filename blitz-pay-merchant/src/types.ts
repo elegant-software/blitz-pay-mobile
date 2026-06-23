@@ -51,6 +51,10 @@ export type RootStackParamList = {
   AppointmentPolicy: undefined;
   BranchOpeningHours: undefined;
   MerchantKpiDashboard: undefined;
+  InvoicePdf: {
+    url: string;
+    title?: string;
+  };
 };
 
 export type TabParamList = {
