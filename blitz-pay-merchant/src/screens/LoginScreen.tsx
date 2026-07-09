@@ -9,7 +9,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../lib/auth';
 import { useLanguage } from '../lib/LanguageContext';
 import { colors, spacing, radius } from '../lib/theme';
-import { config } from '../lib/config';
 
 export default function LoginScreen() {
   const { t } = useLanguage();
@@ -143,13 +142,6 @@ export default function LoginScreen() {
             </View>
           </View>
 
-          {__DEV__ && (
-            <View style={styles.devNote}>
-              <Text style={styles.devNoteText}>
-                Auth bypass: {String(config.authBypass)} · {config.keycloakUrl}
-              </Text>
-            </View>
-          )}
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -212,6 +204,4 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: `${colors.primary}30`,
   },
   biometricText: { fontSize: 15, fontWeight: '600', color: colors.primary },
-  devNote: { marginTop: 16, alignItems: 'center' },
-  devNoteText: { fontSize: 11, color: colors.gray600 },
 });

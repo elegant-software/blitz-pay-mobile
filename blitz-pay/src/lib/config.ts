@@ -15,7 +15,7 @@ function joinUrl(base: string, path: string): string {
   return `${trimmedBase}${trimmedPath}`;
 }
 
-const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? 'https://api-blitzpay-staging.elegantsoftware.de';
+const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? 'https://api-blitzpay-staging.zackpay.de';
 
 export const config = {
   keycloakUrl: process.env.EXPO_PUBLIC_KEYCLOAK_URL ?? 'http://localhost:8080',
