@@ -13,6 +13,15 @@ on:
         required: false
         default: false
         type: boolean
+      target-environment:
+        description: GitHub Environment to pull EXPO_PUBLIC_* vars/secrets from
+        required: false
+        default: local-k8s
+        type: choice
+        options:
+          - local-k8s
+          - aws-staging
+          - production
       eas-profile:
         description: EAS build profile
         required: false
@@ -58,6 +67,10 @@ on:
         required: false
         default: false
         type: boolean
+      target-environment:
+        required: false
+        default: local-k8s
+        type: string
       eas-profile:
         required: false
         default: preview
@@ -111,6 +124,7 @@ jobs:
       app_directory: ${{ steps.resolve.outputs.app_directory }}
       node_version: ${{ steps.resolve.outputs.node_version }}
       run_eas_build: ${{ steps.resolve.outputs.run_eas_build }}
+      target_environment: ${{ steps.resolve.outputs.target_environment }}
       eas_profile: ${{ steps.resolve.outputs.eas_profile }}
       eas_platform: ${{ steps.resolve.outputs.eas_platform }}
       run_device_tests: ${{ steps.resolve.outputs.run_device_tests }}
@@ -125,6 +139,7 @@ jobs:
             echo "app_directory=${{ inputs.app-directory || github.event.inputs.app-directory || './blitz-pay' }}"
             echo "node_version=${{ vars.MOBILE_NODE_VERSION || vars.NODE_VERSION || '20' }}"
             echo "run_eas_build=${{ (inputs.run-eas-build || github.event.inputs.run-eas-build == 'true') && 'true' || 'false' }}"
+            echo "target_environment=${{ inputs.target-environment || github.event.inputs.target-environment || 'local-k8s' }}"
             echo "eas_profile=${{ inputs.eas-profile || github.event.inputs.eas-profile || 'preview' }}"
             echo "eas_platform=${{ inputs.eas-platform || github.event.inputs.eas-platform || 'all' }}"
             echo "run_device_tests=${{ (inputs.run-device-tests || github.event.inputs.run-device-tests == 'true') && 'true' || 'false' }}"
@@ -153,6 +168,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [resolve-config, quality]
     if: ${{ needs.resolve-config.outputs.run_eas_build == 'true' }}
+    environment: ${{ needs.resolve-config.outputs.target_environment }}
     env:
       APP_DIR: ${{ needs.resolve-config.outputs.app_directory }}
       NODE_VERSION: ${{ needs.resolve-config.outputs.node_version }}
@@ -343,6 +359,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [resolve-config, eas-build]
     if: ${{ needs.resolve-config.outputs.run_eas_update == 'true' }}
+    environment: ${{ needs.resolve-config.outputs.target_environment }}
     env:
       APP_DIR: ${{ needs.resolve-config.outputs.app_directory }}
       NODE_VERSION: ${{ needs.resolve-config.outputs.node_version }}

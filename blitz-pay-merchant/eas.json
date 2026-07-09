@@ -11,6 +11,13 @@
     "preview": {
       "distribution": "internal"
     },
+    "aws-staging": {
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.zackpay.de",
+        "EXPO_PUBLIC_KEYCLOAK_URL": "https://auth.zackpay.de"
+      }
+    },
     "production": {
       "autoIncrement": true
     }
