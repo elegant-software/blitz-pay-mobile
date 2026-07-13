@@ -260,9 +260,9 @@ jobs:
             exit 1
           fi
 
-          tmp_file="$(mktemp)"
-          jq --arg version "$app_version" '.expo.version = $version' app.json > "$tmp_file"
-          mv "$tmp_file" app.json
+          test -f app.config.js || { echo "app.config.js not found in $(pwd)"; exit 1; }
+          sed -i.bak -E "s/version: \"[^\"]*\"/version: \"$app_version\"/" app.config.js
+          rm -f app.config.js.bak
           echo "Using Expo app version $app_version from GitHub release $release_tag"
 
       - name: Create runtime .env for Expo/EAS
