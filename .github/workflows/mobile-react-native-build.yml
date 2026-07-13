@@ -16,7 +16,7 @@ on:
       target-environment:
         description: GitHub Environment to pull EXPO_PUBLIC_* vars/secrets from
         required: false
-        default: local-k8s
+        default: aws-staging
         type: choice
         options:
           - local-k8s
@@ -25,7 +25,7 @@ on:
       eas-profile:
         description: EAS build profile
         required: false
-        default: preview
+        default: aws-staging
         type: string
       eas-platform:
         description: EAS build platform
@@ -69,11 +69,11 @@ on:
         type: boolean
       target-environment:
         required: false
-        default: local-k8s
+        default: aws-staging
         type: string
       eas-profile:
         required: false
-        default: preview
+        default: aws-staging
         type: string
       eas-platform:
         required: false
@@ -139,8 +139,8 @@ jobs:
             echo "app_directory=${{ inputs.app-directory || github.event.inputs.app-directory || './blitz-pay' }}"
             echo "node_version=${{ vars.MOBILE_NODE_VERSION || vars.NODE_VERSION || '20' }}"
             echo "run_eas_build=${{ (inputs.run-eas-build || github.event.inputs.run-eas-build == 'true') && 'true' || 'false' }}"
-            echo "target_environment=${{ inputs.target-environment || github.event.inputs.target-environment || 'local-k8s' }}"
-            echo "eas_profile=${{ inputs.eas-profile || github.event.inputs.eas-profile || 'preview' }}"
+            echo "target_environment=${{ inputs.target-environment || github.event.inputs.target-environment || 'aws-staging' }}"
+            echo "eas_profile=${{ inputs.eas-profile || github.event.inputs.eas-profile || 'aws-staging' }}"
             echo "eas_platform=${{ inputs.eas-platform || github.event.inputs.eas-platform || 'all' }}"
             echo "run_device_tests=${{ (inputs.run-device-tests || github.event.inputs.run-device-tests == 'true') && 'true' || 'false' }}"
             echo "run_eas_update=${{ (inputs.run-eas-update || github.event.inputs.run-eas-update == 'true') && 'true' || 'false' }}"
