@@ -30,7 +30,7 @@ on:
       eas-platform:
         description: EAS build platform
         required: false
-        default: all
+        default: android
         type: choice
         options:
           - all
@@ -77,7 +77,7 @@ on:
         type: string
       eas-platform:
         required: false
-        default: all
+        default: android
         type: string
       run-device-tests:
         required: false
@@ -141,7 +141,7 @@ jobs:
             echo "run_eas_build=${{ (inputs.run-eas-build || github.event.inputs.run-eas-build == 'true') && 'true' || 'false' }}"
             echo "target_environment=${{ inputs.target-environment || github.event.inputs.target-environment || 'aws-staging' }}"
             echo "eas_profile=${{ inputs.eas-profile || github.event.inputs.eas-profile || 'aws-staging' }}"
-            echo "eas_platform=${{ inputs.eas-platform || github.event.inputs.eas-platform || 'all' }}"
+            echo "eas_platform=${{ inputs.eas-platform || github.event.inputs.eas-platform || 'android' }}"
             echo "run_device_tests=${{ (inputs.run-device-tests || github.event.inputs.run-device-tests == 'true') && 'true' || 'false' }}"
             echo "run_eas_update=${{ (inputs.run-eas-update || github.event.inputs.run-eas-update == 'true') && 'true' || 'false' }}"
             echo "release_notes_tag=${{ inputs.release-notes-tag || github.event.inputs.release-notes-tag || 'latest' }}"
