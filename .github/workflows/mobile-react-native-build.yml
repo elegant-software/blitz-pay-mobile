@@ -364,6 +364,7 @@ jobs:
       APP_DIR: ${{ needs.resolve-config.outputs.app_directory }}
       NODE_VERSION: ${{ needs.resolve-config.outputs.node_version }}
       RELEASE_NOTES_TAG: ${{ needs.resolve-config.outputs.release_notes_tag }}
+      EAS_PROFILE: ${{ needs.resolve-config.outputs.eas_profile }}
       EXPO_PUBLIC_KEYCLOAK_URL: ${{ vars.EXPO_PUBLIC_KEYCLOAK_URL }}
       EXPO_PUBLIC_KEYCLOAK_REALM: ${{ vars.EXPO_PUBLIC_KEYCLOAK_REALM }}
       EXPO_PUBLIC_KEYCLOAK_CLIENT_ID: ${{ vars.EXPO_PUBLIC_KEYCLOAK_CLIENT_ID }}
@@ -464,13 +465,9 @@ jobs:
       - name: Publish EAS Update
         working-directory: ${{ env.APP_DIR }}
         run: |
-          update_branch="${{ github.ref_name }}"
-          if [ -z "$update_branch" ]; then
-            update_branch="preview"
-          fi
           eas update \
             --non-interactive \
-            --branch "$update_branch" \
+            --channel "${EAS_PROFILE:-aws-staging}" \
             --message "${{ steps.release-notes.outputs.update_message }}" \
             --platform all
 

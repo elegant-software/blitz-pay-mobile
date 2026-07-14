@@ -4,6 +4,8 @@ module.exports = {
     slug: "blitzpay-mobile",
     scheme: "blitzpay",
     version: "1.0.0",
+    runtimeVersion: { policy: "appVersion" },
+    updates: { url: "https://u.expo.dev/283f0dd6-d7d4-4dcc-8613-66621b812e7f" },
     orientation: "portrait",
     platforms: ["ios", "android", "web"],
     userInterfaceStyle: "light",

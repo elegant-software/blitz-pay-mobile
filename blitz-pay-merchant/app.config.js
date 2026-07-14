@@ -4,6 +4,8 @@ module.exports = {
     slug: "blitzpay-merchant",
     scheme: "blitzpaymerchant",
     version: "1.0.0",
+    runtimeVersion: { policy: "appVersion" },
+    updates: { url: "https://u.expo.dev/c42ff88d-abd7-4905-9996-fefa3a619370" },
     orientation: "default",
     platforms: ["ios", "android", "web"],
     userInterfaceStyle: "light",
