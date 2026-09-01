@@ -10,6 +10,8 @@ coverage/
 /blitz-pay/android/
 /blitz-pay/ios/
 /blitz-pay-merchant/.expo/
+/blitz-pay-merchant/android/
+/blitz-pay-merchant/ios/
 .expo/
 .idea/
 .vscode/
