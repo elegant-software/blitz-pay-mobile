@@ -1,4 +1,4 @@
-name: Mobile Quality Checks
+name: CI · Mobile Quality
 
 on:
   workflow_call:
@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   quality:
-    name: Lint, Typecheck, Test
+    name: Lint, typecheck, test ${{ inputs.app-directory }}
     runs-on: ubuntu-latest
     env:
       APP_DIR: ${{ inputs.app-directory }}

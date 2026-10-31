@@ -1,4 +1,4 @@
-name: Mobile Device Tests
+name: CI · Mobile Device Tests
 
 on:
   workflow_call:
@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   device-tests:
-    name: Device / Emulator Tests
+    name: Device tests ${{ inputs.app-directory }}
     runs-on: macos-latest
     env:
       APP_DIR: ${{ inputs.app-directory }}
