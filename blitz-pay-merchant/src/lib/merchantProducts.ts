@@ -5,6 +5,7 @@ import type { Product } from '../types';
 const API_VERSION = 'v1';
 
 type MerchantDetailResponse = {
+  merchantName?: string;
   legalBusinessName?: string;
   offerings?: string[];
   merchantMobility?: 'BRICK_AND_MORTAR' | 'MOBILE';
@@ -245,7 +246,7 @@ export async function fetchMerchantName(merchantId: string): Promise<string | nu
       { method: 'GET' },
       { event: 'fetch_merchant_name', merchantId, failureKey: 'merchant_products_load_failed' },
     );
-    return response.legalBusinessName ?? null;
+    return response.merchantName?.trim() || response.legalBusinessName?.trim() || null;
   } catch {
     return null;
   }
@@ -258,7 +259,7 @@ export async function fetchMerchantDetails(merchantId: string): Promise<Merchant
     { event: 'fetch_merchant_details', merchantId, failureKey: 'merchant_products_load_failed' },
   );
   return {
-    name: response.legalBusinessName?.trim() || null,
+    name: response.merchantName?.trim() || response.legalBusinessName?.trim() || null,
     mobility: response.merchantMobility === 'MOBILE' || response.merchantMobility === 'BRICK_AND_MORTAR'
       ? response.merchantMobility
       : null,
