@@ -11,6 +11,7 @@ import type {
   OrderStatus,
   OrderSummary,
   OverrideOrderLinePriceInput,
+  PreparationStatus,
   RecentOrderSummary,
   UpdateOrderLineQuantityInput,
 } from '../types/orderPayment';
@@ -51,6 +52,8 @@ interface RawOrderResponse {
   targetShopperId?: string | null;
   dueDate?: string | null;
   usesDeferredPayment?: boolean | null;
+  preparationStatus?: string | null;
+  pickupNumber?: number | null;
 }
 
 interface RawOrderListResponse {
@@ -100,6 +103,11 @@ function normalizeCheckoutPaymentMethod(
   if (method === 'PAY_BY_BANK') return 'PAY_BY_BANK';
   if (method === 'TERMINAL') return 'TERMINAL';
   if (method === 'PAYPAL') return 'PAYPAL';
+  return undefined;
+}
+
+function normalizePreparationStatus(status: unknown): PreparationStatus | undefined {
+  if (status === 'RECEIVED' || status === 'PREPARING' || status === 'READY') return status;
   return undefined;
 }
 
@@ -169,6 +177,8 @@ function parseOrder(payload: RawOrderResponse): OrderSummary {
     targetShopperId: payload.targetShopperId ?? undefined,
     dueDate: payload.dueDate ?? undefined,
     usesDeferredPayment: payload.usesDeferredPayment ?? undefined,
+    preparationStatus: normalizePreparationStatus(payload.preparationStatus),
+    pickupNumber: typeof payload.pickupNumber === 'number' ? payload.pickupNumber : null,
   };
 }
 

@@ -16,7 +16,9 @@ import type { RootStackNav } from '../types';
 import { fetchRecentOrders } from '../features/order-payment/services/orderPaymentService';
 import { orderPaymentStore } from '../features/order-payment/store/orderPaymentStore';
 import {
+  formatPickupNumber,
   isOrderResumable,
+  type PreparationStatus,
   type CheckoutPaymentMethod,
   type RecentOrderSummary,
 } from '../features/order-payment/types/orderPayment';
@@ -28,6 +30,12 @@ const ORDER_STATUS_COLORS = {
   PAYMENT_FAILED: colors.error,
   CANCELLED: colors.gray500,
 } as const;
+
+const PREPARATION_STATUS_COLORS: Record<PreparationStatus, string> = {
+  RECEIVED: colors.gray700,
+  PREPARING: colors.warning,
+  READY: colors.success,
+};
 
 function formatAmount(amountMinor: number, currency: string) {
   return new Intl.NumberFormat('de-DE', { style: 'currency', currency }).format(amountMinor / 100);
@@ -181,6 +189,26 @@ export default function VaultScreen() {
                   </View>
                 </View>
 
+                {order.status !== 'CANCELLED' && (order.pickupNumber != null || order.preparationStatus) ? (
+                  <View style={styles.preparationRow}>
+                    {order.pickupNumber != null ? (
+                      <Text style={styles.pickupNumberText}>{formatPickupNumber(order.pickupNumber)}</Text>
+                    ) : null}
+                    {order.preparationStatus ? (
+                      <View
+                        style={[
+                          styles.statusBadge,
+                          { backgroundColor: `${PREPARATION_STATUS_COLORS[order.preparationStatus]}18` },
+                        ]}
+                      >
+                        <Text style={[styles.statusText, { color: PREPARATION_STATUS_COLORS[order.preparationStatus] }]}>
+                          {t(`preparation_status_${order.preparationStatus}`)}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
+                ) : null}
+
                 <View style={styles.orderFooterRow}>
                   <Text style={styles.amountText}>{formatAmount(order.totalAmountMinor, order.currency)}</Text>
                   {resumable ? (
@@ -238,6 +266,8 @@ const styles = StyleSheet.create({
   orderMeta: { marginTop: 4, fontSize: 12, color: colors.gray600 },
   statusBadge: { borderRadius: radius.full, paddingHorizontal: 10, paddingVertical: 4, alignSelf: 'flex-start' },
   statusText: { fontSize: 11, fontWeight: '700' },
+  preparationRow: { marginTop: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  pickupNumberText: { fontSize: 16, fontWeight: '800', color: colors.onSurface },
   orderFooterRow: { marginTop: spacing.md, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   amountText: { fontSize: 18, fontWeight: '800', color: colors.onSurface },
   resumePill: {

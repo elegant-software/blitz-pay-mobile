@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -7,22 +7,26 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
+  RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
+import * as Notifications from 'expo-notifications';
 import { useLanguage } from '../lib/LanguageContext';
 import { useAuth } from '../lib/auth';
 import { colors, spacing, radius, shadow } from '../lib/theme';
 import { useOrderPayment } from '../features/order-payment/hooks/useOrderPayment';
 import { orderPaymentStore } from '../features/order-payment/store/orderPaymentStore';
 import {
+  formatPickupNumber,
   isMethodAvailable,
   isOrderResumable,
   type CheckoutPaymentMethod,
   type OrderPaymentChannel,
   type OrderSummary,
+  type PreparationStatus,
 } from '../features/order-payment/types/orderPayment';
 import { fetchMerchantStripeConnectStatus } from '../features/merchant-catalog/services/merchantCatalogService';
 import type { PaymentChannel } from '../features/merchant-catalog/types/catalog';
@@ -50,6 +54,12 @@ const STATUS_COLORS = {
   CANCELLED: colors.gray500,
 } as const;
 
+const PREPARATION_STATUS_COLORS: Record<PreparationStatus, string> = {
+  RECEIVED: colors.gray700,
+  PREPARING: colors.warning,
+  READY: colors.success,
+};
+
 function formatAmount(amountMinor: number, currency: string) {
   return new Intl.NumberFormat('de-DE', { style: 'currency', currency }).format(amountMinor / 100);
 }
@@ -71,6 +81,7 @@ export default function OrderDetailScreen() {
   const { resumeOrderPayment, refreshOrder, cancelOrder } = useOrderPayment();
   const [order, setOrder] = useState<OrderSummary | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [selectedMethod, setSelectedMethod] = useState<CheckoutPaymentMethod | null>(
@@ -104,6 +115,33 @@ export default function OrderDetailScreen() {
       active = false;
     };
   }, [refreshOrder, route.params.orderId]);
+
+  const reloadOrder = useCallback(async () => {
+    try {
+      setOrder(await refreshOrder(route.params.orderId));
+    } catch (err: unknown) {
+      observability.warn('order_detail_reload_failed', {
+        orderId: route.params.orderId,
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }, [refreshOrder, route.params.orderId]);
+
+  const onPullToRefresh = useCallback(() => {
+    setRefreshing(true);
+    void reloadOrder().finally(() => setRefreshing(false));
+  }, [reloadOrder]);
+
+  // The backend sends an ORDER_READY push when the kitchen marks the order ready for pickup.
+  useEffect(() => {
+    const sub = Notifications.addNotificationReceivedListener((notification) => {
+      const data = notification.request.content.data as Record<string, unknown> | undefined;
+      if (data?.type === 'ORDER_READY' && data.orderId === route.params.orderId) {
+        void reloadOrder();
+      }
+    });
+    return () => sub.remove();
+  }, [reloadOrder, route.params.orderId]);
 
   useEffect(() => {
     if (!order?.orderId) return;
@@ -159,6 +197,9 @@ export default function OrderDetailScreen() {
   }, [order?.merchantId]);
 
   const canResume = Boolean(order && isOrderResumable(order.status));
+  const showPreparation = Boolean(
+    order && order.status !== 'CANCELLED' && (order.pickupNumber != null || order.preparationStatus),
+  );
   const availableChannels = useMemo<OrderPaymentChannel[]>(
     () => mergePaymentChannels(
       route.params.availableChannels,
@@ -267,7 +308,33 @@ export default function OrderDetailScreen() {
           <Text style={styles.centerText}>{t('order_detail_error_body')}</Text>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={{ paddingHorizontal: spacing.md, paddingBottom: 120 + insets.bottom }}>
+        <ScrollView
+          contentContainerStyle={{ paddingHorizontal: spacing.md, paddingBottom: 120 + insets.bottom }}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onPullToRefresh} />}
+        >
+          {showPreparation ? (
+            <View style={[styles.pickupCard, shadow.sm]}>
+              {order.pickupNumber != null ? (
+                <>
+                  <Text style={styles.pickupLabel}>{t('order_pickup_number_label')}</Text>
+                  <Text style={styles.pickupNumber}>{formatPickupNumber(order.pickupNumber)}</Text>
+                </>
+              ) : null}
+              {order.preparationStatus ? (
+                <View
+                  style={[
+                    styles.statusBadge,
+                    styles.preparationBadge,
+                    { backgroundColor: `${PREPARATION_STATUS_COLORS[order.preparationStatus]}18` },
+                  ]}
+                >
+                  <Text style={[styles.preparationText, { color: PREPARATION_STATUS_COLORS[order.preparationStatus] }]}>
+                    {t(`preparation_status_${order.preparationStatus}`)}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          ) : null}
           <View style={[styles.summaryCard, shadow.sm]}>
             <View style={styles.summaryHeader}>
               <View style={styles.summaryText}>
@@ -437,6 +504,17 @@ const styles = StyleSheet.create({
   summaryMeta: { marginTop: 4, fontSize: 12, color: colors.gray600 },
   statusBadge: { borderRadius: radius.full, paddingHorizontal: 10, paddingVertical: 4, alignSelf: 'flex-start' },
   statusText: { fontSize: 11, fontWeight: '700' },
+  pickupCard: {
+    marginTop: spacing.md,
+    backgroundColor: colors.white,
+    borderRadius: radius.xl,
+    padding: spacing.md,
+    alignItems: 'center',
+  },
+  pickupLabel: { fontSize: 12, fontWeight: '600', color: colors.gray600, textTransform: 'uppercase' },
+  pickupNumber: { marginTop: spacing.xs, fontSize: 48, fontWeight: '800', color: colors.onSurface },
+  preparationBadge: { alignSelf: 'center', marginTop: spacing.sm, paddingHorizontal: 14, paddingVertical: 6 },
+  preparationText: { fontSize: 13, fontWeight: '700' },
   amountText: { marginTop: spacing.md, fontSize: 24, fontWeight: '800', color: colors.onSurface },
   section: { marginTop: spacing.md, backgroundColor: colors.white, borderRadius: radius.xl, padding: spacing.md },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.onSurface },
