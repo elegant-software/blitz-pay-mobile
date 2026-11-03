@@ -1,0 +1,16 @@
+name: Automation · Issue Spec
+run-name: "Issue spec #${{ github.event.client_payload.issue_number || github.event.client_payload.issue.number || '?' }}"
+on:
+  repository_dispatch:
+    types:
+      - project_status_change
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+  repository-projects: write
+jobs:
+  issue-spec:
+    name: Issue Spec
+    uses: elegant-software/elegant-ci-cd-pipeline/.github/workflows/codex-github-issue-spec-kit-automation.yml@main
+    secrets: inherit

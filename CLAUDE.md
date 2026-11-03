@@ -88,7 +88,9 @@ Set `EXPO_PUBLIC_AUTH_BYPASS=true` in `blitz-pay-merchant/.env`.
 
 **Design system**: colors, spacing, radius, shadow exported from `src/lib/theme.ts` — identical in both apps.
 
-**CI**: `.github/workflows/mobile-react-native-build.yml` defaults to `./blitz-pay`. Pass `app-directory: ./blitz-pay-merchant` to build the merchant app.
+**CI**: `.github/workflows/cd-build-mobile-app.yml` defaults to `./blitz-pay`. Pass `app-directory: ./blitz-pay-merchant` to build the merchant app.
+
+**GitHub Actions conventions**: file prefixes (`ci-`, `cd-`, `release-`, `pr-`, `cleanup-`, `automation-`), `name: <Category> · <What>`, a `run-name` on dispatch/schedule workflows, a `name:` on every job, and results in the job summary. Follow [`docs/github-actions-conventions.md`](https://github.com/elegant-software/elegant-ci-cd-pipeline/blob/main/docs/github-actions-conventions.md) in `elegant-ci-cd-pipeline` for any new or changed workflow.
 
 ## Recent Changes
 - Renamed `mobile/` → `blitz-pay/` (consumer app)

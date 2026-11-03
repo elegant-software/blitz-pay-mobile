@@ -1,0 +1,61 @@
+name: CI · Mobile Quality
+
+on:
+  workflow_call:
+    inputs:
+      app-directory:
+        required: false
+        default: ./blitz-pay
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Lint, typecheck, test ${{ inputs.app-directory }}
+    runs-on: ubuntu-latest
+    env:
+      APP_DIR: ${{ inputs.app-directory }}
+      NODE_VERSION: ${{ vars.MOBILE_NODE_VERSION || vars.NODE_VERSION || '20' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Validate Expo app files
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          test -f package.json || { echo "package.json not found in $(pwd)"; exit 1; }
+          test -f app.json -o -f app.config.js -o -f app.config.ts || {
+            echo "Expo config not found. Expected app.json, app.config.js, or app.config.ts."
+            exit 1
+          }
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: ${{ env.APP_DIR }}/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ${{ env.APP_DIR }}
+        run: npm ci
+
+      - name: Lint
+        working-directory: ${{ env.APP_DIR }}
+        run: npm run lint
+
+      - name: Typecheck
+        working-directory: ${{ env.APP_DIR }}
+        run: npm run typecheck
+
+      - name: Test
+        working-directory: ${{ env.APP_DIR }}
+        run: npm test -- --ci
+
+      - name: Expo Doctor
+        working-directory: ${{ env.APP_DIR }}
+        env:
+          EXPO_DOCTOR_WARN_ON_NETWORK_ERRORS: "1"
+        run: npx expo-doctor

@@ -1,0 +1,67 @@
+name: CD · Deploy to Kubernetes
+run-name: Deploy ${{ inputs.image-tag }} to ${{ inputs.environment }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      image-tag:
+        description: 'Docker image tag to deploy (e.g. v0.2.2)'
+        required: true
+        type: string
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+
+jobs:
+  deploy:
+    name: Deploy ${{ inputs.image-tag }} to ${{ inputs.environment }}
+    # Self-hosted runner must have kubectl, helm, and ~/.kube/config pre-configured
+    # for the kind cluster on myserver. See reference/RUNNER_SETUP.md.
+    runs-on: self-hosted
+    environment: ${{ inputs.environment }}
+    permissions:
+      contents: read
+    env:
+      APP_NAME: ${{ vars.APP_NAME }}
+      HELM_CHART: ./helm/${{ vars.APP_NAME }}
+      ENV_SUFFIX: ${{ inputs.environment == 'production' && 'prod' || 'staging' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Verify cluster connectivity
+        run: kubectl cluster-info --request-timeout=10s
+
+      - name: Deploy to ${{ inputs.environment }}
+        run: |
+          helm upgrade --install $APP_NAME $HELM_CHART \
+            --namespace blitzpay-$ENV_SUFFIX \
+            --create-namespace \
+            --values $HELM_CHART/values.yaml \
+            --values $HELM_CHART/values-$ENV_SUFFIX.yaml \
+            --set image.tag=${{ inputs.image-tag }} \
+            --wait \
+            --timeout 5m
+
+      - name: Verify rollout
+        run: |
+          kubectl rollout status deployment/$APP_NAME \
+            --namespace blitzpay-$ENV_SUFFIX \
+            --timeout=5m
+
+      - name: Add deployment to job summary
+        env:
+          IMAGE_TAG: ${{ inputs.image-tag }}
+          ENVIRONMENT: ${{ inputs.environment }}
+        run: |
+          {
+            echo "### 🚀 Deployed \`${IMAGE_TAG}\` to ${ENVIRONMENT}"
+            echo "| Release | Namespace | Image tag |"
+            echo "|---|---|---|"
+            echo "| ${APP_NAME} | blitzpay-${ENV_SUFFIX} | \`${IMAGE_TAG}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "::notice title=Deployed::${IMAGE_TAG} → ${ENVIRONMENT} (blitzpay-${ENV_SUFFIX})"

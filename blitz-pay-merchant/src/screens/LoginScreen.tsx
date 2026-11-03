@@ -5,14 +5,17 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../lib/auth';
 import { useLanguage } from '../lib/LanguageContext';
 import { colors, spacing, radius } from '../lib/theme';
+import type { RootStackNav } from '../types';
 
 export default function LoginScreen() {
   const { t } = useLanguage();
   const { login, loginWithBiometric, isBiometricAvailable, biometricEnrolled } = useAuth();
+  const navigation = useNavigation<RootStackNav>();
   const insets = useSafeAreaInsets();
 
   const [email, setEmail] = useState('');
@@ -140,6 +143,13 @@ export default function LoginScreen() {
                 </TouchableOpacity>
               )}
             </View>
+
+            <View style={styles.signupRow}>
+              <Text style={styles.signupHint}>{t('no_account')} </Text>
+              <TouchableOpacity onPress={() => navigation.navigate('Signup')}>
+                <Text style={styles.signupLink}>{t('sign_up_link')}</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
         </ScrollView>
@@ -204,4 +214,11 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: `${colors.primary}30`,
   },
   biometricText: { fontSize: 15, fontWeight: '600', color: colors.primary },
+  signupRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: spacing.lg,
+  },
+  signupHint: { color: colors.gray500, fontSize: 14 },
+  signupLink: { color: colors.primary, fontSize: 14, fontWeight: '600' },
 });

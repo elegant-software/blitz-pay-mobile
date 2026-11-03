@@ -68,8 +68,8 @@ export async function fetchMerchantBranchDetails(
   }
 
   const rows = await response.json() as BranchResponse[];
-  const branch = rows.find((row) => row.id === branchId && row.merchantId === merchantId && row.name);
-  if (!branch || !branch.id || !branch.merchantId || !branch.name) {
+  const branch = rows.find((row) => row.id === branchId && row.name);
+  if (!branch || !branch.id || !branch.name) {
     observability.warn('merchant_branch_details_missing', {
       merchantId,
       branchId,
@@ -86,7 +86,7 @@ export async function fetchMerchantBranchDetails(
 
   return {
     branchId: branch.id,
-    merchantId: branch.merchantId,
+    merchantId: branch.merchantId ?? merchantId,
     name: branch.name,
     latitude: ensureNumber(branch.latitude),
     longitude: ensureNumber(branch.longitude),

@@ -332,6 +332,12 @@ export function AuthProvider({ children, onSessionExpired }: AuthProviderProps) 
     const d = await res.json() as { access_token: string; refresh_token: string; id_token: string; expires_in: number };
 
     if (!hasRequiredGroup(d.access_token)) {
+      const groups = decodeJwt(d.access_token).groups;
+      console.error('[auth] login: access denied — user missing required group', {
+        requiredGroup: REQUIRED_GROUP,
+        userGroups: groups ?? '(no groups claim on token)',
+      });
+      observability.warn('auth_login_access_denied', { requiredGroup: REQUIRED_GROUP, userGroups: groups ?? [] });
       throw new Error('access_denied');
     }
 

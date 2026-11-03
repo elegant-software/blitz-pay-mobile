@@ -1,0 +1,554 @@
+name: CD · Build Mobile App (EAS)
+run-name: >-
+  Build ${{ inputs.app-directory || './blitz-pay' }} ·
+  ${{ inputs.eas-platform || 'android' }} · ${{ inputs.eas-profile || 'aws-staging' }}
+  ${{ !inputs.run-eas-build && '(quality only)' || '' }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      app-directory:
+        description: Relative path to the Expo app
+        required: false
+        default: ./blitz-pay
+        type: string
+      run-eas-build:
+        description: Trigger EAS cloud build
+        required: false
+        default: false
+        type: boolean
+      target-environment:
+        description: GitHub Environment to pull EXPO_PUBLIC_* vars/secrets from
+        required: false
+        default: aws-staging
+        type: choice
+        options:
+          - local-k8s
+          - aws-staging
+          - production
+      eas-profile:
+        description: EAS build profile
+        required: false
+        default: aws-staging
+        type: string
+      eas-platform:
+        description: EAS build platform
+        required: false
+        default: android
+        type: choice
+        options:
+          - all
+          - android
+          - ios
+      run-device-tests:
+        description: Run device or emulator tests (Detox, Maestro, etc.)
+        required: false
+        default: false
+        type: boolean
+      run-eas-update:
+        description: Publish an EAS Update after the build
+        required: false
+        default: false
+        type: boolean
+      release-notes-tag:
+        description: GitHub release tag to use for EAS update message ("latest" uses the latest release)
+        required: false
+        default: latest
+        type: string
+      submit-to-app-stores:
+        description: Submit builds to Google Play and App Store Connect
+        required: false
+        default: false
+        type: boolean
+
+  workflow_call:
+    inputs:
+      app-directory:
+        required: false
+        default: ./blitz-pay
+        type: string
+      run-eas-build:
+        required: false
+        default: false
+        type: boolean
+      target-environment:
+        required: false
+        default: aws-staging
+        type: string
+      eas-profile:
+        required: false
+        default: aws-staging
+        type: string
+      eas-platform:
+        required: false
+        default: android
+        type: string
+      run-device-tests:
+        required: false
+        default: false
+        type: boolean
+      run-eas-update:
+        required: false
+        default: false
+        type: boolean
+      release-notes-tag:
+        required: false
+        default: latest
+        type: string
+      submit-to-app-stores:
+        required: false
+        default: false
+        type: boolean
+    secrets:
+      EXPO_TOKEN:
+        required: false
+      APPLE_ID:
+        required: false
+      APPLE_APP_SPECIFIC_PASSWORD:
+        required: false
+      GOOGLE_SERVICE_ACCOUNT_JSON:
+        required: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  resolve-config:
+    name: Resolve Configuration
+    runs-on: ubuntu-latest
+    outputs:
+      app_directory: ${{ steps.resolve.outputs.app_directory }}
+      node_version: ${{ steps.resolve.outputs.node_version }}
+      run_eas_build: ${{ steps.resolve.outputs.run_eas_build }}
+      target_environment: ${{ steps.resolve.outputs.target_environment }}
+      eas_profile: ${{ steps.resolve.outputs.eas_profile }}
+      eas_platform: ${{ steps.resolve.outputs.eas_platform }}
+      run_device_tests: ${{ steps.resolve.outputs.run_device_tests }}
+      run_eas_update: ${{ steps.resolve.outputs.run_eas_update }}
+      release_notes_tag: ${{ steps.resolve.outputs.release_notes_tag }}
+      submit_to_app_stores: ${{ steps.resolve.outputs.submit_to_app_stores }}
+    steps:
+      - name: Resolve inputs for both workflow_dispatch and workflow_call
+        id: resolve
+        run: |
+          {
+            echo "app_directory=${{ inputs.app-directory || github.event.inputs.app-directory || './blitz-pay' }}"
+            echo "node_version=${{ vars.MOBILE_NODE_VERSION || vars.NODE_VERSION || '20' }}"
+            echo "run_eas_build=${{ (inputs.run-eas-build || github.event.inputs.run-eas-build == 'true') && 'true' || 'false' }}"
+            echo "target_environment=${{ inputs.target-environment || github.event.inputs.target-environment || 'aws-staging' }}"
+            echo "eas_profile=${{ inputs.eas-profile || github.event.inputs.eas-profile || 'aws-staging' }}"
+            echo "eas_platform=${{ inputs.eas-platform || github.event.inputs.eas-platform || 'android' }}"
+            echo "run_device_tests=${{ (inputs.run-device-tests || github.event.inputs.run-device-tests == 'true') && 'true' || 'false' }}"
+            echo "run_eas_update=${{ (inputs.run-eas-update || github.event.inputs.run-eas-update == 'true') && 'true' || 'false' }}"
+            echo "release_notes_tag=${{ inputs.release-notes-tag || github.event.inputs.release-notes-tag || 'latest' }}"
+            echo "submit_to_app_stores=${{ (inputs.submit-to-app-stores || github.event.inputs.submit-to-app-stores == 'true') && 'true' || 'false' }}"
+          } >> "$GITHUB_OUTPUT"
+
+  quality:
+    name: Quality
+    needs: resolve-config
+    uses: ./.github/workflows/ci-mobile-quality.yml
+    with:
+      app-directory: ${{ needs.resolve-config.outputs.app_directory }}
+
+  device-tests:
+    name: Device Tests
+    needs: [resolve-config, quality]
+    if: ${{ needs.resolve-config.outputs.run_device_tests == 'true' }}
+    uses: ./.github/workflows/ci-mobile-device-tests.yml
+    with:
+      app-directory: ${{ needs.resolve-config.outputs.app_directory }}
+
+  eas-build:
+    name: EAS Build (${{ needs.resolve-config.outputs.eas_platform }}, ${{ needs.resolve-config.outputs.eas_profile }})
+    runs-on: ubuntu-latest
+    needs: [resolve-config, quality]
+    if: ${{ needs.resolve-config.outputs.run_eas_build == 'true' }}
+    environment: ${{ needs.resolve-config.outputs.target_environment }}
+    env:
+      APP_DIR: ${{ needs.resolve-config.outputs.app_directory }}
+      NODE_VERSION: ${{ needs.resolve-config.outputs.node_version }}
+      REQUESTED_PROFILE: ${{ needs.resolve-config.outputs.eas_profile }}
+      REQUESTED_PLATFORM: ${{ needs.resolve-config.outputs.eas_platform }}
+      RELEASE_NOTES_TAG: ${{ needs.resolve-config.outputs.release_notes_tag }}
+      EXPO_PUBLIC_KEYCLOAK_URL: ${{ vars.EXPO_PUBLIC_KEYCLOAK_URL }}
+      EXPO_PUBLIC_KEYCLOAK_REALM: ${{ vars.EXPO_PUBLIC_KEYCLOAK_REALM }}
+      EXPO_PUBLIC_KEYCLOAK_CLIENT_ID: ${{ vars.EXPO_PUBLIC_KEYCLOAK_CLIENT_ID }}
+      EXPO_PUBLIC_AUTH_BYPASS: ${{ vars.EXPO_PUBLIC_AUTH_BYPASS }}
+      EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Validate EXPO_TOKEN
+        run: |
+          if [ -z "${{ secrets.EXPO_TOKEN }}" ]; then
+            echo "EXPO_TOKEN secret is required for EAS build."
+            exit 1
+          fi
+
+      - name: Validate EAS config
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          test -f package.json || { echo "package.json not found in $(pwd)"; exit 1; }
+          test -f eas.json || { echo "eas.json not found in $(pwd)"; exit 1; }
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: ${{ env.APP_DIR }}/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ${{ env.APP_DIR }}
+        run: npm ci
+
+      - name: Setup Expo and EAS
+        uses: expo/expo-github-action@v9
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Resolve app release version
+        id: release-version
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const requestedTag = (process.env.RELEASE_NOTES_TAG || "latest").trim();
+            const semverPattern = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
+
+            let release;
+            if (requestedTag.toLowerCase() === "latest") {
+              ({ data: release } = await github.rest.repos.getLatestRelease({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+              }));
+            } else {
+              ({ data: release } = await github.rest.repos.getReleaseByTag({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tag: requestedTag,
+              }));
+            }
+
+            const releaseTag = String(release.tag_name || requestedTag).trim();
+            const appVersion = releaseTag.replace(/^v/i, "");
+
+            if (!semverPattern.test(appVersion)) {
+              core.setFailed(
+                `Release tag "${releaseTag}" is not SemVer. Use tags like v1.2.3 (or 1.2.3).`
+              );
+              return;
+            }
+
+            core.info(`Resolved app version ${appVersion} from release tag "${releaseTag}".`);
+            core.setOutput("release_tag", releaseTag);
+            core.setOutput("app_version", appVersion);
+
+      - name: Apply release version to Expo app config
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          app_version="${{ steps.release-version.outputs.app_version }}"
+          release_tag="${{ steps.release-version.outputs.release_tag }}"
+          if [ -z "$app_version" ]; then
+            echo "Resolved app version is empty."
+            exit 1
+          fi
+
+          test -f app.config.js || { echo "app.config.js not found in $(pwd)"; exit 1; }
+          sed -i.bak -E "s/version: \"[^\"]*\"/version: \"$app_version\"/" app.config.js
+          rm -f app.config.js.bak
+          echo "Using Expo app version $app_version from GitHub release $release_tag"
+
+      - name: Create runtime .env for Expo/EAS
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          {
+            echo "EXPO_PUBLIC_KEYCLOAK_URL=${EXPO_PUBLIC_KEYCLOAK_URL:-}"
+            echo "EXPO_PUBLIC_KEYCLOAK_REALM=${EXPO_PUBLIC_KEYCLOAK_REALM:-}"
+            echo "EXPO_PUBLIC_KEYCLOAK_CLIENT_ID=${EXPO_PUBLIC_KEYCLOAK_CLIENT_ID:-}"
+            echo "EXPO_PUBLIC_AUTH_BYPASS=${EXPO_PUBLIC_AUTH_BYPASS:-false}"
+            echo "EXPO_PUBLIC_API_URL=${EXPO_PUBLIC_API_URL:-}"
+          } > .env
+
+      - name: Skip duplicate active build
+        if: false
+        id: duplicate-build-check
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          config_json="$(npx expo config --json)"
+          app_version="$(printf '%s' "$config_json" | jq -r '.expo.version // .version // empty')"
+          if [ -z "$app_version" ]; then
+            echo "Could not read app version from Expo config (.expo.version or .version)."
+            echo "Resolved config:"
+            printf '%s\n' "$config_json"
+            exit 1
+          fi
+
+          echo "Checking active EAS builds for version=$app_version profile=$REQUESTED_PROFILE platform=$REQUESTED_PLATFORM"
+
+          has_active_build() {
+            local platform="$1"
+            local status
+            for status in in-progress in-queue; do
+              if eas build:list \
+                --json \
+                --non-interactive \
+                --limit 1 \
+                --platform "$platform" \
+                --build-profile "$REQUESTED_PROFILE" \
+                --app-version "$app_version" \
+                --status "$status" | jq -e 'length > 0' >/dev/null; then
+                return 0
+              fi
+            done
+            return 1
+          }
+
+          duplicate_found=false
+          if [ "$REQUESTED_PLATFORM" = "all" ]; then
+            for platform in android ios; do
+              if has_active_build "$platform"; then
+                duplicate_found=true
+                break
+              fi
+            done
+          else
+            if has_active_build "$REQUESTED_PLATFORM"; then
+              duplicate_found=true
+            fi
+          fi
+
+          if [ "$duplicate_found" = true ]; then
+            echo "skip_build=true" >> "$GITHUB_OUTPUT"
+            echo "Active EAS build already exists for this version/profile/platform. Skipping."
+          else
+            echo "skip_build=false" >> "$GITHUB_OUTPUT"
+            echo "No active duplicate build found. Continuing."
+          fi
+
+      - name: Build with EAS (async + poll)
+        if: ${{ steps.duplicate-build-check.outputs.skip_build != 'true' }}
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          case "$REQUESTED_PLATFORM" in
+            all) platforms="ios,android" ;;
+            ios) platforms="ios" ;;
+            android) platforms="android" ;;
+            *)
+              echo "Unsupported eas-platform: $REQUESTED_PLATFORM"
+              exit 1
+              ;;
+          esac
+
+          node ./scripts/eas-build-async.js \
+            --profile "$REQUESTED_PROFILE" \
+            --platforms "$platforms" | tee "$RUNNER_TEMP/eas-build.log"
+
+      - name: Add EAS build to job summary
+        if: ${{ always() && steps.duplicate-build-check.outputs.skip_build != 'true' }}
+        run: |
+          version="${{ steps.release-version.outputs.app_version }}"
+          {
+            echo "### 📱 EAS build ${version:+v$version }· ${REQUESTED_PLATFORM} · ${REQUESTED_PROFILE}"
+            echo '```'
+            grep -E '^\[(ios|android)\] (started|completed|status: (errored|canceled))' "$RUNNER_TEMP/eas-build.log" 2>/dev/null || echo "No EAS build output captured."
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "::notice title=EAS build::${version:+v$version }${REQUESTED_PLATFORM} (${REQUESTED_PROFILE}) — ${{ job.status }}"
+
+      - name: Duplicate build detected
+        if: ${{ steps.duplicate-build-check.outputs.skip_build == 'true' }}
+        run: echo "Skipped EAS build because an active build with the same version/profile/platform is already running."
+
+  eas-update:
+    name: Publish EAS Update (${{ needs.resolve-config.outputs.eas_profile }})
+    runs-on: ubuntu-latest
+    needs: [resolve-config, eas-build]
+    if: ${{ needs.resolve-config.outputs.run_eas_update == 'true' }}
+    environment: ${{ needs.resolve-config.outputs.target_environment }}
+    env:
+      APP_DIR: ${{ needs.resolve-config.outputs.app_directory }}
+      NODE_VERSION: ${{ needs.resolve-config.outputs.node_version }}
+      RELEASE_NOTES_TAG: ${{ needs.resolve-config.outputs.release_notes_tag }}
+      EAS_PROFILE: ${{ needs.resolve-config.outputs.eas_profile }}
+      EXPO_PUBLIC_KEYCLOAK_URL: ${{ vars.EXPO_PUBLIC_KEYCLOAK_URL }}
+      EXPO_PUBLIC_KEYCLOAK_REALM: ${{ vars.EXPO_PUBLIC_KEYCLOAK_REALM }}
+      EXPO_PUBLIC_KEYCLOAK_CLIENT_ID: ${{ vars.EXPO_PUBLIC_KEYCLOAK_CLIENT_ID }}
+      EXPO_PUBLIC_AUTH_BYPASS: ${{ vars.EXPO_PUBLIC_AUTH_BYPASS }}
+      EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Validate EXPO_TOKEN
+        run: |
+          if [ -z "${{ secrets.EXPO_TOKEN }}" ]; then
+            echo "EXPO_TOKEN secret is required for EAS update."
+            exit 1
+          fi
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: ${{ env.APP_DIR }}/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ${{ env.APP_DIR }}
+        run: npm ci
+
+      - name: Setup Expo and EAS
+        uses: expo/expo-github-action@v9
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Create runtime .env for Expo/EAS
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          {
+            echo "EXPO_PUBLIC_KEYCLOAK_URL=${EXPO_PUBLIC_KEYCLOAK_URL:-}"
+            echo "EXPO_PUBLIC_KEYCLOAK_REALM=${EXPO_PUBLIC_KEYCLOAK_REALM:-}"
+            echo "EXPO_PUBLIC_KEYCLOAK_CLIENT_ID=${EXPO_PUBLIC_KEYCLOAK_CLIENT_ID:-}"
+            echo "EXPO_PUBLIC_AUTH_BYPASS=${EXPO_PUBLIC_AUTH_BYPASS:-false}"
+            echo "EXPO_PUBLIC_API_URL=${EXPO_PUBLIC_API_URL:-}"
+          } > .env
+
+      - name: Resolve release notes message
+        id: release-notes
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const requestedTag = (process.env.RELEASE_NOTES_TAG || "latest").trim();
+            const fallbackMessage = `CI update from ${context.workflow}`;
+
+            const normalize = (value) =>
+              String(value || "")
+                .replace(/\r\n/g, "\n")
+                .trim();
+
+            try {
+              let release;
+              if (requestedTag.toLowerCase() === "latest") {
+                ({ data: release } = await github.rest.repos.getLatestRelease({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                }));
+              } else {
+                ({ data: release } = await github.rest.repos.getReleaseByTag({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  tag: requestedTag,
+                }));
+              }
+
+              const releaseTitle = normalize(release.name) || normalize(release.tag_name);
+              const releaseBody = normalize(release.body);
+              const firstBodyLine =
+                releaseBody
+                  .split("\n")
+                  .map((line) => line.trim())
+                  .find((line) => line.length > 0 && !line.startsWith("#")) || "";
+
+              let updateMessage = releaseTitle || fallbackMessage;
+              if (firstBodyLine) {
+                updateMessage = `${updateMessage}: ${firstBodyLine}`;
+              }
+              if (updateMessage.length > 240) {
+                updateMessage = `${updateMessage.slice(0, 237)}...`;
+              }
+
+              core.setOutput("update_message", updateMessage);
+              core.info(`Using release notes from tag "${release.tag_name}".`);
+            } catch (error) {
+              core.warning(
+                `Unable to resolve release notes for tag "${requestedTag}". Using fallback message. ${error.message}`
+              );
+              core.setOutput("update_message", fallbackMessage);
+            }
+
+      - name: Publish EAS Update
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          eas update \
+            --non-interactive \
+            --channel "${EAS_PROFILE:-aws-staging}" \
+            --message "${{ steps.release-notes.outputs.update_message }}" \
+            --platform all
+
+      - name: Add EAS update to job summary
+        env:
+          UPDATE_MESSAGE: ${{ steps.release-notes.outputs.update_message }}
+        run: |
+          {
+            echo "### 🔄 Published EAS update to channel \`${EAS_PROFILE:-aws-staging}\`"
+            echo
+            echo "> ${UPDATE_MESSAGE}"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "::notice title=EAS update::channel ${EAS_PROFILE:-aws-staging}"
+
+  store-submit:
+    name: Submit to App Stores (${{ needs.resolve-config.outputs.eas_profile }})
+    runs-on: ubuntu-latest
+    needs: [resolve-config, eas-build]
+    if: ${{ needs.resolve-config.outputs.submit_to_app_stores == 'true' && vars.ENABLE_STORE_SUBMIT == 'true' }}
+    env:
+      APP_DIR: ${{ needs.resolve-config.outputs.app_directory }}
+      NODE_VERSION: ${{ needs.resolve-config.outputs.node_version }}
+      REQUESTED_PROFILE: ${{ needs.resolve-config.outputs.eas_profile }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: ${{ env.APP_DIR }}/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ${{ env.APP_DIR }}
+        run: npm ci
+
+      - name: Setup Expo and EAS
+        uses: expo/expo-github-action@v9
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Prepare Google Play credentials (disabled)
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          printf '%s' "${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}" > "$PWD/google-play-sa.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$PWD/google-play-sa.json"
+
+      - name: Submit to Google Play (disabled)
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          export GOOGLE_APPLICATION_CREDENTIALS="$PWD/google-play-sa.json"
+          eas submit \
+            --non-interactive \
+            --platform android \
+            --profile "$REQUESTED_PROFILE"
+
+      - name: Submit to App Store Connect (disabled)
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          eas submit \
+            --non-interactive \
+            --platform ios \
+            --profile "$REQUESTED_PROFILE" \
+            --apple-id "${{ secrets.APPLE_ID }}" \
+            --apple-app-specific-password "${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}"

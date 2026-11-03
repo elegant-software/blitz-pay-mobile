@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useLanguage } from '../lib/LanguageContext';
 import { colors, spacing, radius, shadow } from '../lib/theme';
 import type { RootStackNav } from '../types';
@@ -79,7 +79,7 @@ export default function VaultScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const loadOrders = useCallback(async () => {
-    setLoading(true);
+    // ponytail: loading starts true for first load only; refocus refreshes silently.
     setError(null);
     try {
       const recentOrders = await fetchRecentOrders();
@@ -92,9 +92,12 @@ export default function VaultScreen() {
     }
   }, []);
 
-  useEffect(() => {
-    void loadOrders();
-  }, [loadOrders]);
+  // Tab screens stay mounted, so reload on every focus to pick up webhook-driven status changes (e.g. PAID).
+  useFocusEffect(
+    useCallback(() => {
+      void loadOrders();
+    }, [loadOrders]),
+  );
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
