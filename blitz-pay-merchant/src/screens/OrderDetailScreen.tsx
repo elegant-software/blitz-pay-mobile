@@ -10,7 +10,8 @@ import { useLanguage } from '../lib/LanguageContext';
 import { useAuth } from '../lib/auth';
 import { colors, spacing, radius, shadow } from '../lib/theme';
 import type { RootStackParamList } from '../types';
-import { getMerchantOrderStatusIcon, getMerchantOrderStatusLabelKey } from '../features/orders/orderPresentation';
+import { formatPickupNumber, getMerchantOrderStatusIcon, getMerchantOrderStatusLabelKey } from '../features/orders/orderPresentation';
+import { PreparationStatusBadge } from '../features/orders/components/PreparationStatusBadge';
 import { useMerchantOrderDetail } from '../features/orders/hooks/useMerchantOrderDetail';
 import { useMerchantProducts } from '../features/products/hooks/useMerchantProducts';
 import { useStripeTerminalPayment } from '../hooks/useStripeTerminalPayment';
@@ -128,6 +129,18 @@ export default function OrderDetailScreen() {
 
             <View style={styles.divider} />
 
+            {order.pickupNumber != null ? (
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>{t('merchant_pickup_number')}</Text>
+                <Text style={[styles.detailValue, styles.amountText]}>{formatPickupNumber(order.pickupNumber)}</Text>
+              </View>
+            ) : null}
+            {order.preparationStatus ? (
+              <View style={[styles.detailRow, styles.detailRowCentered]}>
+                <Text style={styles.detailLabel}>{t('merchant_preparation_status')}</Text>
+                <PreparationStatusBadge status={order.preparationStatus} />
+              </View>
+            ) : null}
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>{t('order_total')}</Text>
               <Text style={[styles.detailValue, styles.amountText]}>
@@ -406,6 +419,7 @@ const styles = StyleSheet.create({
   statusText: { flexShrink: 1, fontSize: 12, lineHeight: 15, fontWeight: '700', textAlign: 'center' },
   divider: { height: 1, backgroundColor: colors.gray200, marginVertical: spacing.md },
   detailRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.sm },
+  detailRowCentered: { alignItems: 'center' },
   detailLabel: { fontSize: 14, color: colors.gray600 },
   detailValue: { fontSize: 14, fontWeight: '600', color: colors.onSurface },
   amountText: { fontSize: 18, fontWeight: '800' },

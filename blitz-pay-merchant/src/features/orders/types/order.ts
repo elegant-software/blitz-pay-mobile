@@ -18,6 +18,7 @@ export type MerchantPaymentProvider =
   | 'QRPAY';
 export type MerchantOrderPriceSource = 'CATALOG' | 'MERCHANT_OVERRIDE';
 export type MerchantOrderUpdateActor = 'MERCHANT' | 'SHOPPER';
+export type MerchantPreparationStatus = 'RECEIVED' | 'PREPARING' | 'READY';
 
 export interface MerchantOrderItem {
   lineId: string;
@@ -43,6 +44,9 @@ export interface MerchantOrderSummary {
   createdAt: string;
   updatedAt: string;
   itemCount?: number;
+  preparationStatus?: MerchantPreparationStatus;
+  /** Null for legacy orders and orders without a Branch; hide it then. */
+  pickupNumber: number | null;
 }
 
 export interface MerchantOrderDetail extends MerchantOrderSummary {

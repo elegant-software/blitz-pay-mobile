@@ -1,5 +1,6 @@
 import type { TranslationKeys } from '../../lib/translations';
-import type { MerchantOrderStatus } from './types/order';
+import { colors } from '../../lib/theme';
+import type { MerchantOrderStatus, MerchantPreparationStatus } from './types/order';
 
 export type MerchantOrderSectionKey =
   | 'payment_failed'
@@ -29,7 +30,7 @@ export function getMerchantOrderSection(status: MerchantOrderStatus): MerchantOr
 export function getMerchantOrderSectionTitleKey(section: MerchantOrderSectionKey): TranslationKeys {
   if (section === 'payment_failed') return 'merchant_order_queue_payment_failed';
   if (section === 'awaiting_payment') return 'merchant_order_queue_awaiting_payment';
-  if (section === 'payment_in_progress') return 'merchant_order_queue_preparing';
+  if (section === 'payment_in_progress') return 'merchant_order_queue_payment_in_progress';
   if (section === 'paid') return 'merchant_order_queue_completed';
   return 'merchant_order_queue_cancelled';
 }
@@ -37,7 +38,7 @@ export function getMerchantOrderSectionTitleKey(section: MerchantOrderSectionKey
 export function getMerchantOrderStatusLabelKey(status: MerchantOrderStatus): TranslationKeys {
   if (status === 'payment_failed') return 'merchant_order_queue_status_payment_failed';
   if (status === 'awaiting_payment') return 'merchant_order_queue_status_awaiting_payment';
-  if (status === 'payment_in_progress') return 'merchant_order_queue_status_preparing';
+  if (status === 'payment_in_progress') return 'merchant_order_queue_status_payment_in_progress';
   if (status === 'paid') return 'merchant_order_queue_status_completed';
   return 'merchant_order_queue_status_cancelled';
 }
@@ -48,4 +49,26 @@ export function getMerchantOrderStatusIcon(status: MerchantOrderStatus): string 
   if (status === 'payment_in_progress') return 'hourglass-outline';
   if (status === 'paid') return 'checkmark-circle';
   return 'ban';
+}
+
+export function getPreparationStatusLabelKey(status: MerchantPreparationStatus): TranslationKeys {
+  if (status === 'READY') return 'merchant_preparation_status_ready';
+  if (status === 'PREPARING') return 'merchant_preparation_status_preparing';
+  return 'merchant_preparation_status_received';
+}
+
+export function getPreparationStatusIcon(status: MerchantPreparationStatus): string {
+  if (status === 'READY') return 'bag-check-outline';
+  if (status === 'PREPARING') return 'flame-outline';
+  return 'receipt-outline';
+}
+
+export function getPreparationStatusColor(status: MerchantPreparationStatus): string {
+  if (status === 'READY') return colors.success;
+  if (status === 'PREPARING') return colors.warning;
+  return colors.gray700;
+}
+
+export function formatPickupNumber(pickupNumber: number): string {
+  return `#${String(pickupNumber).padStart(3, '0')}`;
 }

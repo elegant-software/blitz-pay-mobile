@@ -10,6 +10,7 @@ import type {
   MerchantOrderStatus,
   MerchantOrderSummary,
   MerchantOverrideOrderLinePriceInput,
+  MerchantPreparationStatus,
   MerchantUpdateOrderLineQuantityInput,
 } from '../types/order';
 
@@ -41,6 +42,8 @@ interface RawOrder {
   paymentRetryAllowed?: boolean | null;
   manualSettlementNote?: string | null;
   lastUpdatedBy?: string | null;
+  preparationStatus?: string | null;
+  pickupNumber?: number | null;
 }
 
 function mapStatus(status: unknown): MerchantOrderStatus {
@@ -83,6 +86,11 @@ function mapCheckoutPaymentMethod(method: unknown): 'BANK_ACCOUNT' | 'CARD' | 'P
   return undefined;
 }
 
+function mapPreparationStatus(status: unknown): MerchantPreparationStatus | undefined {
+  if (status === 'RECEIVED' || status === 'PREPARING' || status === 'READY') return status;
+  return undefined;
+}
+
 function parseItems(items: RawOrderItem[] | undefined, orderId: string): MerchantOrderItem[] {
   return (items ?? []).map((item, index) => ({
     lineId: item.itemId ?? item.lineId ?? `${orderId}-${item.productId ?? 'line'}-${index}`,
@@ -116,6 +124,8 @@ function parseSummary(raw: RawOrder): MerchantOrderSummary {
     createdAt: raw.createdAt,
     updatedAt: raw.updatedAt ?? raw.createdAt,
     itemCount: itemCount && itemCount > 0 ? itemCount : undefined,
+    preparationStatus: mapPreparationStatus(raw.preparationStatus),
+    pickupNumber: typeof raw.pickupNumber === 'number' ? raw.pickupNumber : null,
   };
 }
 
