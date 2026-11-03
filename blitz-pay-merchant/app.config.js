@@ -24,6 +24,7 @@ module.exports = {
       infoPlist: {
         NSCameraUsageDescription: "Used to scan QR codes for payments",
         NSFaceIDUsageDescription: "Used for biometric authentication",
+        NSBluetoothAlwaysUsageDescription: "Used to connect to card readers for in-person payments",
         NSLocationWhenInUseUsageDescription: "BlitzPay Merchant uses your location to detect your active branch.",
         NSLocationAlwaysAndWhenInUseUsageDescription: "BlitzPay Merchant monitors branch proximity in the background to improve your experience.",
         UIBackgroundModes: ["remote-notification", "location"],

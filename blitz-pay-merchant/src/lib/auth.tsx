@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 import { storage } from './storage';
 import { config } from './config';
 import { observability } from './observability';
-import { fetchMerchantBranches, fetchMerchantDetails, fetchMerchantName } from './merchantProducts';
+import { fetchMerchantDetails } from './merchantProducts';
 import { fetchMerchantBranchDetails } from './merchantBranches';
 
 const LocalAuthentication = Platform.OS !== 'web'
@@ -499,20 +499,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setActiveBranchScope(enrichedScope);
     setBranchScopeError(parsed.errorKey);
 
-    if (parsed.activeBranchScope) {
-      const { merchantId, branchId } = parsed.activeBranchScope;
-      void (async () => {
-        const [branches, merchantName] = await Promise.all([
-          fetchMerchantBranches(merchantId).catch(() => []),
-          fetchMerchantName(merchantId),
-        ]);
-        const branchName = branches.find((b) => b.branchId === branchId)?.name ?? null;
-        setActiveBranchScope((prev) =>
-          prev ? { ...prev, branchName, merchantName } : prev,
-        );
-      })();
-    }
-
     if (parsed.profile?.activeBranchId) {
       await writeActiveBranchId(parsed.profile.activeBranchId);
     } else {
@@ -737,20 +723,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     setActiveBranchScope(enrichedScope);
     setBranchScopeError(nextScope.errorKey);
-
-    if (nextScope.activeBranchScope) {
-      const { merchantId, branchId: activeBranchId } = nextScope.activeBranchScope;
-      void (async () => {
-        const [branches, merchantName] = await Promise.all([
-          fetchMerchantBranches(merchantId).catch(() => []),
-          fetchMerchantName(merchantId),
-        ]);
-        const branchName = branches.find((b) => b.branchId === activeBranchId)?.name ?? null;
-        setActiveBranchScope((prev) =>
-          prev ? { ...prev, branchName, merchantName } : prev,
-        );
-      })();
-    }
 
     observability.info('merchant_branch_scope_selection_succeeded', {
       branchId,

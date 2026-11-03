@@ -130,7 +130,8 @@ export default function DashboardScreen() {
           <View style={styles.headerTop}>
             <View>
               <Text style={styles.greeting}>Good morning,</Text>
-              <Text style={styles.merchantName}>{user?.name ?? 'Merchant'}</Text>
+              <Text style={styles.merchantName}>{activeBranchScope?.merchantName ?? user?.name ?? 'Merchant'}</Text>
+              {activeBranchScope?.branchName ? <Text style={styles.greeting}>{activeBranchScope.branchName}</Text> : null}
             </View>
             <View style={styles.headerActions}>
               <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('Notifications')}>
