@@ -31,7 +31,7 @@ jobs:
       ENV_SUFFIX: ${{ inputs.environment == 'production' && 'prod' || 'staging' }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Verify cluster connectivity
         run: kubectl cluster-info --request-timeout=10s
