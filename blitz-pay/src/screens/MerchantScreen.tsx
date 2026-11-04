@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { Image } from 'expo-image';
+import { ProductImage } from '../features/merchant-catalog/components/ProductImage';
 import {
   View,
   Text,
@@ -6,7 +8,6 @@ import {
   ScrollView,
   StyleSheet,
   ActivityIndicator,
-  Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -40,13 +41,16 @@ function ProductRow({ product, quantity, token, merchantId, branch, onPress, onD
   return (
     <TouchableOpacity style={styles.productRow} activeOpacity={0.75} onPress={onPress}>
       {productImage ? (
-        <Image
+        <ProductImage
+          merchantId={merchantId}
+          branchId={branch?.branchId}
+          productId={product.productId}
           source={{
             uri: productImage.uri,
             headers: productImage.needsAuth && token ? { Authorization: `Bearer ${token}` } : undefined,
           }}
           style={styles.productImage}
-          resizeMode="cover"
+          contentFit="cover" cachePolicy="memory-disk"
           onLoadStart={() => {
             observability.info('merchant_product_image_load_started', {
               merchantId: merchantId ?? null,
@@ -72,7 +76,7 @@ function ProductRow({ product, quantity, token, merchantId, branch, onPress, onD
               productId: product.productId,
               imageHost: imageMeta.host,
               imagePath: imageMeta.path,
-              reason: event.nativeEvent.error ?? 'unknown_image_error',
+              reason: event.error ?? 'unknown_image_error',
             });
           }}
         />
@@ -220,7 +224,7 @@ export default function MerchantScreen() {
       <ScrollView contentContainerStyle={{ paddingBottom: 100 + insets.bottom }} showsVerticalScrollIndicator={false}>
         <View style={styles.banner}>
           {visibleLogoUrl ? (
-            <Image source={{ uri: visibleLogoUrl }} style={styles.bannerLogo} resizeMode="contain" />
+            <Image source={{ uri: visibleLogoUrl }} style={styles.bannerLogo} contentFit="contain" cachePolicy="memory-disk" />
           ) : (
             <View style={styles.bannerIcon}>
               <Ionicons name="storefront" size={40} color={colors.secondary} />

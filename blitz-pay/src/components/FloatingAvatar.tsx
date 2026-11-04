@@ -1,10 +1,10 @@
 import React, { useEffect, useRef } from 'react';
+import { Image } from 'expo-image';
 import {
   Animated,
   PanResponder,
   TouchableOpacity,
   View,
-  Image,
   StyleSheet,
   Dimensions,
 } from 'react-native';
@@ -129,7 +129,8 @@ export default function FloatingAvatar() {
           <Image
             source={{ uri: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=400&h=600' }}
             style={styles.image}
-            resizeMode="cover"
+            contentFit="cover"
+            cachePolicy="memory-disk"
           />
         </Animated.View>
 
