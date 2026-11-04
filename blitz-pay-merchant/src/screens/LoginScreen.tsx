@@ -1,7 +1,8 @@
+import { colors, theme } from '../lib/theme';
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView,
-  KeyboardAvoidingView, ActivityIndicator,
+  KeyboardAvoidingView, ActivityIndicator, Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,10 +10,11 @@ import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../lib/auth';
 import { useLanguage } from '../lib/LanguageContext';
-import { colors, spacing, radius } from '../lib/theme';
+import { spacing, radius } from '../lib/theme';
 import type { RootStackNav } from '../types';
 
 export default function LoginScreen() {
+  const { logo, name, gradient } = theme;
   const { t } = useLanguage();
   const { login, loginWithBiometric, isBiometricAvailable, biometricEnrolled } = useAuth();
   const navigation = useNavigation<RootStackNav>();
@@ -54,7 +56,7 @@ export default function LoginScreen() {
   };
 
   return (
-    <LinearGradient colors={['#000000', '#0A0A1E', '#0D0D2B']} style={styles.gradient}>
+    <LinearGradient colors={gradient} style={styles.gradient}>
       <KeyboardAvoidingView
         behavior="padding"
         keyboardVerticalOffset={insets.top}
@@ -67,12 +69,11 @@ export default function LoginScreen() {
         >
           <View style={styles.content}>
             <View style={styles.logoSection}>
-              <View style={styles.logoRing}>
-                <View style={styles.logoCore}>
-                  <Ionicons name="storefront" size={32} color={colors.primary} />
-                </View>
+              <View style={styles.logoPanel}>
+                <Image source={logo}
+                  style={styles.logo} resizeMode="contain"
+                  accessibilityLabel={t('theme_logo_label', { brand: name })} />
               </View>
-              <Text style={styles.brandName}>BlitzPay</Text>
               <Text style={styles.tagline}>{t('splash_tagline')}</Text>
             </View>
 
@@ -130,7 +131,7 @@ export default function LoginScreen() {
                 activeOpacity={0.85}
               >
                 {loading ? (
-                  <ActivityIndicator color={colors.black} size="small" />
+                  <ActivityIndicator color={colors.onPrimary} size="small" />
                 ) : (
                   <Text style={styles.loginBtnText}>{t('log_in')}</Text>
                 )}
@@ -165,24 +166,18 @@ const styles = StyleSheet.create({
   scroll: { flexGrow: 1, paddingHorizontal: spacing.md },
   content: { width: '100%' },
   logoSection: { alignItems: 'center', marginBottom: 40 },
-  logoRing: {
-    width: 80, height: 80, borderRadius: 40,
-    borderWidth: 2, borderColor: `${colors.primary}40`,
-    justifyContent: 'center', alignItems: 'center', marginBottom: 16,
+  logoPanel: {
+    width: '100%', maxWidth: 340, padding: 20,
+    borderRadius: radius.xxl, backgroundColor: colors.background, marginBottom: 12,
   },
-  logoCore: {
-    width: 60, height: 60, borderRadius: 30,
-    backgroundColor: `${colors.primary}20`,
-    justifyContent: 'center', alignItems: 'center',
-  },
-  brandName: { fontSize: 32, fontWeight: '800', color: colors.white, letterSpacing: -1 },
-  tagline: { fontSize: 13, color: colors.gray500, marginTop: 4 },
+  logo: { width: '100%', height: 108 },
+  tagline: { fontSize: 13, color: colors.gray700, marginTop: 4 },
   card: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: colors.cardBg,
     borderRadius: radius.xxl, padding: spacing.lg,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+    borderWidth: 1, borderColor: colors.gray200,
   },
-  cardTitle: { fontSize: 22, fontWeight: '700', color: colors.white, marginBottom: spacing.lg },
+  cardTitle: { fontSize: 22, fontWeight: '700', color: colors.onSurface, marginBottom: spacing.lg },
   errorBox: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     backgroundColor: `${colors.error}20`, borderRadius: radius.md,
@@ -190,13 +185,13 @@ const styles = StyleSheet.create({
   },
   errorText: { color: colors.error, fontSize: 13, flex: 1 },
   field: { marginBottom: spacing.md },
-  label: { fontSize: 13, fontWeight: '600', color: colors.gray300, marginBottom: 6 },
+  label: { fontSize: 13, fontWeight: '600', color: colors.gray700, marginBottom: 6 },
   labelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
   forgotLink: { fontSize: 13, color: colors.primary },
   input: {
-    backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: radius.lg,
-    padding: spacing.md, fontSize: 15, color: colors.white,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: colors.surface, borderRadius: radius.lg,
+    padding: spacing.md, fontSize: 15, color: colors.onSurface,
+    borderWidth: 1, borderColor: colors.gray200,
   },
   passwordWrapper: { position: 'relative' },
   passwordInput: { paddingRight: 48 },
@@ -206,7 +201,7 @@ const styles = StyleSheet.create({
     padding: spacing.md, alignItems: 'center', marginTop: spacing.sm,
   },
   disabled: { opacity: 0.5 },
-  loginBtnText: { fontSize: 16, fontWeight: '700', color: colors.black },
+  loginBtnText: { fontSize: 16, fontWeight: '700', color: colors.onPrimary },
   biometricBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     backgroundColor: `${colors.primary}15`, borderRadius: radius.full,
@@ -219,6 +214,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: spacing.lg,
   },
-  signupHint: { color: colors.gray500, fontSize: 14 },
+  signupHint: { color: colors.gray700, fontSize: 14 },
   signupLink: { color: colors.primary, fontSize: 14, fontWeight: '600' },
 });

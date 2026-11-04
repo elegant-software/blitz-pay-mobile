@@ -369,7 +369,7 @@ export default function AppointmentDetailScreen() {
                       disabled={mutating}
                       activeOpacity={0.85}
                     >
-                      <Ionicons name="checkmark-circle-outline" size={18} color={colors.black} />
+                      <Ionicons name="checkmark-circle-outline" size={18} color={colors.onPrimary} />
                       <Text style={styles.primaryActionText}>{t('appointment_mark_complete')}</Text>
                     </TouchableOpacity>
                   ) : null}
@@ -434,9 +434,9 @@ export default function AppointmentDetailScreen() {
               activeOpacity={0.85}
             >
               {patchSaving ? (
-                <ActivityIndicator size="small" color={colors.black} />
+                <ActivityIndicator size="small" color={colors.onPrimary} />
               ) : null}
-              <Text style={[styles.modalDestructiveBtnText, { color: colors.black }]}>
+              <Text style={[styles.modalDestructiveBtnText, { color: colors.onPrimary }]}>
                 {patchSaving ? t('appointment_edit_saving') : t('appointment_edit_save')}
               </Text>
             </TouchableOpacity>
@@ -496,9 +496,9 @@ export default function AppointmentDetailScreen() {
               activeOpacity={0.85}
             >
               {patchSaving ? (
-                <ActivityIndicator size="small" color={colors.black} />
+                <ActivityIndicator size="small" color={colors.onPrimary} />
               ) : null}
-              <Text style={[styles.modalDestructiveBtnText, { color: colors.black }]}>
+              <Text style={[styles.modalDestructiveBtnText, { color: colors.onPrimary }]}>
                 {patchSaving ? t('appointment_edit_saving') : t('appointment_edit_save')}
               </Text>
             </TouchableOpacity>
@@ -595,7 +595,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
   },
-  retryBtnText: { color: colors.black, fontWeight: '700' },
+  retryBtnText: { color: colors.onPrimary, fontWeight: '700' },
   summaryCard: {
     backgroundColor: colors.white,
     borderRadius: radius.xl,
@@ -726,7 +726,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     backgroundColor: colors.primary,
   },
-  primaryActionText: { fontSize: 15, fontWeight: '700', color: colors.black },
+  primaryActionText: { fontSize: 15, fontWeight: '700', color: colors.onPrimary },
   secondaryAction: {
     flexDirection: 'row',
     alignItems: 'center',

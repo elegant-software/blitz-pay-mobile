@@ -71,7 +71,7 @@ export default function CreateAppearanceScreen() {
         <Text style={styles.label}>{t('merchant_appearance_end')}</Text><TextInput style={styles.input} value={end} onChangeText={setEnd} placeholder="YYYY-MM-DD HH:MM" />
         {preview ? <View style={styles.preview}><Text style={styles.previewTitle}>{t('merchant_appearance_preview')}</Text><Text>{name}</Text><Text>{activeBranchScope?.branchName}</Text><Text>{start} - {end}</Text><Text>{preview.label}</Text></View> : null}
         <TouchableOpacity style={styles.button} disabled={saving} onPress={() => void (preview ? submit() : prepare())}>
-          {saving ? <ActivityIndicator color={colors.black} /> : <Text style={styles.buttonText}>{preview ? t('confirm') : t('merchant_appearance_preview')}</Text>}
+          {saving ? <ActivityIndicator color={colors.onPrimary} /> : <Text style={styles.buttonText}>{preview ? t('confirm') : t('merchant_appearance_preview')}</Text>}
         </TouchableOpacity>
       </>}
     </ScrollView>

@@ -1,3 +1,4 @@
+import { colors } from '../lib/theme';
 import * as Location from 'expo-location';
 import { Platform } from 'react-native';
 import { storage } from '../lib/storage';
@@ -180,7 +181,7 @@ export async function startPolling(): Promise<void> {
     foregroundService: {
       notificationTitle: 'BlitzPay Merchant',
       notificationBody: 'Monitoring branch proximity…',
-      notificationColor: '#00C2FF',
+      notificationColor: colors.primary,
     },
   });
 }

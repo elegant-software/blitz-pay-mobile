@@ -1,3 +1,4 @@
+import { colors, theme } from '../lib/theme';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
@@ -16,7 +17,7 @@ import * as Haptics from 'expo-haptics';
 import { useAuth } from '../lib/auth';
 import { useLanguage } from '../lib/LanguageContext';
 import { observability } from '../lib/observability';
-import { colors, spacing, radius, shadow } from '../lib/theme';
+import { spacing, radius, shadow } from '../lib/theme';
 import { useMerchantProducts } from '../features/products/hooks/useMerchantProducts';
 import {
   createMerchantOrder,
@@ -29,7 +30,6 @@ import type { BranchCustomer } from '../features/orders/types/order';
 import type { RootStackNav } from '../types';
 import type { Product } from '../types';
 
-const APP_LOGO = require('../../assets/app-icon.png');
 
 const POLL_INTERVAL_MS = 3000;
 const MAX_POLLS = 100; // 5 minutes
@@ -46,6 +46,7 @@ function formatDate(iso: string) {
 type Mode = 'compose' | 'intent' | 'shopper' | 'qr' | 'paid' | 'expired' | 'invoice_sent';
 
 export default function CreateOrderScreen() {
+  const { logo } = theme;
   const { t } = useLanguage();
   const navigation = useNavigation<RootStackNav>();
   const insets = useSafeAreaInsets();
@@ -307,7 +308,7 @@ export default function CreateOrderScreen() {
               onPress={handleReset}
               activeOpacity={0.85}
             >
-              <Ionicons name="add" size={18} color={colors.black} />
+              <Ionicons name="add" size={18} color={colors.onPrimary} />
               <Text style={styles.primaryBtnText}>{t('create_order_new')}</Text>
             </TouchableOpacity>
           </View>
@@ -352,7 +353,7 @@ export default function CreateOrderScreen() {
               onPress={handleReset}
               activeOpacity={0.85}
             >
-              <Ionicons name="add" size={18} color={colors.black} />
+              <Ionicons name="add" size={18} color={colors.onPrimary} />
               <Text style={styles.primaryBtnText}>{t('create_order_new')}</Text>
             </TouchableOpacity>
           </View>
@@ -397,7 +398,7 @@ export default function CreateOrderScreen() {
               onPress={handleReset}
               activeOpacity={0.85}
             >
-              <Ionicons name="add" size={18} color={colors.black} />
+              <Ionicons name="add" size={18} color={colors.onPrimary} />
               <Text style={styles.primaryBtnText}>{t('create_order_new')}</Text>
             </TouchableOpacity>
           </View>
@@ -424,7 +425,7 @@ export default function CreateOrderScreen() {
               size={240}
               color={colors.onSurface}
               backgroundColor={colors.white}
-              logo={APP_LOGO}
+              logo={logo}
               logoSize={52}
               logoBackgroundColor={colors.white}
               logoMargin={4}
@@ -456,7 +457,7 @@ export default function CreateOrderScreen() {
               onPress={handleReset}
               activeOpacity={0.85}
             >
-              <Ionicons name="add" size={18} color={colors.black} />
+              <Ionicons name="add" size={18} color={colors.onPrimary} />
               <Text style={styles.primaryBtnText}>{t('create_order_new')}</Text>
             </TouchableOpacity>
           </View>
@@ -572,7 +573,7 @@ export default function CreateOrderScreen() {
                   activeOpacity={0.85}
                 >
                   {searching ? (
-                    <ActivityIndicator size="small" color={colors.black} />
+                    <ActivityIndicator size="small" color={colors.onPrimary} />
                   ) : (
                     <Text style={styles.searchBtnText}>{t('create_order_search')}</Text>
                   )}
@@ -668,9 +669,9 @@ export default function CreateOrderScreen() {
             activeOpacity={0.85}
           >
             {creating ? (
-              <ActivityIndicator size="small" color={colors.black} />
+              <ActivityIndicator size="small" color={colors.onPrimary} />
             ) : (
-              <Ionicons name="paper-plane-outline" size={18} color={colors.black} />
+              <Ionicons name="paper-plane-outline" size={18} color={colors.onPrimary} />
             )}
             <Text style={styles.generateBtnText}>
               {creating ? t('create_order_sending_invoice') : t('create_order_send_invoice_cta')}
@@ -733,7 +734,7 @@ export default function CreateOrderScreen() {
               disabled={selectedCount === 0}
               activeOpacity={0.85}
             >
-              <Ionicons name="arrow-forward" size={18} color={colors.black} />
+              <Ionicons name="arrow-forward" size={18} color={colors.onPrimary} />
               <Text style={styles.generateBtnText}>{t('next')}</Text>
             </TouchableOpacity>
           </View>
@@ -878,7 +879,7 @@ const styles = StyleSheet.create({
     // same as generateBtn — kept as a hook for future differentiation
   },
   generateBtnDisabled: { opacity: 0.45 },
-  generateBtnText: { fontSize: 16, fontWeight: '700', color: colors.black },
+  generateBtnText: { fontSize: 16, fontWeight: '700', color: colors.onPrimary },
   errorText: { fontSize: 13, color: colors.error, textAlign: 'center' },
   // QR mode
   qrContainer: {
@@ -913,7 +914,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
   },
   primaryBtn: { backgroundColor: colors.primary },
-  primaryBtnText: { fontSize: 15, fontWeight: '700', color: colors.black },
+  primaryBtnText: { fontSize: 15, fontWeight: '700', color: colors.onPrimary },
   secondaryBtn: { borderWidth: 1.5, borderColor: colors.primary, backgroundColor: `${colors.primary}10` },
   secondaryBtnText: { fontSize: 15, fontWeight: '600', color: colors.primary },
   // Paid / expired result modes
@@ -1020,7 +1021,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   searchBtnDisabled: { opacity: 0.45 },
-  searchBtnText: { fontSize: 14, fontWeight: '700', color: colors.black },
+  searchBtnText: { fontSize: 14, fontWeight: '700', color: colors.onPrimary },
   searchErrorText: { fontSize: 13, color: colors.error, marginBottom: spacing.sm },
   customerRow: {
     flexDirection: 'row',

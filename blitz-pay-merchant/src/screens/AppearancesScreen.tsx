@@ -85,7 +85,7 @@ export default function AppearancesScreen() {
       <TouchableOpacity disabled={page + 1 >= (vm.history?.totalPages ?? 0)} onPress={() => setPage(p => p + 1)}><Text>{t('next')}</Text></TouchableOpacity>
     </View> : null}
     {vm.canCreate && <TouchableOpacity style={styles.create} onPress={() => navigation.navigate('CreateAppearance')}>
-      <Ionicons name="add" size={20} color={colors.black} /><Text style={styles.createText}>{t('merchant_appearance_create_cta')}</Text>
+      <Ionicons name="add" size={20} color={colors.onPrimary} /><Text style={styles.createText}>{t('merchant_appearance_create_cta')}</Text>
     </TouchableOpacity>}
   </ScreenFrame>;
 }
@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.surface }, header: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center', padding: spacing.md, backgroundColor: colors.white },
   title: { fontSize: 22, fontWeight: '800' }, content: { padding: spacing.md, paddingBottom: 120, gap: spacing.sm }, scope: { color: colors.gray600 },
   tabs: { flexDirection: 'row', backgroundColor: colors.white, borderRadius: radius.full, padding: 4 }, tab: { flex: 1, padding: spacing.sm, alignItems: 'center', borderRadius: radius.full },
-  tabActive: { backgroundColor: colors.primary }, tabText: { fontSize: 12, fontWeight: '600' }, tabTextActive: { color: colors.black },
+  tabActive: { backgroundColor: colors.primary }, tabText: { fontSize: 12, fontWeight: '600' }, tabTextActive: { color: colors.onPrimary },
   filters: { gap: spacing.sm }, filterRow: { flexDirection: 'row', gap: spacing.sm }, filterPill: { padding: spacing.sm, backgroundColor: colors.white, borderRadius: radius.full },
   filterPillActive: { backgroundColor: colors.primary }, dateInput: { flex: 1, backgroundColor: colors.white, padding: spacing.sm, borderRadius: radius.lg },
   loader: { marginTop: spacing.xl }, state: { alignItems: 'center', gap: spacing.sm, padding: spacing.xl, backgroundColor: colors.white, borderRadius: radius.xl },
@@ -124,5 +124,5 @@ const styles = StyleSheet.create({
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between' }, cardTitle: { fontWeight: '700', fontSize: 16 }, status: { fontSize: 11, color: colors.secondary },
   meta: { color: colors.gray600, fontSize: 12 }, cancelText: { color: colors.error, fontWeight: '700', marginTop: spacing.xs },
   pagination: { flexDirection: 'row', justifyContent: 'space-between', padding: spacing.md }, create: { flexDirection: 'row', justifyContent: 'center', gap: spacing.xs, backgroundColor: colors.primary, padding: spacing.md, borderRadius: radius.full },
-  createText: { fontWeight: '700' },
+  createText: { fontWeight: '700', color: colors.onPrimary },
 });

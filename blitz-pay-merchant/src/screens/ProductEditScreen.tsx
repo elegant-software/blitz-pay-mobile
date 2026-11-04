@@ -316,7 +316,7 @@ export default function ProductEditScreen() {
             onPress={handleSave}
             disabled={!canSave || saving}
           >
-            {saving ? <ActivityIndicator size="small" color={colors.black} /> : <Text style={styles.saveBtnText}>{t('save')}</Text>}
+            {saving ? <ActivityIndicator size="small" color={colors.onPrimary} /> : <Text style={styles.saveBtnText}>{t('save')}</Text>}
           </TouchableOpacity>
         </View>
       </View>
@@ -524,7 +524,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md, paddingVertical: 6,
   },
   saveBtnDisabled: { opacity: 0.4 },
-  saveBtnText: { fontSize: 14, fontWeight: '700', color: colors.black },
+  saveBtnText: { fontSize: 14, fontWeight: '700', color: colors.onPrimary },
   stateCard: {
     flex: 1, alignItems: 'center', justifyContent: 'center',
     gap: spacing.sm, padding: spacing.xl,

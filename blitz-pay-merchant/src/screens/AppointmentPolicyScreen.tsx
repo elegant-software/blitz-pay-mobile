@@ -169,9 +169,9 @@ export default function AppointmentPolicyScreen() {
             activeOpacity={0.85}
           >
             {saveMutation.isPending ? (
-              <ActivityIndicator size="small" color={colors.black} />
+              <ActivityIndicator size="small" color={colors.onPrimary} />
             ) : (
-              <Ionicons name="save-outline" size={18} color={colors.black} />
+              <Ionicons name="save-outline" size={18} color={colors.onPrimary} />
             )}
             <Text style={styles.saveBtnText}>
               {saveMutation.isPending ? t('appointment_policy_saving') : t('appointment_policy_save')}
@@ -262,7 +262,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
   },
-  retryBtnText: { color: colors.black, fontWeight: '700' },
+  retryBtnText: { color: colors.onPrimary, fontWeight: '700' },
   successBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -298,5 +298,5 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
   },
   btnDisabled: { opacity: 0.55 },
-  saveBtnText: { fontSize: 16, fontWeight: '700', color: colors.black },
+  saveBtnText: { fontSize: 16, fontWeight: '700', color: colors.onPrimary },
 });

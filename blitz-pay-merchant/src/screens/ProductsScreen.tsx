@@ -61,7 +61,7 @@ export default function ProductsScreen() {
           onPress={() => activeBranchScope?.branchId && navigation.navigate('ProductEdit', { mode: 'create' })}
           disabled={!activeBranchScope?.branchId}
         >
-          <Ionicons name="add" size={20} color={colors.black} />
+          <Ionicons name="add" size={20} color={colors.onPrimary} />
           <Text style={styles.addBtnText}>{t('add_product')}</Text>
         </TouchableOpacity>
       </View>
@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
   },
   addBtnDisabled: { opacity: 0.45 },
-  addBtnText: { fontSize: 14, fontWeight: '700', color: colors.black },
+  addBtnText: { fontSize: 14, fontWeight: '700', color: colors.onPrimary },
   stateCard: {
     backgroundColor: colors.white, borderRadius: radius.xl,
     padding: spacing.lg, alignItems: 'center', gap: spacing.sm,
@@ -155,7 +155,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs, backgroundColor: colors.primary,
     borderRadius: radius.full, paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
   },
-  retryBtnText: { fontSize: 14, fontWeight: '700', color: colors.black },
+  retryBtnText: { fontSize: 14, fontWeight: '700', color: colors.onPrimary },
   categoryHeader: {
     fontSize: 13, fontWeight: '700', color: colors.gray500,
     textTransform: 'uppercase', letterSpacing: 0.5,

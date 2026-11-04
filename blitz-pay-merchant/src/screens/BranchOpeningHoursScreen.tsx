@@ -204,8 +204,8 @@ export default function BranchOpeningHoursScreen() {
             activeOpacity={0.85}
           >
             {addWindowMutation.isPending
-              ? <ActivityIndicator size="small" color={colors.black} />
-              : <Ionicons name="add" size={16} color={colors.black} />}
+              ? <ActivityIndicator size="small" color={colors.onPrimary} />
+              : <Ionicons name="add" size={16} color={colors.onPrimary} />}
             <Text style={styles.addBtnText}>{t('branch_opening_hours_add_slot')}</Text>
           </TouchableOpacity>
         </View>
@@ -286,8 +286,8 @@ export default function BranchOpeningHoursScreen() {
             activeOpacity={0.85}
           >
             {addExceptionMutation.isPending
-              ? <ActivityIndicator size="small" color={colors.black} />
-              : <Ionicons name="add" size={16} color={colors.black} />}
+              ? <ActivityIndicator size="small" color={colors.onPrimary} />
+              : <Ionicons name="add" size={16} color={colors.onPrimary} />}
             <Text style={styles.addBtnText}>{t('branch_opening_hours_add_exception')}</Text>
           </TouchableOpacity>
         </View>
@@ -367,7 +367,7 @@ const styles = StyleSheet.create({
   },
   dayChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   dayChipText: { fontSize: 13, fontWeight: '600', color: colors.gray700 },
-  dayChipTextActive: { color: colors.black },
+  dayChipTextActive: { color: colors.onPrimary },
   timeRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm,
   },
@@ -395,6 +395,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.full, paddingVertical: spacing.sm, marginTop: spacing.md,
   },
   addBtnDisabled: { opacity: 0.55 },
-  addBtnText: { fontSize: 14, fontWeight: '700', color: colors.black },
+  addBtnText: { fontSize: 14, fontWeight: '700', color: colors.onPrimary },
   errorText: { fontSize: 12, color: colors.error, marginTop: spacing.xs },
 });

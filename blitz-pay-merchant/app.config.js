@@ -11,9 +11,9 @@ module.exports = {
     userInterfaceStyle: "light",
     icon: "./assets/app-icon.png",
     splash: {
-      image: "./assets/app-icon.png",
+      image: "./assets/bona-me-logo.png",
       resizeMode: "contain",
-      backgroundColor: "#000000",
+      backgroundColor: "#FFF9EF",
     },
     ios: {
       supportsTablet: false,
@@ -36,9 +36,9 @@ module.exports = {
         backgroundColor: "#000000",
       },
       splash: {
-        image: "./assets/app-icon.png",
+        image: "./assets/bona-me-logo.png",
         resizeMode: "contain",
-        backgroundColor: "#000000",
+        backgroundColor: "#FFF9EF",
       },
       package: "app.blitzpay.merchant",
       permissions: [
@@ -72,7 +72,7 @@ module.exports = {
           },
         },
       ],
-      ["expo-splash-screen", { backgroundColor: "#000000", image: "./assets/app-icon.png", imageWidth: 200 }],
+      ["expo-splash-screen", { backgroundColor: "#FFF9EF", image: "./assets/bona-me-logo.png", imageWidth: 200 }],
       ["expo-camera", { cameraPermission: "Allow BlitzPay Merchant to access your camera to scan QR codes." }],
       ["expo-location", {
         locationWhenInUsePermission: "Allow BlitzPay Merchant to access your location to detect your active branch.",

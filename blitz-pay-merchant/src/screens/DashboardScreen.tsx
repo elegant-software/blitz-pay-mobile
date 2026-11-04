@@ -1,3 +1,4 @@
+import { colors, theme } from '../lib/theme';
 import React, { useMemo, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator,
@@ -8,7 +9,7 @@ import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../lib/auth';
 import { useLanguage } from '../lib/LanguageContext';
-import { colors, spacing, radius, shadow } from '../lib/theme';
+import { spacing, radius, shadow } from '../lib/theme';
 import { useSettlementSummary } from '../features/reporting/hooks/useSettlementSummary';
 import { useMerchantKpi, toIsoDate } from '../features/reporting/hooks/useMerchantKpi';
 import { useMerchantOrders } from '../features/orders/hooks/useMerchantOrders';
@@ -87,6 +88,7 @@ function KpiCardShell({ icon, title, loading, children }: {
 // ─── Main screen ─────────────────────────────────────────────────────────────
 
 export default function DashboardScreen() {
+  const { headerGradient } = theme;
   const { t } = useLanguage();
   const { user, activeBranchScope, branchScopeError } = useAuth();
   const navigation = useNavigation<RootStackNav>();
@@ -126,7 +128,7 @@ export default function DashboardScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* ── Dark header ── */}
-        <LinearGradient colors={['#000000', '#0D0D2B']} style={styles.header}>
+        <LinearGradient colors={headerGradient} style={styles.header}>
           <View style={styles.headerTop}>
             <View>
               <Text style={styles.greeting}>Good morning,</Text>
@@ -374,7 +376,7 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.55)',
   },
   periodBtnTextActive: {
-    color: colors.black,
+    color: colors.onPrimary,
   },
 
   // Revenue card

@@ -210,7 +210,7 @@ export default function MerchantCalendarScreen() {
         onPress={() => navigation.navigate('NewAppointment')}
         activeOpacity={0.85}
       >
-        <Ionicons name="add" size={26} color={colors.black} />
+        <Ionicons name="add" size={26} color={colors.onPrimary} />
       </TouchableOpacity>
 
       {/* Body */}
@@ -533,7 +533,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
   },
-  retryBtnText: { color: colors.black, fontWeight: '700' },
+  retryBtnText: { color: colors.onPrimary, fontWeight: '700' },
   emptyState: {
     alignItems: 'center',
     paddingTop: 80,
@@ -558,7 +558,7 @@ const styles = StyleSheet.create({
   },
   dayBadgeToday: { backgroundColor: colors.primary },
   dayBadgeText: { fontSize: 15, fontWeight: '700', color: colors.gray700 },
-  dayBadgeTextToday: { color: colors.black },
+  dayBadgeTextToday: { color: colors.onPrimary },
   dayName: { fontSize: 15, fontWeight: '700', color: colors.onSurface },
   dayMeta: { fontSize: 12, color: colors.gray500, marginTop: 1 },
   dayEmpty: {

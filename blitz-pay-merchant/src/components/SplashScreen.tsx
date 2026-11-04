@@ -1,63 +1,109 @@
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
+import { colors, theme } from '../lib/theme';
+import React, { useEffect, useRef, useState } from 'react';
+import { AccessibilityInfo, Animated, Image, StyleSheet, Text, View } from 'react-native';
+import * as ExpoSplashScreen from 'expo-splash-screen';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing } from '../lib/theme';
+import { useLanguage } from '../lib/LanguageContext';
 
 interface Props {
+  ready: boolean;
   onComplete: () => void;
 }
 
-export default function SplashScreen({ onComplete }: Props) {
-  const opacity = new Animated.Value(0);
-  const scale = new Animated.Value(0.85);
+export default function SplashScreen({ ready, onComplete }: Props) {
+  const { logo, name, gradient } = theme;
+  const { t } = useLanguage();
+  const [reducedMotion, setReducedMotion] = useState<boolean | null>(null);
+  const [entered, setEntered] = useState(false);
+  const entrance = useRef(new Animated.Value(0)).current;
+  const pulse = useRef(new Animated.Value(0)).current;
+  const progress = useRef(new Animated.Value(0)).current;
+  const opacity = useRef(new Animated.Value(1)).current;
+  const complete = useRef(onComplete);
+  complete.current = onComplete;
 
   useEffect(() => {
-    Animated.parallel([
-      Animated.timing(opacity, { toValue: 1, duration: 500, useNativeDriver: true }),
-      Animated.spring(scale, { toValue: 1, useNativeDriver: true }),
-    ]).start();
+    let active = true;
+    AccessibilityInfo.isReduceMotionEnabled().then(
+      value => { if (active) setReducedMotion(value); },
+      () => { if (active) setReducedMotion(true); },
+    );
+    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', setReducedMotion);
+    return () => { active = false; subscription.remove(); };
+  }, []);
 
-    const timer = setTimeout(onComplete, 1800);
-    return () => clearTimeout(timer);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (reducedMotion === null) return;
+    const animation = Animated.timing(entrance, {
+      toValue: 1, duration: reducedMotion ? 0 : 750, useNativeDriver: true,
+    });
+    animation.start(({ finished }) => { if (finished) setEntered(true); });
+    if (reducedMotion) return () => animation.stop();
+    const breathing = Animated.loop(Animated.sequence([
+      Animated.timing(pulse, { toValue: 1, duration: 1600, useNativeDriver: true }),
+      Animated.timing(pulse, { toValue: 0, duration: 1600, useNativeDriver: true }),
+    ]));
+    const loading = Animated.loop(Animated.timing(progress, {
+      toValue: 1, duration: 1400, useNativeDriver: true,
+    }));
+    breathing.start();
+    loading.start();
+    return () => { animation.stop(); breathing.stop(); loading.stop(); };
+  }, [reducedMotion, entrance, pulse, progress]);
+
+  useEffect(() => {
+    if (!ready || !entered) return;
+    const animation = Animated.timing(opacity, {
+      toValue: 0, duration: reducedMotion ? 0 : 300, useNativeDriver: true,
+    });
+    animation.start(({ finished }) => { if (finished) complete.current(); });
+    return () => animation.stop();
+  }, [ready, entered, reducedMotion, opacity]);
 
   return (
-    <LinearGradient colors={['#000000', '#0A0A1E', '#0D0D2B']} style={styles.container}>
-      <Animated.View style={[styles.content, { opacity, transform: [{ scale }] }]}>
-        <View style={styles.iconRing}>
-          <View style={styles.iconCore}>
-            <Ionicons name="storefront" size={36} color={colors.primary} />
+    <Animated.View
+      style={[styles.overlay, { opacity, backgroundColor: colors.background }]}
+      accessibilityViewIsModal
+      onLayout={() => { void ExpoSplashScreen.hideAsync(); }}
+    >
+      <LinearGradient colors={gradient} style={styles.background}>
+        <Animated.View style={[styles.halo, { backgroundColor: colors.primary + '18',
+          opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.6] }),
+          transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.12] }) }],
+        }]} />
+        <Animated.View style={[styles.content, {
+          opacity: entrance,
+          transform: [{ translateY: entrance.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) }],
+        }]}>
+          <Image source={logo} style={styles.logo}
+            resizeMode="contain" accessibilityLabel={t('theme_logo_label', { brand: name })} />
+          <Text style={[styles.tagline, { color: colors.gray700 }]}>{t('splash_tagline')}</Text>
+        </Animated.View>
+        <View style={styles.loading} accessible accessibilityRole="progressbar"
+          accessibilityLabel={t('loading')} accessibilityState={{ busy: !ready }}>
+          <View style={[styles.track, { backgroundColor: colors.gray200 }]}>
+            <Animated.View style={[styles.fill, { backgroundColor: colors.primary,
+              transform: [{ translateX: reducedMotion ? 60 : progress.interpolate({
+                inputRange: [0, 1], outputRange: [-80, 220],
+              }) }],
+            }]} />
           </View>
+          <Text style={[styles.loadingText, { color: colors.gray700 }]}>{t('loading')}</Text>
         </View>
-        <Text style={styles.brand}>BlitzPay</Text>
-        <Text style={styles.sub}>Merchant Portal</Text>
-      </Animated.View>
-    </LinearGradient>
+      </LinearGradient>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  content: { alignItems: 'center', gap: spacing.sm },
-  iconRing: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    borderWidth: 2,
-    borderColor: `${colors.primary}40`,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  iconCore: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: `${colors.primary}20`,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  brand: { fontSize: 36, fontWeight: '800', color: colors.white, letterSpacing: -1 },
-  sub: { fontSize: 14, color: colors.gray500, letterSpacing: 1 },
+  overlay: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 1000, elevation: 1000 },
+  background: { flex: 1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  halo: { position: 'absolute', width: 320, height: 320, borderRadius: 160 },
+  content: { width: '100%', alignItems: 'center', paddingHorizontal: 36 },
+  logo: { width: '100%', maxWidth: 340, height: 140 },
+  tagline: { marginTop: 16, fontSize: 14, letterSpacing: 2 },
+  loading: { position: 'absolute', bottom: '12%', alignItems: 'center', gap: 16 },
+  track: { width: 220, height: 3, borderRadius: 2, overflow: 'hidden' },
+  fill: { width: 80, height: 3, borderRadius: 2 },
+  loadingText: { color: '#765A2C', fontSize: 12, letterSpacing: 1 },
 });

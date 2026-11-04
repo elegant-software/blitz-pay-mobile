@@ -511,6 +511,8 @@ export const translations = {
     loading: 'Loading...',
     no_data: 'No data',
     splash_tagline: 'Merchant Portal',
+    theme_logo_label: '{brand} logo',
+    splash_logo_label: 'Bona Me logo',
   },
   de: {
     // Auth
@@ -1020,5 +1022,7 @@ export const translations = {
     loading: 'Laden...',
     no_data: 'Keine Daten',
     splash_tagline: 'Händler-Portal',
+    theme_logo_label: 'Logo von {brand}',
+    splash_logo_label: 'Bona Me Logo',
   },
 } as const;

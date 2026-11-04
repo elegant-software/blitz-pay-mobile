@@ -183,7 +183,7 @@ const styles = StyleSheet.create({
   promptEnableBtnText: {
     fontSize: 16,
     fontWeight: '700',
-    color: colors.black,
+    color: colors.onPrimary,
   },
   promptDismissBtn: {
     paddingVertical: spacing.sm,

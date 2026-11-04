@@ -9,8 +9,8 @@ export const APPOINTMENT_STATUS_COLORS: Record<AppointmentStatus, string> = {
 
 // Deterministic color per employeeId for color-coding in the merchant calendar
 const EMPLOYEE_PALETTE = [
-  '#00C2FF', // primary
-  '#5856D6', // secondary
+  colors.primary,
+  colors.secondary,
   '#FF9500', // warning
   '#34C759', // success
   '#FF3B30', // error

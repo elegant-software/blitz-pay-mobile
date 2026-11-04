@@ -1,8 +1,7 @@
 import React from 'react';
-import { Platform, StyleSheet } from 'react-native';
+import GlassTabBar from './GlassTabBar';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../lib/theme';
 import { useLanguage } from '../lib/LanguageContext';
 import { useMerchantFeatures } from '../lib/useMerchantFeatures';
@@ -28,11 +27,11 @@ const tabIcons: Record<keyof TabParamList, { active: IoniconName; inactive: Ioni
 
 export default function TabNavigator() {
   const { t } = useLanguage();
-  const insets = useSafeAreaInsets();
   const { appointmentsEnabled } = useMerchantFeatures();
 
   return (
     <Tab.Navigator
+      tabBar={props => <GlassTabBar {...props} />}
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarIcon: ({ focused, color, size }) => {
@@ -41,13 +40,6 @@ export default function TabNavigator() {
         },
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.gray500,
-        tabBarStyle: {
-          ...styles.tabBar,
-          height: 60 + insets.bottom,
-          paddingBottom: insets.bottom + 4,
-        },
-        tabBarLabelStyle: styles.tabLabel,
-        tabBarItemStyle: styles.tabItem,
       })}
     >
       <Tab.Screen name="Dashboard" component={DashboardScreen} options={{ title: t('dashboard') }} />
@@ -60,16 +52,3 @@ export default function TabNavigator() {
     </Tab.Navigator>
   );
 }
-
-const styles = StyleSheet.create({
-  tabBar: {
-    backgroundColor: 'rgba(255,255,255,0.95)',
-    borderTopWidth: 0,
-    ...Platform.select({
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.08, shadowRadius: 16 },
-      android: { elevation: 16 },
-    }),
-  },
-  tabLabel: { fontSize: 11, fontWeight: '500' },
-  tabItem: { paddingTop: 6 },
-});

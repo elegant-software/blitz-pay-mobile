@@ -207,7 +207,7 @@ export default function OrdersScreen() {
         onPress={() => navigation.navigate('CreateOrder')}
         activeOpacity={0.85}
       >
-        <Ionicons name="add" size={26} color={colors.black} />
+        <Ionicons name="add" size={26} color={colors.onPrimary} />
       </TouchableOpacity>
 
       <ScrollView
@@ -431,7 +431,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
   },
-  retryBtnText: { color: colors.black, fontWeight: '700' },
+  retryBtnText: { color: colors.onPrimary, fontWeight: '700' },
   fab: {
     position: 'absolute',
     right: spacing.lg,

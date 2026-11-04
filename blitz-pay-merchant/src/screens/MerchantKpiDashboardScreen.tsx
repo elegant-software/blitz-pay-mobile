@@ -425,5 +425,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
   },
-  retryBtnText: { fontSize: 14, fontWeight: '700', color: colors.black },
+  retryBtnText: { fontSize: 14, fontWeight: '700', color: colors.onPrimary },
 });

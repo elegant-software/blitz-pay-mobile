@@ -1,3 +1,4 @@
+import { colors, theme } from '../lib/theme';
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -16,7 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../lib/auth';
 import { useLanguage } from '../lib/LanguageContext';
 import { config } from '../lib/config';
-import { colors, spacing, radius } from '../lib/theme';
+import { spacing, radius } from '../lib/theme';
 import type { RootStackNav } from '../types';
 
 type Vertical = { code: string; displayName: string };
@@ -26,6 +27,7 @@ function validatePassword(pw: string): boolean {
 }
 
 export default function SignupScreen() {
+  const { gradient } = theme;
   const { t } = useLanguage();
   const { login } = useAuth();
   const navigation = useNavigation<RootStackNav>();
@@ -100,14 +102,14 @@ export default function SignupScreen() {
     validatePassword(password) && password === confirmPassword;
 
   return (
-    <LinearGradient colors={['#000000', '#0A0A1E', '#0D0D2B']} style={styles.gradient}>
+    <LinearGradient colors={gradient} style={styles.gradient}>
       <KeyboardAvoidingView behavior="padding" keyboardVerticalOffset={insets.top} style={styles.flex}>
         <ScrollView
           contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 32 }]}
           keyboardShouldPersistTaps="handled"
         >
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <Ionicons name="chevron-back" size={24} color={colors.white} />
+            <Ionicons name="chevron-back" size={24} color={colors.onSurface} />
           </TouchableOpacity>
 
           <View style={styles.header}>
@@ -220,7 +222,7 @@ export default function SignupScreen() {
               activeOpacity={0.85}
             >
               {loading ? (
-                <ActivityIndicator color={colors.black} size="small" />
+                <ActivityIndicator color={colors.onPrimary} size="small" />
               ) : (
                 <Text style={styles.registerBtnText}>{t('sign_up')}</Text>
               )}
@@ -259,14 +261,14 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 26,
     fontWeight: '800',
-    color: colors.white,
+    color: colors.onSurface,
   },
   card: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: colors.cardBg,
     borderRadius: radius.xxl,
     padding: spacing.lg,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: colors.gray200,
   },
   errorBox: {
     flexDirection: 'row',
@@ -286,13 +288,13 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   input: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: colors.surface,
     borderRadius: radius.lg,
     padding: spacing.md,
     fontSize: 15,
-    color: colors.white,
+    color: colors.onSurface,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: colors.gray200,
   },
   inputError: {
     borderColor: `${colors.error}80`,
@@ -302,9 +304,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: radius.full,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: colors.gray200,
     marginRight: spacing.sm,
   },
   chipActive: {
@@ -312,7 +314,7 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
   },
   chipText: { fontSize: 13, fontWeight: '600', color: colors.gray300 },
-  chipTextActive: { color: colors.black },
+  chipTextActive: { color: colors.onPrimary },
   passwordWrapper: { position: 'relative' },
   passwordInput: { paddingRight: 48 },
   eyeBtn: {
@@ -338,7 +340,7 @@ const styles = StyleSheet.create({
   registerBtnText: {
     fontSize: 16,
     fontWeight: '700',
-    color: colors.black,
+    color: colors.onPrimary,
   },
   loginRow: {
     flexDirection: 'row',

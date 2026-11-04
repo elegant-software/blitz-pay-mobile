@@ -245,7 +245,7 @@ export default function EmployeeSetupScreen() {
               activeOpacity={0.85}
             >
               {createMutation.isPending ? (
-                <ActivityIndicator size="small" color={colors.black} />
+                <ActivityIndicator size="small" color={colors.onPrimary} />
               ) : null}
               <Text style={styles.modalPrimaryBtnText}>{t('confirm')}</Text>
             </TouchableOpacity>
@@ -297,7 +297,7 @@ export default function EmployeeSetupScreen() {
               activeOpacity={0.85}
             >
               {renameMutation.isPending ? (
-                <ActivityIndicator size="small" color={colors.black} />
+                <ActivityIndicator size="small" color={colors.onPrimary} />
               ) : null}
               <Text style={styles.modalPrimaryBtnText}>{t('save')}</Text>
             </TouchableOpacity>
@@ -424,7 +424,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
   },
-  retryBtnText: { color: colors.black, fontWeight: '700' },
+  retryBtnText: { color: colors.onPrimary, fontWeight: '700' },
   employeeCard: {
     backgroundColor: colors.white,
     borderRadius: radius.xl,
@@ -484,7 +484,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
   },
   btnDisabled: { opacity: 0.55 },
-  modalPrimaryBtnText: { fontSize: 15, fontWeight: '700', color: colors.black },
+  modalPrimaryBtnText: { fontSize: 15, fontWeight: '700', color: colors.onPrimary },
   modalDismissBtn: { paddingVertical: spacing.sm, alignItems: 'center' },
   modalDismissBtnText: { fontSize: 15, color: colors.gray600 },
 });

@@ -241,7 +241,7 @@ export default function AccountScreen() {
         {/* Profile */}
         <View style={styles.profileSection}>
           <View style={styles.avatarLarge}>
-            <Ionicons name="storefront" size={32} color={colors.black} />
+            <Ionicons name="storefront" size={32} color={colors.onPrimary} />
           </View>
           <Text style={styles.profileName}>{user?.name ?? 'Merchant'}</Text>
           <Text style={styles.profileEmail}>{user?.email ?? ''}</Text>
@@ -351,7 +351,7 @@ const styles = StyleSheet.create({
   langBtn: { paddingHorizontal: 12, paddingVertical: 4, borderRadius: radius.full },
   langBtnActive: { backgroundColor: colors.primary },
   langText: { fontSize: 12, fontWeight: '700', color: colors.gray600 },
-  langTextActive: { color: colors.black },
+  langTextActive: { color: colors.onPrimary },
   settingsLink: { fontSize: 12, fontWeight: '600', color: colors.primary },
   logoutFooter: {
     paddingHorizontal: spacing.md,

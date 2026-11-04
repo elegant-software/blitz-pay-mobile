@@ -360,7 +360,7 @@ export default function EmployeeDetailScreen() {
                 activeOpacity={0.85}
               >
                 {addSlotMutation.isPending
-                  ? <ActivityIndicator size="small" color={colors.black} />
+                  ? <ActivityIndicator size="small" color={colors.onPrimary} />
                   : null}
                 <Text style={styles.saveBtnText}>{t('employee_detail_availability_add_slot')}</Text>
               </TouchableOpacity>
@@ -435,7 +435,7 @@ export default function EmployeeDetailScreen() {
                   disabled={!exceptionDate.trim() || addExceptionMutation.isPending}
                   activeOpacity={0.85}
                 >
-                  {addExceptionMutation.isPending ? <ActivityIndicator size="small" color={colors.black} /> : null}
+                  {addExceptionMutation.isPending ? <ActivityIndicator size="small" color={colors.onPrimary} /> : null}
                   <Text style={styles.saveBtnText}>{t('employee_detail_exception_add')}</Text>
                 </TouchableOpacity>
               </View>
@@ -657,7 +657,7 @@ const styles = StyleSheet.create({
   },
   dayChipActive: { backgroundColor: colors.primary },
   dayChipText: { fontSize: 12, fontWeight: '600', color: colors.gray700 },
-  dayChipTextActive: { color: colors.black },
+  dayChipTextActive: { color: colors.onPrimary },
   slotTimes: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   timeInput: {
     flex: 1,
@@ -690,7 +690,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     marginTop: spacing.xs,
   },
-  saveBtnText: { fontSize: 14, fontWeight: '700', color: colors.black },
+  saveBtnText: { fontSize: 14, fontWeight: '700', color: colors.onPrimary },
   addExceptionForm: { gap: spacing.sm, marginTop: spacing.xs },
   exceptionInput: {
     backgroundColor: colors.surface,

@@ -269,9 +269,9 @@ export default function RescheduleAppointmentScreen() {
           activeOpacity={0.85}
         >
           {submitting ? (
-            <ActivityIndicator size="small" color={colors.black} />
+            <ActivityIndicator size="small" color={colors.onPrimary} />
           ) : (
-            <Ionicons name="calendar-outline" size={18} color={colors.black} />
+            <Ionicons name="calendar-outline" size={18} color={colors.onPrimary} />
           )}
           <Text style={styles.submitBtnText}>
             {submitting
@@ -443,7 +443,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
   },
   submitBtnDisabled: { opacity: 0.55 },
-  submitBtnText: { fontSize: 16, fontWeight: '700', color: colors.black },
+  submitBtnText: { fontSize: 16, fontWeight: '700', color: colors.onPrimary },
   pickerOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.6)',

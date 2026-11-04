@@ -106,7 +106,7 @@ export default function MerchantQRCodeScreen() {
             <Text style={styles.copyBtnText}>{copied ? 'Copied!' : 'Copy Link'}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.actionBtn, styles.shareBtn]} onPress={handleShare} activeOpacity={0.85}>
-            <Ionicons name="share-outline" size={18} color={colors.black} />
+            <Ionicons name="share-outline" size={18} color={colors.onPrimary} />
             <Text style={styles.shareBtnText}>Share</Text>
           </TouchableOpacity>
         </View>
@@ -161,5 +161,5 @@ const styles = StyleSheet.create({
   },
   copyBtnText: { fontSize: 15, fontWeight: '600', color: colors.primary },
   shareBtn: { backgroundColor: colors.primary },
-  shareBtnText: { fontSize: 15, fontWeight: '700', color: colors.black },
+  shareBtnText: { fontSize: 15, fontWeight: '700', color: colors.onPrimary },
 });

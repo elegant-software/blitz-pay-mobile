@@ -533,5 +533,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.primary,
   },
-  primaryActionText: { fontSize: 14, fontWeight: '700', color: colors.black },
+  primaryActionText: { fontSize: 14, fontWeight: '700', color: colors.onPrimary },
 });
