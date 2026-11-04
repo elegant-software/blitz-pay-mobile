@@ -337,7 +337,7 @@ export function AuthProvider({ children, onSessionExpired }: AuthProviderProps) 
         requiredGroup: REQUIRED_GROUP,
         userGroups: groups ?? '(no groups claim on token)',
       });
-      observability.warn('auth_login_access_denied', { requiredGroup: REQUIRED_GROUP, userGroups: groups ?? [] });
+      observability.warn('auth_login_access_denied', { requiredGroup: REQUIRED_GROUP, userGroups: Array.isArray(groups) ? groups.join(',') : null });
       throw new Error('access_denied');
     }
 
