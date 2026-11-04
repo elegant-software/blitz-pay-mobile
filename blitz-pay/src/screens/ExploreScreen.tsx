@@ -22,6 +22,7 @@ const APPEARANCE_CARD_COLORS = ['#0E7490', '#1D4ED8', '#C2410C'];
 const QUICK_ACTIONS = [
   { key: 'my_qr', icon: 'qr-code-outline', screen: 'MyQRCode' as const },
   { key: 'scan_qr', icon: 'scan-outline', screen: 'QRScanner' as const },
+  { key: 'table_code_quick_action', icon: 'restaurant-outline', screen: 'TableCheckIn' as const },
   { key: 'notifications', icon: 'notifications-outline', screen: 'Notifications' as const },
 ];
 

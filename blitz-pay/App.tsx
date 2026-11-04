@@ -35,9 +35,11 @@ ExpoSplashScreen.preventAutoHideAsync();
 const navigationRef = createNavigationContainerRef<RootStackParamList>();
 
 const linking: LinkingOptions<RootStackParamList> = {
-  prefixes: [`${config.trueLayerRedirectScheme}://`],
+  // Table Links (https://<storefront>/t/{code}) arrive as universal/app links when the storefront host is configured.
+  prefixes: [`${config.trueLayerRedirectScheme}://`, ...(config.storefrontUrl ? [config.storefrontUrl] : [])],
   config: {
     screens: {
+      TableCheckIn: 't/:code',
       PaymentResult: 'payments/:paymentRequestId/result',
       PaymentProcessing: 'payments/:paymentRequestId/processing',
       PaymentPending: 'payments/:paymentRequestId/pending',

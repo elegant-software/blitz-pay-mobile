@@ -4,7 +4,7 @@ import type { PaymentChannel as MerchantPaymentChannel } from '../../merchant-ca
 export type CheckoutPaymentMethod = 'bank' | 'card' | 'paypal' | 'pay_by_bank' | 'tap_to_pay';
 export type OrderPaymentChannel = MerchantPaymentChannel;
 export type CreateOrderPaymentMethod = 'TRUELAYER' | 'STRIPE' | 'BRAINTREE';
-export type BackendCheckoutPaymentMethod = 'BANK_ACCOUNT' | 'CARD' | 'PAY_BY_BANK' | 'TERMINAL' | 'PAYPAL';
+export type BackendCheckoutPaymentMethod = 'BANK_ACCOUNT' | 'CARD' | 'PAY_BY_BANK' | 'TERMINAL' | 'PAYPAL' | 'CASH';
 export type OrderType = 'PRE_ORDER' | 'WALK_IN_ORDERING';
 export type CheckoutIntent = 'PAY_NOW' | 'PAY_LATER';
 export type PaymentSource = 'APP_PAYMENT' | 'MANUAL_SETTLEMENT';
@@ -33,6 +33,18 @@ export interface CreateOrderInput {
   paymentMethod?: CreateOrderPaymentMethod;
   checkoutPaymentMethod?: BackendCheckoutPaymentMethod;
   items: CreateOrderItemInput[];
+  /** Table check-in: requires orderType WALK_IN_ORDERING and a customerLocation. */
+  tableCode?: string;
+  /** People at the Table; the backend applies it only when the Table has no Guest Count yet. */
+  guestCount?: number;
+  customerLocation?: CustomerLocationInput;
+}
+
+export interface CustomerLocationInput {
+  latitude: number;
+  longitude: number;
+  accuracyMeters: number;
+  capturedAt: string;
 }
 
 export interface AddOrderItemInput {

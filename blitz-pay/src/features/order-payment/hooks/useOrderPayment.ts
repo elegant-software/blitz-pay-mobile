@@ -18,6 +18,7 @@ import {
   updateOrderLineQuantity,
 } from '../services/orderPaymentService';
 import { orderPaymentStore } from '../store/orderPaymentStore';
+import { captureWalkInLocation } from '../../table-checkin/services/tableCheckInService';
 import {
   isMethodAvailable,
   isOrderEditable,
@@ -64,6 +65,10 @@ interface ConfirmCheckoutArgs {
   selectedMethod: CheckoutPaymentMethod | null;
   availableChannels: OrderPaymentChannel[];
   navigation: RootStackNav;
+  /** Ordering at a Table: a Walk-In order with fresh geolocation (ADR-0023). */
+  table?: { tableCode: string; guestCount?: number };
+  /** Cash Payment: the order stays unpaid until staff confirm the cash. */
+  payWithCash?: boolean;
 }
 
 function toSession(args: ConfirmCheckoutArgs, order: OrderSummary): OrderPaymentSession {
@@ -442,10 +447,11 @@ export function useOrderPayment() {
     async (args: ConfirmCheckoutArgs): Promise<void> => {
       if (!args.merchantId) throw new Error('merchant_unavailable');
       if (!args.branchId) throw new Error('merchant_branch_unavailable');
-      if (args.selectedIntent === 'PAY_NOW' && !args.selectedMethod) {
+      const payWithCash = args.selectedIntent === 'PAY_NOW' && args.payWithCash === true && Boolean(args.table);
+      if (args.selectedIntent === 'PAY_NOW' && !args.selectedMethod && !payWithCash) {
         throw new Error('payment_option_required');
       }
-      if (args.selectedIntent === 'PAY_NOW' && args.selectedMethod && !isMethodAvailable(args.selectedMethod, args.availableChannels)) {
+      if (args.selectedIntent === 'PAY_NOW' && args.selectedMethod && !payWithCash && !isMethodAvailable(args.selectedMethod, args.availableChannels)) {
         throw new Error('payment_option_unavailable');
       }
 
@@ -473,12 +479,29 @@ export function useOrderPayment() {
         ),
       });
 
+      if (args.table) {
+        observability.info('table_order_requested', {
+          merchantId: args.merchantId,
+          branchId: args.branchId,
+          checkoutIntent: args.selectedIntent,
+          payWithCash,
+          hasGuestCount: args.table.guestCount != null,
+        });
+      }
+      const customerLocation = args.table ? await captureWalkInLocation() : undefined;
       const order = await createOrder({
         branchId: args.branchId,
-        orderType: 'PRE_ORDER',
+        orderType: args.table ? 'WALK_IN_ORDERING' : 'PRE_ORDER',
         checkoutIntent: args.selectedIntent,
-        paymentMethod: args.selectedMethod ? mapMethodToOrderPaymentMethod(args.selectedMethod) : undefined,
-        checkoutPaymentMethod: args.selectedMethod ? mapMethodToBackendCheckoutPaymentMethod(args.selectedMethod) : undefined,
+        paymentMethod: !payWithCash && args.selectedMethod ? mapMethodToOrderPaymentMethod(args.selectedMethod) : undefined,
+        checkoutPaymentMethod: payWithCash
+          ? 'CASH'
+          : args.selectedMethod
+            ? mapMethodToBackendCheckoutPaymentMethod(args.selectedMethod)
+            : undefined,
+        tableCode: args.table?.tableCode,
+        guestCount: args.table?.guestCount,
+        customerLocation,
         items: args.basketItems.map((item) => ({
           productId: item.productId,
           quantity: item.quantity,
@@ -504,7 +527,7 @@ export function useOrderPayment() {
         checkoutIntent: order.checkoutIntent,
       });
 
-      if (args.selectedIntent === 'PAY_LATER') {
+      if (args.selectedIntent === 'PAY_LATER' || payWithCash) {
         args.navigation.replace('OrderDetail', {
           orderId: order.orderId,
           merchantName: args.merchantName,

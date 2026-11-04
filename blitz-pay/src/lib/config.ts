@@ -24,6 +24,8 @@ export const config = {
   authBypass: process.env.EXPO_PUBLIC_AUTH_BYPASS === 'true',
   stripePublishableKey: process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '',
   apiUrl,
+  /** Public storefront base URL; Table Links are `${storefrontUrl}/t/{code}`. Unset disables universal/app links. */
+  storefrontUrl: process.env.EXPO_PUBLIC_STOREFRONT_URL?.replace(/\/+$/, '') || null,
   trueLayerPaymentsUrl: joinUrl(apiUrl, '/v1/payments/request'),
   trueLayerEnvironment: process.env.EXPO_PUBLIC_TRUELAYER_ENVIRONMENT ?? 'sandbox',
   trueLayerRedirectScheme: process.env.EXPO_PUBLIC_TRUELAYER_REDIRECT_SCHEME ?? 'blitzpay',

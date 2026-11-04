@@ -1,3 +1,10 @@
+// Table Links (https://<storefront host>/t/{code}) open the app via universal/app links. The host comes
+// from EXPO_PUBLIC_STOREFRONT_URL; without it no association is declared.
+const storefrontHost = (() => {
+  const match = /^https:\/\/([^/?#:]+)/i.exec(process.env.EXPO_PUBLIC_STOREFRONT_URL ?? "");
+  return match ? match[1].toLowerCase() : null;
+})();
+
 module.exports = {
   expo: {
     name: "BlitzPay",
@@ -18,6 +25,7 @@ module.exports = {
     ios: {
       supportsTablet: false,
       bundleIdentifier: "app.blitzpay.mobile",
+      ...(storefrontHost ? { associatedDomains: [`applinks:${storefrontHost}`] } : {}),
       infoPlist: {
         NSCameraUsageDescription: "Used to scan QR codes and credit cards for payments",
         NSFaceIDUsageDescription: "Used for biometric authentication",
@@ -38,6 +46,18 @@ module.exports = {
         backgroundColor: "#000000",
       },
       package: "app.blitzpay.mobile",
+      ...(storefrontHost
+        ? {
+            intentFilters: [
+              {
+                action: "VIEW",
+                autoVerify: true,
+                data: [{ scheme: "https", host: storefrontHost, pathPrefix: "/t/" }],
+                category: ["BROWSABLE", "DEFAULT"],
+              },
+            ],
+          }
+        : {}),
       googleServicesFile: "./google-services.json",
       permissions: [
         "CAMERA",

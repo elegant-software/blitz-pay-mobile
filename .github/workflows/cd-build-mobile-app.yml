@@ -184,6 +184,7 @@ jobs:
       EXPO_PUBLIC_KEYCLOAK_CLIENT_ID: ${{ vars.EXPO_PUBLIC_KEYCLOAK_CLIENT_ID }}
       EXPO_PUBLIC_AUTH_BYPASS: ${{ vars.EXPO_PUBLIC_AUTH_BYPASS }}
       EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL }}
+      EXPO_PUBLIC_STOREFRONT_URL: ${{ vars.EXPO_PUBLIC_STOREFRONT_URL }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -278,6 +279,7 @@ jobs:
             echo "EXPO_PUBLIC_KEYCLOAK_CLIENT_ID=${EXPO_PUBLIC_KEYCLOAK_CLIENT_ID:-}"
             echo "EXPO_PUBLIC_AUTH_BYPASS=${EXPO_PUBLIC_AUTH_BYPASS:-false}"
             echo "EXPO_PUBLIC_API_URL=${EXPO_PUBLIC_API_URL:-}"
+            echo "EXPO_PUBLIC_STOREFRONT_URL=${EXPO_PUBLIC_STOREFRONT_URL:-}"
           } > .env
 
       - name: Skip duplicate active build
@@ -386,6 +388,7 @@ jobs:
       EXPO_PUBLIC_KEYCLOAK_CLIENT_ID: ${{ vars.EXPO_PUBLIC_KEYCLOAK_CLIENT_ID }}
       EXPO_PUBLIC_AUTH_BYPASS: ${{ vars.EXPO_PUBLIC_AUTH_BYPASS }}
       EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL }}
+      EXPO_PUBLIC_STOREFRONT_URL: ${{ vars.EXPO_PUBLIC_STOREFRONT_URL }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -423,6 +426,7 @@ jobs:
             echo "EXPO_PUBLIC_KEYCLOAK_CLIENT_ID=${EXPO_PUBLIC_KEYCLOAK_CLIENT_ID:-}"
             echo "EXPO_PUBLIC_AUTH_BYPASS=${EXPO_PUBLIC_AUTH_BYPASS:-false}"
             echo "EXPO_PUBLIC_API_URL=${EXPO_PUBLIC_API_URL:-}"
+            echo "EXPO_PUBLIC_STOREFRONT_URL=${EXPO_PUBLIC_STOREFRONT_URL:-}"
           } > .env
 
       - name: Resolve release notes message
