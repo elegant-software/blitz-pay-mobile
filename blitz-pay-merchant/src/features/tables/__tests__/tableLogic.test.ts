@@ -48,15 +48,15 @@ describe('table status', () => {
 
   it('colours pins by status and payment', () => {
     expect(tablePinTone({ status: 'FREE', orders: [] })).toBe('free');
-    expect(tablePinTone({ status: 'OCCUPIED', orders: [order('PAID'), order('PENDING_PAYMENT')] })).toBe('unpaid');
+    expect(tablePinTone({ status: 'OCCUPIED', orders: [order('PAID'), order('CREATED')] })).toBe('unpaid');
     expect(tablePinTone({ status: 'OCCUPIED', orders: [order('PAID'), order('CANCELLED')] })).toBe('paid');
   });
 
   it('detects unpaid orders and labels payment status', () => {
     expect(hasUnpaidOrders({ orders: [order('PAID')] })).toBe(false);
-    expect(hasUnpaidOrders({ orders: [order('PAYMENT_FAILED')] })).toBe(true);
-    expect(paymentStatusLabel('PAYMENT_IN_PROGRESS')).toBe('table_payment_in_progress');
-    expect(paymentStatusLabel('PENDING_PAYMENT')).toBe('table_payment_unpaid');
+    expect(hasUnpaidOrders({ orders: [order('FAILED')] })).toBe(true);
+    expect(paymentStatusLabel('PAYMENT_INITIATED')).toBe('table_payment_in_progress');
+    expect(paymentStatusLabel('CREATED')).toBe('table_payment_unpaid');
   });
 });
 

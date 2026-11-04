@@ -216,8 +216,8 @@ function inferImageMimeType(uri: string): string {
 }
 
 /**
- * Uploads a Floor Plan picture the same way as the merchant logo: ask the backend for a presigned
- * URL, PUT the bytes to storage, then record the storage key on the Floor Plan.
+ * Uploads a Floor Plan picture: ask the backend for a presigned URL and PUT the bytes to storage.
+ * The backend links the picture to the Floor Plan itself; callers reload the Floor Plans afterwards.
  */
 export async function uploadFloorPlanImage(
   ref: BranchRef,
@@ -253,11 +253,6 @@ export async function uploadFloorPlanImage(
     throw new TableError('floor_plan_image_upload_failed', reason);
   }
   observability.info('floor_plan_image_upload_succeeded', { floorPlanId });
-
-  await request<unknown>('floor_plan_image_attach', `${planPath}/image`, {
-    method: 'PUT',
-    body: { storageKey: presigned.storageKey },
-  });
 }
 
 export async function fetchBranchFloor(ref: BranchRef): Promise<BranchFloor> {
