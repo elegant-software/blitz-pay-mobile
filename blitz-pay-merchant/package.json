@@ -9,7 +9,7 @@
     "ios": "expo run:ios",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit --pretty false",
-    "test": "echo \"No test suite configured\"",
+    "test": "jest --testPathPattern=__tests__",
     "test:contract": "jest --testPathPattern=__contract__"
   },
   "dependencies": {
@@ -48,6 +48,7 @@
     "react-dom": "19.2.0",
     "react-native": "0.83.6",
     "react-native-gesture-handler": "~2.30.0",
+    "react-native-nfc-manager": "^4.2.0",
     "react-native-qrcode-svg": "^6.3.1",
     "react-native-safe-area-context": "~5.6.2",
     "react-native-screens": "~4.23.0",
@@ -66,7 +67,8 @@
   "jest": {
     "testEnvironment": "node",
     "testMatch": [
-      "**/__contract__/**/*.test.ts"
+      "**/__contract__/**/*.test.ts",
+      "**/__tests__/**/*.test.ts"
     ],
     "transform": {
       "^.+\\.tsx?$": "babel-jest"

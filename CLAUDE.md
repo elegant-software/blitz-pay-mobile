@@ -66,6 +66,7 @@ Same stack as blitz-pay. No payment SDKs (Stripe/TrueLayer/Braintree), no voice/
 
 - **Tabs**: Dashboard, Orders, Products, Account
 - **Stack screens**: Login, OrderDetail, ProductEdit, MerchantQRCode, PaymentsHistory, Notifications
+- **Tables & Floor** (Account → Tables & Floor): FloorView (live floor over the `/floor/events` SSE stream), TableDetail (Guest Count, clear, Tap to Pay, confirm cash); Merchant Manager only: Tables, TableSettings (QR, NFC write + lock via `react-native-nfc-manager`), FloorPlans, FloorPlanEditor
 - **i18n**: `useLanguage()` from `src/lib/LanguageContext.tsx`; merchant-specific translation keys in `src/lib/translations.ts`
 - **Design tokens**: identical `src/lib/theme.ts`
 - **Auth**: same Keycloak ROPC pattern; separate session key `blitzpay_merchant_session`

@@ -9,6 +9,8 @@ export const STALE_TIMES = {
   BRANCH_NAMES: 10 * 60_000,
   SETTLEMENT_SUMMARY: 5 * 60_000,
   MERCHANT_KPI: 5 * 60_000,
+  BRANCH_TABLES: 60_000,
+  BRANCH_FLOOR: 10_000,
 } as const;
 
 export const QUERY_KEYS = {
@@ -19,6 +21,9 @@ export const QUERY_KEYS = {
     ['settlements', 'summary', merchantId, from, to] as const,
   merchantKpi: (merchantId: string, from: string, to: string, branchId: string | null) =>
     ['reporting', 'kpi', merchantId, from, to, branchId] as const,
+  branchTables: (branchId: string | null) => ['tables', branchId] as const,
+  floorPlans: (branchId: string | null) => ['floor-plans', branchId] as const,
+  branchFloor: (branchId: string | null) => ['floor', branchId] as const,
 };
 
 export const queryClient = new QueryClient({
