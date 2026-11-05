@@ -90,6 +90,7 @@ function parseTable(raw: RawTable): BranchTable {
     placement: raw.placement && raw.placement.floorPlanId
       ? { floorPlanId: raw.placement.floorPlanId, x: Number(raw.placement.x), y: Number(raw.placement.y) }
       : null,
+    nfcTagWrittenAt: raw.nfcTagWrittenAt ?? null,
   };
 }
 
@@ -178,6 +179,13 @@ export async function placeTable(
 export async function unplaceTable(ref: BranchRef, tableId: string): Promise<void> {
   await request<void>('branch_table_unplace', `${branchPath(ref)}/tables/${encodeURIComponent(tableId)}/placement`, {
     method: 'DELETE',
+  });
+}
+
+/** Tells the backend an NFC tag carrying the Table Link was just written, so the web admin shows it. */
+export async function recordNfcTag(ref: BranchRef, tableId: string): Promise<void> {
+  await request<void>('branch_table_nfc_tag', `${branchPath(ref)}/tables/${encodeURIComponent(tableId)}/nfc-tag`, {
+    method: 'PUT',
   });
 }
 

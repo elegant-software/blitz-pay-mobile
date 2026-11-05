@@ -4,6 +4,7 @@ import { QUERY_KEYS, STALE_TIMES } from '../../../lib/queryClient';
 import {
   createTables,
   deleteTable,
+  recordNfcTag,
   fetchBranchFloor,
   fetchTables,
   TableError,
@@ -88,6 +89,8 @@ export function useTableSetup() {
       ref ? run(() => updateTable(ref, tableId, { name: name.trim() }), 'branch_table_update_failed') : Promise.resolve(false),
     setActive: (tableId: string, active: boolean) =>
       ref ? run(() => updateTable(ref, tableId, { active }), 'branch_table_update_failed') : Promise.resolve(false),
+    recordNfcTag: (tableId: string) =>
+      ref ? run(() => recordNfcTag(ref, tableId), 'nfc_tag_record_failed') : Promise.resolve(false),
     remove: (tableId: string) =>
       ref ? run(() => deleteTable(ref, tableId), 'tables_delete_failed') : Promise.resolve(false),
   };

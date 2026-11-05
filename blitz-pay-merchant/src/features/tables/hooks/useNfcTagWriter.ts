@@ -31,21 +31,24 @@ export function useNfcTagWriter() {
     return () => sub.remove();
   }, [refreshAvailability]);
 
-  const write = useCallback(async (link: string, alertMessage: string) => {
+  /** Resolves true once the tag is written and locked. */
+  const write = useCallback(async (link: string, alertMessage: string): Promise<boolean> => {
     setState({ phase: 'writing' });
     try {
       await writeAndLockTableLink(link, alertMessage);
       setState({ phase: 'succeeded' });
+      return true;
     } catch (err) {
       if (err instanceof NfcWriteError && err.key === 'nfc_error_cancelled') {
         setState({ phase: 'idle' });
-        return;
+        return false;
       }
       setState({
         phase: 'failed',
         errorKey: err instanceof NfcWriteError ? err.key : 'nfc_error_write_failed',
         detail: err instanceof Error ? err.message : String(err),
       });
+      return false;
     }
   }, []);
 

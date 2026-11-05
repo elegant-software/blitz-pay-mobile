@@ -4,7 +4,7 @@ import type { BranchFloor, TableLive } from '../types/table';
 
 function live(id: string, overrides: Partial<TableLive> = {}, seats: number | null = 4): TableLive {
   return {
-    table: { id, code: `C${id}`, name: id, active: true, link: '', seats, placement: null },
+    table: { id, code: `C${id}`, name: id, active: true, link: '', seats, placement: null, nfcTagWrittenAt: null },
     status: 'FREE',
     occupiedSince: null,
     guestCount: null,

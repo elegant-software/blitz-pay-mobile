@@ -15,6 +15,8 @@ export interface BranchTable {
   /** Number of seats, 1..50; null when the merchant has not set it. */
   seats: number | null;
   placement: TablePlacement | null;
+  /** When an NFC tag carrying [link] was last written for this Table (ISO); null when none was. */
+  nfcTagWrittenAt: string | null;
 }
 
 export interface FloorPlan {

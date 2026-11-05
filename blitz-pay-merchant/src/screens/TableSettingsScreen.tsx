@@ -41,7 +41,7 @@ export default function TableSettingsScreen() {
       <ErrorBanner error={vm.actionError} />
       <CapacityWarning seated={vm.seatedCapacity} capacity={vm.branchCapacity} />
       <TableLinkCard table={table} />
-      <NfcCard table={table} />
+      <NfcCard table={table} onWritten={() => void vm.recordNfcTag(table.id)} />
       <TableEditCard
         table={table}
         busy={vm.busy}
@@ -105,7 +105,7 @@ function TableLinkCard({ table }: { table: BranchTable }) {
   );
 }
 
-function NfcCard({ table }: { table: BranchTable }) {
+function NfcCard({ table, onWritten }: { table: BranchTable; onWritten: () => void }) {
   const { t } = useLanguage();
   const nfc = useNfcTagWriter();
 
@@ -129,7 +129,9 @@ function NfcCard({ table }: { table: BranchTable }) {
   const confirmAndWrite = () => {
     Alert.alert(t('nfc_lock_warning_title'), t('nfc_lock_warning_body', { name: table.name }), [
       { text: t('cancel'), style: 'cancel' },
-      { text: t('nfc_lock_warning_confirm'), style: 'destructive', onPress: () => void nfc.write(table.link, t('nfc_hold_near_tag')) },
+      { text: t('nfc_lock_warning_confirm'), style: 'destructive', onPress: () => {
+        void nfc.write(table.link, t('nfc_hold_near_tag')).then((written) => { if (written) onWritten(); });
+      } },
     ]);
   };
 
@@ -137,6 +139,11 @@ function NfcCard({ table }: { table: BranchTable }) {
     <View style={tableStyles.card}>
       <Text style={tableStyles.sectionTitle}>{t('nfc_write_title')}</Text>
       <Text style={tableStyles.hint}>{t('nfc_write_hint')}</Text>
+      <Text style={[tableStyles.hint, styles.spaced]}>
+        {table.nfcTagWrittenAt
+          ? t('nfc_tag_written_at', { date: new Date(table.nfcTagWrittenAt).toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' }) })
+          : t('nfc_tag_none')}
+      </Text>
       {nfc.state.phase === 'writing' ? (
         <View style={[tableStyles.row, styles.spaced]}>
           <ActivityIndicator color={colors.primary} />
