@@ -1,13 +1,34 @@
 import { Platform } from 'react-native';
-import NfcManager, { Ndef, NdefStatus, NfcError, NfcTech } from 'react-native-nfc-manager';
 import { observability } from '../../../lib/observability';
 import { classifyNfcError, ndefUriMessageSize, NfcWriteError, type NfcWriteErrorKey } from '../nfcTag';
 
 export type NfcAvailability = 'unsupported' | 'disabled' | 'ready';
 
+type NfcModule = typeof import('react-native-nfc-manager');
+
 let started = false;
+let nfcModule: NfcModule | null | undefined;
+
+/**
+ * The library looks its native module up on import and throws when the running binary lacks it (Expo Go, or a dev
+ * build made before react-native-nfc-manager was added). Loading it lazily keeps such a binary working without NFC.
+ */
+function loadNfc(): NfcModule | null {
+  if (nfcModule === undefined) {
+    try {
+      nfcModule = require('react-native-nfc-manager') as NfcModule;
+    } catch (err) {
+      observability.warn('nfc_module_unavailable', { reason: err instanceof Error ? err.message : String(err) });
+      nfcModule = null;
+    }
+  }
+  return nfcModule;
+}
 
 export async function getNfcAvailability(): Promise<NfcAvailability> {
+  const nfc = loadNfc();
+  if (!nfc) return 'unsupported';
+  const NfcManager = nfc.default;
   try {
     const supported = await NfcManager.isSupported();
     if (!supported) return 'unsupported';
@@ -25,7 +46,9 @@ export async function getNfcAvailability(): Promise<NfcAvailability> {
 }
 
 export async function openNfcSettings(): Promise<void> {
-  if (Platform.OS !== 'android') return;
+  const nfc = loadNfc();
+  if (Platform.OS !== 'android' || !nfc) return;
+  const NfcManager = nfc.default;
   try {
     await NfcManager.goToNfcSetting();
   } catch (err) {
@@ -33,7 +56,7 @@ export async function openNfcSettings(): Promise<void> {
   }
 }
 
-function toKey(err: unknown): NfcWriteErrorKey {
+function toKey(err: unknown, NfcError: NfcModule['NfcError']): NfcWriteErrorKey {
   if (err instanceof NfcError.UserCancel) return 'nfc_error_cancelled';
   if (err instanceof NfcError.TagNotWritable) return 'nfc_error_locked_tag';
   if (err instanceof NfcError.TagSizeTooSmall) return 'nfc_error_tag_too_small';
@@ -45,6 +68,9 @@ function toKey(err: unknown): NfcWriteErrorKey {
  * The tag must be blank or writable; an already-locked tag is reported, never silently skipped.
  */
 export async function writeAndLockTableLink(link: string, alertMessage: string): Promise<void> {
+  const nfc = loadNfc();
+  if (!nfc) throw new NfcWriteError('nfc_error_write_failed', 'nfc_module_unavailable');
+  const { default: NfcManager, Ndef, NdefStatus, NfcError, NfcTech } = nfc;
   observability.info('nfc_table_tag_write_started', { linkLength: link.length });
   let step = 'request_technology';
   try {
@@ -77,7 +103,7 @@ export async function writeAndLockTableLink(link: string, alertMessage: string):
     }
     observability.info('nfc_table_tag_write_succeeded', { capacity, bytes: needed });
   } catch (err) {
-    const key = toKey(err);
+    const key = toKey(err, NfcError);
     const detail = err instanceof NfcWriteError ? err.detail : err instanceof Error ? err.message : String(err);
     if (key === 'nfc_error_cancelled') {
       observability.info('nfc_table_tag_write_cancelled', { step });
