@@ -15,6 +15,7 @@ import type {
   RecentOrderSummary,
   UpdateOrderLineQuantityInput,
 } from '../types/orderPayment';
+import { readApiError } from '../../../lib/apiError';
 
 interface RawOrderItemResponse {
   lineId?: string;
@@ -58,11 +59,6 @@ interface RawOrderResponse {
 
 interface RawOrderListResponse {
   orders?: RawOrderResponse[];
-}
-
-interface ErrorPayload {
-  error?: string;
-  message?: string;
 }
 
 function normalizeOrderStatus(status: unknown): OrderStatus {
@@ -188,25 +184,6 @@ function parseRecentOrder(payload: RawOrderResponse): RecentOrderSummary {
   };
 }
 
-async function readError(response: Response): Promise<string> {
-  try {
-    const payload = (await response.json()) as ErrorPayload;
-    if (payload.error) return payload.error;
-    if (payload.message) return payload.message;
-  } catch {
-    // ignore
-  }
-
-  try {
-    const text = await response.text();
-    if (text.trim()) return text.slice(0, 400);
-  } catch {
-    // ignore
-  }
-
-  return `HTTP ${response.status}`;
-}
-
 async function mutateOrder(
   orderId: string,
   path: string,
@@ -223,7 +200,7 @@ async function mutateOrder(
   });
 
   if (!response.ok) {
-    throw new Error(await readError(response));
+    throw new Error(await readApiError(response));
   }
 
   const payload = (await response.json()) as RawOrderResponse;
@@ -288,7 +265,7 @@ export async function createOrder(input: CreateOrderInput): Promise<OrderSummary
   });
 
   if (!response.ok) {
-    const message = await readError(response);
+    const message = await readApiError(response);
     observability.error('order_create_response_failed', {
       checkoutIntent: input.checkoutIntent,
       paymentMethod: input.paymentMethod ?? null,
@@ -344,7 +321,7 @@ export async function fetchOrder(orderId: string): Promise<OrderSummary> {
   });
 
   if (!response.ok) {
-    const message = await readError(response);
+    const message = await readApiError(response);
     observability.warn('order_fetch_failed', { orderId, status: response.status, message });
     throw new Error(message);
   }
@@ -376,7 +353,7 @@ export async function fetchRecentOrders(): Promise<RecentOrderSummary[]> {
   });
 
   if (!response.ok) {
-    const message = await readError(response);
+    const message = await readApiError(response);
     observability.warn('recent_orders_fetch_failed', { status: response.status, message });
     throw new Error(message);
   }
@@ -478,7 +455,7 @@ export async function createStripeIntentForOrder(
   });
 
   if (!response.ok) {
-    const message = await readError(response);
+    const message = await readApiError(response);
     observability.warn('stripe_create_intent_failed', {
       orderId: context.orderId,
       status: response.status,
@@ -568,7 +545,7 @@ export async function createStripePayByBankCheckoutForOrder(
   });
 
   if (!response.ok) {
-    const message = await readError(response);
+    const message = await readApiError(response);
     observability.warn('stripe_pay_by_bank_checkout_failed', {
       orderId: context.orderId,
       status: response.status,
@@ -621,7 +598,7 @@ export async function submitBraintreeOrderNonce(
   });
 
   if (!response.ok) {
-    throw new Error(await readError(response));
+    throw new Error(await readApiError(response));
   }
 
   return (await response.json()) as BraintreeCheckoutResponse;

@@ -19,6 +19,7 @@ import { useLanguage } from '../lib/LanguageContext';
 import { config } from '../lib/config';
 import { colors, spacing, radius } from '../lib/theme';
 import type { RootStackNav } from '../types';
+import { readApiProblem } from '../lib/apiError';
 
 function validatePassword(pw: string): boolean {
   return pw.length >= 8 && /[A-Z]/.test(pw) && /[0-9]/.test(pw);
@@ -59,8 +60,7 @@ export default function SignupScreen() {
       });
 
       if (!res.ok) {
-        const body = await res.json().catch(() => ({})) as { error?: string };
-        if (body.error === 'email_conflict') throw new Error('email_conflict');
+        if ((await readApiProblem(res)).code === 'EMAIL_CONFLICT') throw new Error('email_conflict');
         throw new Error('registration_failed');
       }
 

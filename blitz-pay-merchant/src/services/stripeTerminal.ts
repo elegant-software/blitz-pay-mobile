@@ -1,4 +1,5 @@
 import { authedFetch } from '../lib/api';
+import { readApiError } from '../lib/apiError';
 
 export interface ConnectionTokenResult {
   secret: string;
@@ -48,8 +49,7 @@ export async function fetchConnectionToken(branchId: string, merchantId: string)
     body: JSON.stringify({ branchId, merchantId }),
   });
   if (!res.ok) {
-    const body = await res.json().catch(() => ({})) as { error?: string };
-    throw new Error(body.error ?? `ConnectionToken failed: ${res.status}`);
+    throw new Error(`ConnectionToken failed: ${await readApiError(res)}`);
   }
   return res.json() as Promise<ConnectionTokenResult>;
 }
@@ -65,8 +65,7 @@ export async function createTerminalIntent(params: {
     body: JSON.stringify({ ...params, paymentMethodType: 'card_present' }),
   });
   if (!res.ok) {
-    const body = await res.json().catch(() => ({})) as { error?: string };
-    throw new Error(body.error ?? `CreateIntent failed: ${res.status}`);
+    throw new Error(`CreateIntent failed: ${await readApiError(res)}`);
   }
   return res.json() as Promise<StripeIntentResult>;
 }

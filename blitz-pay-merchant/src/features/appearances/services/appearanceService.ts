@@ -7,6 +7,7 @@ import type {
   CreateAppearanceInput,
   MerchantAppearance,
 } from '../types/appearance';
+import { readApiError } from '../../../lib/apiError';
 
 type AppearanceResponse = Partial<Omit<MerchantAppearance, 'appearanceId'>> & { id?: string };
 type PageResponse = { content?: AppearanceResponse[]; page?: number; size?: number; totalElements?: number; totalPages?: number };
@@ -44,12 +45,7 @@ async function request<T>(path: string, init: RequestInit, failureKey: string): 
   observability.info('merchant_appearances_request_started', { path, method: init.method ?? 'GET' });
   const response = await authedFetch(`/v1${path}`, init);
   if (!response.ok) {
-    const raw = await response.text().catch(() => '');
-    let detail = raw || `HTTP ${response.status}`;
-    try {
-      const parsed = JSON.parse(raw) as { error?: string; message?: string };
-      detail = parsed.error ?? parsed.message ?? detail;
-    } catch {}
+    const detail = await readApiError(response);
     observability.error('merchant_appearances_request_failed', { path, status: response.status, reason: detail.slice(0, 500) });
     throw new MerchantAppearanceError(failureKey, detail, response.status);
   }
