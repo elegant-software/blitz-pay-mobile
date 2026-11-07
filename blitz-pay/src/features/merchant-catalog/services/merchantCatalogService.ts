@@ -239,7 +239,6 @@ export async function fetchActiveProducts(
   const response = await fetchMerchantCommerceJson<ProductResponse[]>(
     `/merchants/${merchantId}/products?${search.toString()}`,
   );
-  console.log('[catalog] raw products sample:', JSON.stringify(response.slice(0, 2), null, 2));
   return response
     .filter((product) => product.productId && product.branchId && product.name && typeof product.unitPrice === 'number')
     .map((product) => {

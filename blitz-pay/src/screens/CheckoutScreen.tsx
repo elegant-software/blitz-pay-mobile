@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { ProductImage } from '../features/merchant-catalog/components/ProductImage';
 import {
   View,
   Text,
@@ -6,7 +7,6 @@ import {
   ScrollView,
   StyleSheet,
   ActivityIndicator,
-  Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -271,13 +271,16 @@ export default function CheckoutScreen() {
                   <View key={item.productId} style={styles.basketRow}>
                     <View style={styles.basketRowMain}>
                       {productImageUri ? (
-                        <Image
+                        <ProductImage
+                          merchantId={merchantId}
+                          branchId={branchId}
+                          productId={item.productId}
                           source={{
                             uri: productImageUri,
                             headers: token ? { Authorization: `Bearer ${token}` } : undefined,
                           }}
                           style={styles.basketRowImage}
-                          resizeMode="cover"
+                          contentFit="cover" cachePolicy="memory-disk"
                           onLoadStart={() => {
                             observability.info('checkout_product_image_load_started', {
                               merchantId: merchantId ?? null,
@@ -303,7 +306,7 @@ export default function CheckoutScreen() {
                               productId: item.productId,
                               imageHost: imageMeta.host,
                               imagePath: imageMeta.path,
-                              reason: event.nativeEvent.error ?? 'unknown_image_error',
+                              reason: event.error ?? 'unknown_image_error',
                             });
                           }}
                         />

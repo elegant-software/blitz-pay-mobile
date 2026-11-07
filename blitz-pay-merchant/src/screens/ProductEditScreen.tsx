@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { ProductImage } from '../features/products/components/ProductImage';
 import * as ImagePicker from 'expo-image-picker';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet,
-  KeyboardAvoidingView, ActivityIndicator, Image, Alert, Switch, Modal, FlatList,
+  KeyboardAvoidingView, ActivityIndicator, Alert, Switch, Modal, FlatList,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -428,7 +429,8 @@ export default function ProductEditScreen() {
                 <Ionicons name="chevron-forward" size={16} color={colors.gray400} />
               </TouchableOpacity>
               {form.imageUri ? (
-                <Image source={{ uri: form.imageUri }} style={styles.previewImage} resizeMode="cover" />
+                <ProductImage merchantId={activeBranchScope?.merchantId} branchId={form.branchId} productId={route.params.productId}
+                  source={{ uri: form.imageUri }} style={styles.previewImage} contentFit="cover" cachePolicy="none" />
               ) : null}
             </Field>
 

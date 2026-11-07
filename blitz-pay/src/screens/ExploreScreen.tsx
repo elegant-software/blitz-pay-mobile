@@ -1,4 +1,5 @@
 import React from 'react';
+import { Image } from 'expo-image';
 import {
   View,
   Text,
@@ -6,7 +7,6 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
-  Image,
   ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -62,6 +62,8 @@ export default function ExploreScreen() {
           <Image
             source={{ uri: 'https://i.pravatar.cc/150?img=47' }}
             style={styles.avatar}
+            contentFit="cover"
+            cachePolicy="memory-disk"
           />
           <View>
             <Text style={styles.greeting}>{t('happening_now')}</Text>
@@ -226,7 +228,7 @@ export default function ExploreScreen() {
           >
             <View style={styles.merchantIconBox}>
               {merchant.logoUrl ? (
-                <Image source={{ uri: merchant.logoUrl }} style={styles.merchantLogo} resizeMode="contain" />
+                <Image source={{ uri: merchant.logoUrl }} style={styles.merchantLogo} contentFit="contain" cachePolicy="memory-disk" />
               ) : (
                 <Ionicons name="storefront-outline" size={24} color={colors.secondary} />
               )}

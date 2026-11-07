@@ -1,8 +1,8 @@
 import React from 'react';
+import { ProductImage } from '../features/merchant-catalog/components/ProductImage';
 import {
   View,
   Text,
-  Image,
   ScrollView,
   TouchableOpacity,
   StyleSheet,
@@ -64,13 +64,17 @@ export default function ProductDetailScreen() {
 
       <ScrollView contentContainerStyle={{ paddingBottom: 120 + insets.bottom }}>
         {productImage ? (
-          <Image
+          <ProductImage
+            merchantId={merchantId}
+            branchId={branchId}
+            productId={productId}
             source={{
               uri: productImage.uri,
               headers: productImage.needsAuth && token ? { Authorization: `Bearer ${token}` } : undefined,
             }}
             style={styles.heroImage}
-            resizeMode="cover"
+            contentFit="cover"
+            cachePolicy="memory-disk"
           />
         ) : (
           <View style={styles.heroPlaceholder}>

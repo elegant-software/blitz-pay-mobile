@@ -1,4 +1,5 @@
 import React from 'react';
+import { ProductImage } from '../features/products/components/ProductImage';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator,
 } from 'react-native';
@@ -103,9 +104,14 @@ export default function ProductsScreen() {
                   activeOpacity={0.7}
                 >
                   <View style={styles.productLeft}>
-                    <View style={[styles.productIcon, { backgroundColor: product.active ? `${colors.primary}15` : colors.surface }]}>
-                      <Ionicons name="cube-outline" size={22} color={product.active ? colors.primary : colors.gray400} />
-                    </View>
+                    {product.imageUrl ? (
+                      <ProductImage merchantId={activeBranchScope?.merchantId} branchId={product.branchId} productId={product.id}
+                        source={{ uri: product.imageUrl }} style={styles.productIcon} contentFit="cover" cachePolicy="memory-disk" />
+                    ) : (
+                      <View style={[styles.productIcon, { backgroundColor: product.active ? `${colors.primary}15` : colors.surface }]}>
+                        <Ionicons name="cube-outline" size={22} color={product.active ? colors.primary : colors.gray400} />
+                      </View>
+                    )}
                     <View style={styles.productInfo}>
                       <Text style={[styles.productName, !product.active && styles.textMuted]}>{product.name}</Text>
                       {product.productCode != null ? <Text style={styles.productMeta}>#{product.productCode}</Text> : null}
