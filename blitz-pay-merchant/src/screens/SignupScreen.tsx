@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -15,15 +15,10 @@ import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../lib/auth';
 import { useLanguage } from '../lib/LanguageContext';
-import { config } from '../lib/config';
+import { useMerchantSignup } from '../features/auth/hooks/useMerchantSignup';
+import BusinessTypeAutocomplete from '../features/auth/components/BusinessTypeAutocomplete';
 import { colors, spacing, radius } from '../lib/theme';
 import type { RootStackNav } from '../types';
-
-type Vertical = { code: string; displayName: string };
-
-function validatePassword(pw: string): boolean {
-  return pw.length >= 8 && /[A-Z]/.test(pw) && /[0-9]/.test(pw);
-}
 
 export default function SignupScreen() {
   const { t } = useLanguage();
@@ -31,73 +26,10 @@ export default function SignupScreen() {
   const navigation = useNavigation<RootStackNav>();
   const insets = useSafeAreaInsets();
 
-  const [ownerName, setOwnerName] = useState('');
-  const [merchantName, setMerchantName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [verticals, setVerticals] = useState<Vertical[]>([]);
-  const [businessType, setBusinessType] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    fetch(`${config.apiUrl}/v1/merchants/verticals`)
-      .then((res) => (res.ok ? res.json() : []))
-      .then((list: Vertical[]) => {
-        setVerticals(list);
-        if (list.length > 0) setBusinessType(list[0].code);
-      })
-      .catch(() => {});
-  }, []);
-
-  const handleRegister = async () => {
-    setError('');
-    if (!ownerName.trim() || !merchantName.trim() || !email.trim() || !password.trim() || !confirmPassword.trim() || !businessType) return;
-    if (!validatePassword(password)) {
-      setError(t('password_hint'));
-      return;
-    }
-    if (password !== confirmPassword) {
-      setError(t('passwords_do_not_match'));
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const res = await fetch(`${config.apiUrl}/api/merchant-register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ownerName: ownerName.trim(),
-          merchantName: merchantName.trim(),
-          email: email.trim(),
-          password,
-          businessType,
-        }),
-      });
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({})) as { error?: string };
-        if (body.error === 'email_conflict') throw new Error('email_conflict');
-        throw new Error('registration_failed');
-      }
-
-      await login(email.trim(), password);
-    } catch (e) {
-      // fetch() rejects with a raw TypeError on network failure; map anything unknown to network_error.
-      const msg = e instanceof Error ? e.message : '';
-      const key = msg === 'email_conflict' || msg === 'registration_failed' ? msg : 'network_error';
-      setError(t(key));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const canSubmit =
-    ownerName.trim() && merchantName.trim() && email.trim() && businessType &&
-    validatePassword(password) && password === confirmPassword;
+  const {fields, setField, verticals, verticalsLoading, verticalsError, retryVerticals,
+    loading, error, notice, canSubmit, handleRegister} = useMerchantSignup(login, t);
+  const {ownerName, merchantName, email, password, confirmPassword, businessType, operatingCountry} = fields;
 
   return (
     <LinearGradient colors={['#000000', '#0A0A1E', '#0D0D2B']} style={styles.gradient}>
@@ -111,11 +43,15 @@ export default function SignupScreen() {
           </TouchableOpacity>
 
           <View style={styles.header}>
-            <Ionicons name="storefront" size={28} color={colors.primary} />
-            <Text style={styles.title}>{t('create_account')}</Text>
+            <View style={styles.headerIcon}><Ionicons name="storefront-outline" size={24} color={colors.primary} /></View>
+            <View style={styles.headerCopy}>
+              <Text accessibilityRole="header" style={styles.title}>{t('create_account')}</Text>
+              <Text style={styles.subtitle}>{t('registration_subtitle')}</Text>
+            </View>
           </View>
 
           <View style={styles.card}>
+            {notice ? <View style={styles.noticeBox} accessibilityRole="alert"><Text style={styles.noticeText}>{notice}</Text></View> : null}
             {error ? (
               <View style={styles.errorBox}>
                 <Ionicons name="alert-circle-outline" size={16} color={colors.error} />
@@ -130,7 +66,7 @@ export default function SignupScreen() {
                 placeholder="Jane Doe"
                 placeholderTextColor={colors.gray500}
                 value={ownerName}
-                onChangeText={setOwnerName}
+                onChangeText={(value) => setField('ownerName', value)}
                 autoCapitalize="words"
               />
             </View>
@@ -142,26 +78,24 @@ export default function SignupScreen() {
                 placeholder="Jane's Café"
                 placeholderTextColor={colors.gray500}
                 value={merchantName}
-                onChangeText={setMerchantName}
+                onChangeText={(value) => setField('merchantName', value)}
                 autoCapitalize="words"
               />
             </View>
 
             <View style={styles.field}>
-              <Text style={styles.label}>{t('business_type')}</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
-                {verticals.map((v) => (
-                  <TouchableOpacity
-                    key={v.code}
-                    style={[styles.chip, businessType === v.code && styles.chipActive]}
-                    onPress={() => setBusinessType(v.code)}
-                  >
-                    <Text style={[styles.chipText, businessType === v.code && styles.chipTextActive]}>
-                      {v.displayName}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
+              <Text style={styles.label}>{t('registration_operating_country')}</Text>
+              <TextInput style={styles.input} value={operatingCountry} maxLength={2} autoCapitalize="characters"
+                onChangeText={(value) => setField('operatingCountry', value.toUpperCase())} placeholder="DE" placeholderTextColor={colors.gray500}/>
+              <Text style={styles.hint}>{t('registration_country_hint')}</Text>
+            </View>
+
+            <View style={styles.field}>
+              <Text style={styles.label}>{t('registration_business_type')}</Text>
+              {verticalsError ? <View accessibilityRole="alert"><Text style={styles.errorText}>{verticalsError}</Text>
+                <TouchableOpacity onPress={() => void retryVerticals()}><Text style={styles.loginLink}>{t('registration_retry')}</Text></TouchableOpacity></View> : null}
+              {!verticalsError ? <BusinessTypeAutocomplete options={verticals} value={businessType} loading={verticalsLoading}
+                onChange={code => setField('businessType', code)}/> : null}
             </View>
 
             <View style={styles.field}>
@@ -171,7 +105,7 @@ export default function SignupScreen() {
                 placeholder="you@example.com"
                 placeholderTextColor={colors.gray500}
                 value={email}
-                onChangeText={setEmail}
+                onChangeText={(value) => setField('email', value)}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -186,7 +120,7 @@ export default function SignupScreen() {
                   placeholder="••••••••"
                   placeholderTextColor={colors.gray500}
                   value={password}
-                  onChangeText={setPassword}
+                  onChangeText={(value) => setField('password', value)}
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"
                 />
@@ -207,7 +141,7 @@ export default function SignupScreen() {
                 placeholder="••••••••"
                 placeholderTextColor={colors.gray500}
                 value={confirmPassword}
-                onChangeText={setConfirmPassword}
+                onChangeText={(value) => setField('confirmPassword', value)}
                 secureTextEntry={!showPassword}
                 autoCapitalize="none"
               />
@@ -240,11 +174,16 @@ export default function SignupScreen() {
 }
 
 const styles = StyleSheet.create({
+  noticeBox: {padding: spacing.md, marginBottom: spacing.md, backgroundColor: 'rgba(0,194,255,0.12)', borderRadius: radius.md},
+  noticeText: {color: colors.primary, fontSize: 14, lineHeight: 20},
   gradient: { flex: 1 },
   flex: { flex: 1 },
   scroll: {
     flexGrow: 1,
     paddingHorizontal: spacing.md,
+    width: '100%',
+    maxWidth: 520,
+    alignSelf: 'center',
   },
   backBtn: {
     marginBottom: spacing.md,
@@ -252,15 +191,19 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
+    alignItems: 'flex-start',
+    gap: spacing.md,
     marginBottom: spacing.lg,
   },
   title: {
-    fontSize: 26,
+    fontSize: 25,
+    lineHeight: 32,
     fontWeight: '800',
     color: colors.white,
   },
+  headerIcon: {width: 48, height: 48, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,194,255,0.12)'},
+  headerCopy: {flex: 1, minWidth: 0},
+  subtitle: {fontSize: 14, lineHeight: 21, color: colors.gray300, marginTop: spacing.xs},
   card: {
     backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: radius.xxl,
@@ -297,22 +240,6 @@ const styles = StyleSheet.create({
   inputError: {
     borderColor: `${colors.error}80`,
   },
-  chipRow: { flexDirection: 'row' },
-  chip: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.full,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    marginRight: spacing.sm,
-  },
-  chipActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  chipText: { fontSize: 13, fontWeight: '600', color: colors.gray300 },
-  chipTextActive: { color: colors.black },
   passwordWrapper: { position: 'relative' },
   passwordInput: { paddingRight: 48 },
   eyeBtn: {
@@ -342,6 +269,7 @@ const styles = StyleSheet.create({
   },
   loginRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'center',
     marginTop: spacing.lg,
   },

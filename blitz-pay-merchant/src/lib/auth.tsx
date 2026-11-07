@@ -1,3 +1,4 @@
+import { merchantIdFromGroups, isMerchantGroup } from '../features/auth/services/merchantSignupClaims';
 import React, { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Platform } from 'react-native';
 import { storage } from './storage';
@@ -152,7 +153,10 @@ function resolveMerchantId(claims: Record<string, unknown>): string | null {
     if (nestedId) return nestedId;
   }
 
-  return null;
+  return merchantIdFromGroups([
+    ...readStringArrayClaim(claims, 'groups'), ...readStringArrayClaim(claims, 'access_group'),
+    ...readStringArrayClaim(claims, 'access_groups'),
+  ]);
 }
 
 function parseBranchMemberships(
@@ -177,7 +181,7 @@ function parseBranchMemberships(
 
       if (!match) {
         const isRoleGroup = groupPath === ROLE_GROUP_PREFIX || groupPath.startsWith(ROLE_GROUP_PREFIX + '/');
-        if (!isRoleGroup && (groupPath.includes('merchant') || groupPath.includes('branch'))) invalidCount += 1;
+        if (!isRoleGroup && !isMerchantGroup(groupPath) && (groupPath.includes('merchant') || groupPath.includes('branch'))) invalidCount += 1;
         continue;
       }
 
@@ -451,6 +455,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [biometricEnrolled, setBiometricEnrolled] = useState(false);
   const [biometricPromptDismissed, setBiometricPromptDismissed] = useState(false);
   const initStarted = useRef(false);
+  const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!isBypass) return;
@@ -575,9 +580,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function scheduleRefresh(session: StoredSession) {
+    if (refreshTimer.current) clearTimeout(refreshTimer.current);
     const ms = session.expiresAt - Date.now() - 60_000;
     if (ms > 0) {
-      setTimeout(() => {
+      refreshTimer.current = setTimeout(() => {
         void refreshAccessToken(session.refreshToken).then(async (renewed) => {
           if (renewed) {
             await storage.setItem(SESSION_KEY, JSON.stringify(renewed));
@@ -657,6 +663,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async (): Promise<void> => {
+    if (refreshTimer.current) clearTimeout(refreshTimer.current);
+    refreshTimer.current = null;
     await storage.deleteItem(SESSION_KEY);
     await writeActiveBranchId(null);
     setAuthenticated(false);
@@ -696,7 +704,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const stored = JSON.parse(raw) as StoredSession;
-    await applySessionUser(stored.accessToken, stored.idToken, 'manual_retry');
+    const renewed = await refreshAccessToken(stored.refreshToken);
+    if (!renewed) throw new Error('Unable to refresh branch access');
+    await storage.setItem(SESSION_KEY, JSON.stringify(renewed));
+    setToken(renewed.accessToken);
+    await applySessionUser(renewed.accessToken, renewed.idToken, 'manual_retry');
+    scheduleRefresh(renewed);
   };
 
   const selectActiveBranch = async (branchId: string): Promise<void> => {

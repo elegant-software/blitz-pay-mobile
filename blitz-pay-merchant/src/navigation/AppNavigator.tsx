@@ -1,3 +1,4 @@
+import MerchantSetupScreen from '../screens/MerchantSetupScreen';
 import React, { useState, useEffect } from 'react';
 import { View, ActivityIndicator, StyleSheet, Modal, Text, TouchableOpacity } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -32,7 +33,7 @@ import InvoicePdfScreen from '../screens/InvoicePdfScreen';
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function AppNavigator() {
-  const { initialized, authenticated, isBiometricAvailable, biometricEnrolled, biometricPromptDismissed, enrollBiometric, dismissBiometricPrompt } = useAuth();
+  const { user, branchScopeError, initialized, authenticated, isBiometricAvailable, biometricEnrolled, biometricPromptDismissed, enrollBiometric, dismissBiometricPrompt } = useAuth();
   const { t } = useLanguage();
   const [showBiometricPrompt, setShowBiometricPrompt] = useState(false);
 
@@ -48,6 +49,11 @@ export default function AppNavigator() {
         <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
+  }
+
+  if (authenticated && user?.role === 'MANAGER' && user.merchantId && user.branchMemberships.length === 0
+      && branchScopeError === 'merchant_branch_access_missing') {
+    return <MerchantSetupScreen />;
   }
 
   return (

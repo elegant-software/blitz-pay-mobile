@@ -93,6 +93,7 @@ Set `EXPO_PUBLIC_AUTH_BYPASS=true` in `blitz-pay-merchant/.env`.
 **GitHub Actions conventions**: file prefixes (`ci-`, `cd-`, `release-`, `pr-`, `cleanup-`, `automation-`), `name: <Category> · <What>`, a `run-name` on dispatch/schedule workflows, a `name:` on every job, and results in the job summary. Follow [`docs/github-actions-conventions.md`](https://github.com/elegant-software/elegant-ci-cd-pipeline/blob/main/docs/github-actions-conventions.md) in `elegant-ci-cd-pipeline` for any new or changed workflow.
 
 ## Recent Changes
+- Merchant self-registration uses public `GET /v1/merchants/verticals` and `POST /v1/merchant-registrations`. Keep networking in `features/auth/services` and form state in its hook. Signup creates an owner and business, then requires an administrator to add and activate the first branch. Owners with valid merchant claims and no branch see `MerchantSetupScreen`; refreshing access renews their token before resolving assignments. Honour realm email verification and keep registration successful if automatic login fails. Both English and German messages are required. Deploy the matching backend first; server mode uses `https://api-blitzpay-staging.zackpay.de` and the configured `blitzpay-mobile` Keycloak client. Do not commit `.env.local`.
 - Renamed `mobile/` → `blitz-pay/` (consumer app)
 - Created `blitz-pay-merchant/` (merchant portal — Dashboard, Orders, Products, Payments, QR, Account)
 - Removed root web SPA (Vite/React/Tailwind) — both products are now pure React Native / Expo
