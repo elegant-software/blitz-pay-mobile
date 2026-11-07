@@ -66,7 +66,7 @@ export default function SignupScreen() {
 
     setLoading(true);
     try {
-      const res = await fetch(`${config.apiUrl}/api/merchant-register`, {
+      const res = await fetch(`${config.apiUrl}/v1/signup/merchant`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
