@@ -29,7 +29,7 @@ export default function MerchantQRCodeScreen() {
   const navigation = useNavigation();
   const route = useRoute<RouteProps>();
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
+  const { user, activeBranchScope } = useAuth();
 
   const [amountStr, setAmountStr] = useState(route.params?.amount ? String(route.params.amount) : '');
   const [label, setLabel] = useState(route.params?.label ?? '');
@@ -63,7 +63,8 @@ export default function MerchantQRCodeScreen() {
         {/* QR code */}
         <View style={[styles.qrCard, shadow.lg]}>
           <QRCode value={qrValue} size={220} color={colors.onSurface} backgroundColor={colors.white} />
-          <Text style={styles.merchantName}>{user?.name ?? 'Merchant'}</Text>
+          <Text style={styles.merchantName}>{activeBranchScope?.merchantName ?? user?.name ?? 'Merchant'}</Text>
+          {activeBranchScope?.branchName ? <Text style={styles.amountHint}>{activeBranchScope.branchName}</Text> : null}
           {amount ? (
             <Text style={styles.amountHint}>
               {new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(amount)}

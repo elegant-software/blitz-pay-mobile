@@ -1,4 +1,4 @@
-name: Mobile Quality Checks
+name: CI · Mobile Quality
 
 on:
   workflow_call:
@@ -13,14 +13,14 @@ permissions:
 
 jobs:
   quality:
-    name: Lint, Typecheck, Test
+    name: Lint, typecheck, test ${{ inputs.app-directory }}
     runs-on: ubuntu-latest
     env:
       APP_DIR: ${{ inputs.app-directory }}
       NODE_VERSION: ${{ vars.MOBILE_NODE_VERSION || vars.NODE_VERSION || '20' }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Validate Expo app files
         working-directory: ${{ env.APP_DIR }}
@@ -32,7 +32,7 @@ jobs:
           }
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm

@@ -14,7 +14,7 @@ import { useMerchantKpi, toIsoDate } from '../features/reporting/hooks/useMercha
 import { useMerchantOrders } from '../features/orders/hooks/useMerchantOrders';
 import { useMerchantProducts } from '../features/products/hooks/useMerchantProducts';
 import { useMerchantFeatures } from '../lib/useMerchantFeatures';
-import { getMerchantOrderStatusLabelKey } from '../features/orders/orderPresentation';
+import { formatPickupNumber, getMerchantOrderStatusLabelKey } from '../features/orders/orderPresentation';
 import type { MerchantOrderStatus } from '../features/orders/types/order';
 import type { PaymentMethodFrequency } from '../features/reporting/types/kpi';
 import type { RootStackNav } from '../types';
@@ -130,7 +130,8 @@ export default function DashboardScreen() {
           <View style={styles.headerTop}>
             <View>
               <Text style={styles.greeting}>Good morning,</Text>
-              <Text style={styles.merchantName}>{user?.name ?? 'Merchant'}</Text>
+              <Text style={styles.merchantName}>{activeBranchScope?.merchantName ?? user?.name ?? 'Merchant'}</Text>
+              {activeBranchScope?.branchName ? <Text style={styles.greeting}>{activeBranchScope.branchName}</Text> : null}
             </View>
             <View style={styles.headerActions}>
               <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('Notifications')}>
@@ -311,7 +312,10 @@ export default function DashboardScreen() {
               activeOpacity={0.7}
             >
               <View style={styles.orderLeft}>
-                <Text style={styles.orderNum}>{order.orderId.slice(-8).toUpperCase()}</Text>
+                <Text style={styles.orderNum}>
+                  {order.pickupNumber != null ? `${formatPickupNumber(order.pickupNumber)} · ` : ''}
+                  {order.orderId.slice(-8).toUpperCase()}
+                </Text>
               </View>
               <View style={styles.orderRight}>
                 <Text style={styles.orderAmount}>{formatCurrency(order.amountMinor, order.currency)}</Text>

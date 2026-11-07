@@ -1,4 +1,8 @@
-name: Mobile React Native Build
+name: CD · Build Mobile App (EAS)
+run-name: >-
+  Build ${{ inputs.app-directory || './blitz-pay' }} ·
+  ${{ inputs.eas-platform || 'android' }} · ${{ inputs.eas-profile || 'aws-staging' }}
+  ${{ !inputs.run-eas-build && '(quality only)' || '' }}
 
 on:
   workflow_dispatch:
@@ -118,7 +122,7 @@ defaults:
 
 jobs:
   resolve-config:
-    name: Resolve Workflow Configuration
+    name: Resolve Configuration
     runs-on: ubuntu-latest
     outputs:
       app_directory: ${{ steps.resolve.outputs.app_directory }}
@@ -151,7 +155,7 @@ jobs:
   quality:
     name: Quality
     needs: resolve-config
-    uses: ./.github/workflows/mobile-quality.yml
+    uses: ./.github/workflows/ci-mobile-quality.yml
     with:
       app-directory: ${{ needs.resolve-config.outputs.app_directory }}
 
@@ -159,12 +163,12 @@ jobs:
     name: Device Tests
     needs: [resolve-config, quality]
     if: ${{ needs.resolve-config.outputs.run_device_tests == 'true' }}
-    uses: ./.github/workflows/mobile-device-tests.yml
+    uses: ./.github/workflows/ci-mobile-device-tests.yml
     with:
       app-directory: ${{ needs.resolve-config.outputs.app_directory }}
 
   eas-build:
-    name: EAS Build
+    name: EAS Build (${{ needs.resolve-config.outputs.eas_platform }}, ${{ needs.resolve-config.outputs.eas_profile }})
     runs-on: ubuntu-latest
     needs: [resolve-config, quality]
     if: ${{ needs.resolve-config.outputs.run_eas_build == 'true' }}
@@ -182,7 +186,7 @@ jobs:
       EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Validate EXPO_TOKEN
         run: |
@@ -198,7 +202,7 @@ jobs:
           test -f eas.json || { echo "eas.json not found in $(pwd)"; exit 1; }
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -209,7 +213,7 @@ jobs:
         run: npm ci
 
       - name: Setup Expo and EAS
-        uses: expo/expo-github-action@v8
+        uses: expo/expo-github-action@v9
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
@@ -348,14 +352,26 @@ jobs:
 
           node ./scripts/eas-build-async.js \
             --profile "$REQUESTED_PROFILE" \
-            --platforms "$platforms"
+            --platforms "$platforms" | tee "$RUNNER_TEMP/eas-build.log"
+
+      - name: Add EAS build to job summary
+        if: ${{ always() && steps.duplicate-build-check.outputs.skip_build != 'true' }}
+        run: |
+          version="${{ steps.release-version.outputs.app_version }}"
+          {
+            echo "### 📱 EAS build ${version:+v$version }· ${REQUESTED_PLATFORM} · ${REQUESTED_PROFILE}"
+            echo '```'
+            grep -E '^\[(ios|android)\] (started|completed|status: (errored|canceled))' "$RUNNER_TEMP/eas-build.log" 2>/dev/null || echo "No EAS build output captured."
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "::notice title=EAS build::${version:+v$version }${REQUESTED_PLATFORM} (${REQUESTED_PROFILE}) — ${{ job.status }}"
 
       - name: Duplicate build detected
         if: ${{ steps.duplicate-build-check.outputs.skip_build == 'true' }}
         run: echo "Skipped EAS build because an active build with the same version/profile/platform is already running."
 
   eas-update:
-    name: Publish EAS Update
+    name: Publish EAS Update (${{ needs.resolve-config.outputs.eas_profile }})
     runs-on: ubuntu-latest
     needs: [resolve-config, eas-build]
     if: ${{ needs.resolve-config.outputs.run_eas_update == 'true' }}
@@ -372,7 +388,7 @@ jobs:
       EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Validate EXPO_TOKEN
         run: |
@@ -382,7 +398,7 @@ jobs:
           fi
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -393,7 +409,7 @@ jobs:
         run: npm ci
 
       - name: Setup Expo and EAS
-        uses: expo/expo-github-action@v8
+        uses: expo/expo-github-action@v9
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
@@ -471,8 +487,19 @@ jobs:
             --message "${{ steps.release-notes.outputs.update_message }}" \
             --platform all
 
+      - name: Add EAS update to job summary
+        env:
+          UPDATE_MESSAGE: ${{ steps.release-notes.outputs.update_message }}
+        run: |
+          {
+            echo "### 🔄 Published EAS update to channel \`${EAS_PROFILE:-aws-staging}\`"
+            echo
+            echo "> ${UPDATE_MESSAGE}"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "::notice title=EAS update::channel ${EAS_PROFILE:-aws-staging}"
+
   store-submit:
-    name: Submit to App Stores (feature-flagged)
+    name: Submit to App Stores (${{ needs.resolve-config.outputs.eas_profile }})
     runs-on: ubuntu-latest
     needs: [resolve-config, eas-build]
     if: ${{ needs.resolve-config.outputs.submit_to_app_stores == 'true' && vars.ENABLE_STORE_SUBMIT == 'true' }}
@@ -482,10 +509,10 @@ jobs:
       REQUESTED_PROFILE: ${{ needs.resolve-config.outputs.eas_profile }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -496,7 +523,7 @@ jobs:
         run: npm ci
 
       - name: Setup Expo and EAS
-        uses: expo/expo-github-action@v8
+        uses: expo/expo-github-action@v9
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}

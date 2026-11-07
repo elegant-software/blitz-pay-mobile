@@ -8,6 +8,7 @@ import { colors, spacing, radius } from '../lib/theme';
 import type { RootStackParamList } from '../types';
 
 import LoginScreen from '../screens/LoginScreen';
+import SignupScreen from '../screens/SignupScreen';
 import TabNavigator from './TabNavigator';
 import OrderDetailScreen from '../screens/OrderDetailScreen';
 import ProductEditScreen from '../screens/ProductEditScreen';
@@ -53,7 +54,10 @@ export default function AppNavigator() {
     <>
     <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
       {!authenticated ? (
-        <Stack.Screen name="Login" component={LoginScreen} />
+        <>
+          <Stack.Screen name="Login" component={LoginScreen} />
+          <Stack.Screen name="Signup" component={SignupScreen} />
+        </>
       ) : (
         <>
           <Stack.Screen name="Main" component={TabNavigator} options={{ animation: 'fade' }} />

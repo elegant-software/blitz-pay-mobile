@@ -1,0 +1,64 @@
+name: Release · Create Release
+run-name: "Release notes from ${{ inputs.base_branch || 'main' }}${{ inputs.release_boundary && format(' since {0}', inputs.release_boundary) || '' }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_boundary:
+        description: 'Tag to diff from (e.g. v1.2.3). Leave blank to use latest tag.'
+        required: false
+        type: string
+        default: ''
+      base_branch:
+        description: 'Branch to collect merged PRs from'
+        required: false
+        type: string
+        default: main
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  notes:
+    name: Release Notes
+    uses: elegant-software/elegant-ci-cd-pipeline/.github/workflows/release-notes.yml@main
+    with:
+      base_branch: ${{ inputs.base_branch }}
+      release_boundary: ${{ inputs.release_boundary }}
+    permissions:
+      contents: write
+      pull-requests: read
+
+  summary:
+    name: Report Release Decision
+    needs: notes
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Add release decision to job summary
+        env:
+          RELEASE_REQUIRED: ${{ needs.notes.outputs.release_required }}
+          VERSION_BUMP: ${{ needs.notes.outputs.version_bump }}
+          NEXT_VERSION: ${{ needs.notes.outputs.next_version }}
+          INCLUDED_PR_COUNT: ${{ needs.notes.outputs.included_pr_count }}
+          DECISION_REASON: ${{ needs.notes.outputs.decision_reason }}
+          RELEASE_NOTES_MARKDOWN: ${{ needs.notes.outputs.release_notes_markdown }}
+        run: |
+          if [ "$RELEASE_REQUIRED" = "true" ]; then
+            headline="📦 Release v${NEXT_VERSION} (${VERSION_BUMP} bump, ${INCLUDED_PR_COUNT} PRs)"
+          else
+            headline="⏭️ No release: ${DECISION_REASON:-not required}"
+          fi
+          {
+            echo "### ${headline}"
+            echo
+            echo "| Release required | Version bump | Next version | Included PRs |"
+            echo "|---|---|---|---|"
+            echo "| ${RELEASE_REQUIRED:-false} | ${VERSION_BUMP:-—} | ${NEXT_VERSION:-—} | ${INCLUDED_PR_COUNT:-0} |"
+            if [ "$RELEASE_REQUIRED" = "true" ]; then
+              echo
+              echo "${RELEASE_NOTES_MARKDOWN}"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "::notice title=Release decision::${headline}"

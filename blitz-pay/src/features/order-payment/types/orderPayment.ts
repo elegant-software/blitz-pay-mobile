@@ -16,6 +16,8 @@ export type OrderStatus =
   | 'PAID'
   | 'PAYMENT_FAILED'
   | 'CANCELLED';
+/** Kitchen-side progress of an order, independent of payment status. */
+export type PreparationStatus = 'RECEIVED' | 'PREPARING' | 'READY';
 
 export interface CreateOrderItemInput {
   lineId?: string;
@@ -105,6 +107,9 @@ export interface OrderSummary {
   dueDate?: string;
   /** True when the order uses deferred payment (PAY_LATER / invoice order). */
   usesDeferredPayment?: boolean;
+  preparationStatus?: PreparationStatus;
+  /** Number staff call out at pickup. Null for legacy orders and orders without a Branch. */
+  pickupNumber?: number | null;
 }
 
 export interface RecentOrderSummary extends OrderSummary {
@@ -206,4 +211,9 @@ export function mapOrderStatusToPaymentResult(
   if (status === 'CANCELLED') return 'cancelled';
   if (status === 'PAYMENT_IN_PROGRESS') return 'processing';
   return 'pending';
+}
+
+/** "#042": the Pickup Number as staff call it out (matches the backend push text). */
+export function formatPickupNumber(pickupNumber: number): string {
+  return `#${String(pickupNumber).padStart(3, '0')}`;
 }

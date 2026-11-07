@@ -149,7 +149,7 @@ Optional flags: `--profile <profile>`, `--platforms ios,android`, `--poll-ms <ms
 
 ### GitHub Actions
 
-Workflow: `.github/workflows/mobile-react-native-build.yml`
+Workflow: `.github/workflows/cd-build-mobile-app.yml`
 
 - Defaults to `./blitz-pay`. Pass `app-directory: ./blitz-pay-merchant` to build the merchant app.
 - Duplicate-build guard: skips EAS if a build with the same version/profile/platform is already running.

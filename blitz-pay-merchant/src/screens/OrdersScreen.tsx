@@ -17,11 +17,13 @@ import {
   getMerchantOrderSectionTitleKey,
   getMerchantOrderStatusIcon,
   getMerchantOrderStatusLabelKey,
+  formatPickupNumber,
   MERCHANT_ORDER_PREVIEW_COUNT,
   MERCHANT_ORDER_SECTION_ORDER,
   type MerchantOrderSectionKey,
 } from '../features/orders/orderPresentation';
 import type { MerchantOrderStatus, MerchantOrderSummary } from '../features/orders/types/order';
+import { PreparationStatusBadge } from '../features/orders/components/PreparationStatusBadge';
 
 const STATUS_COLORS: Record<MerchantOrderStatus, string> = {
   awaiting_payment: colors.warning,
@@ -301,10 +303,18 @@ export default function OrdersScreen() {
                   <View style={styles.orderBody}>
                     <View style={styles.orderTop}>
                       <View style={styles.orderHeading}>
+                        {order.pickupNumber != null ? (
+                          <Text style={styles.pickupNumber}>{formatPickupNumber(order.pickupNumber)}</Text>
+                        ) : null}
                         <Text style={styles.orderNum}>{t('order_number')}{order.orderId}</Text>
                         <Text style={[styles.statusText, { color: STATUS_COLORS[order.status] }]}>
                           {t(getMerchantOrderStatusLabelKey(order.status))}
                         </Text>
+                        {order.preparationStatus ? (
+                          <View style={styles.preparationBadgeWrap}>
+                            <PreparationStatusBadge status={order.preparationStatus} />
+                          </View>
+                        ) : null}
                       </View>
                       <View style={styles.orderAmountStack}>
                         <Text style={styles.orderAmount}>{formatCurrency(order.amountMinor, order.currency)}</Text>
@@ -391,6 +401,8 @@ const styles = StyleSheet.create({
   orderHeading: { flex: 1 },
   orderNum: { fontSize: 15, fontWeight: '700', color: colors.onSurface },
   statusText: { marginTop: 4, fontSize: 12, fontWeight: '700' },
+  pickupNumber: { fontSize: 18, fontWeight: '800', color: colors.onSurface, marginBottom: 2 },
+  preparationBadgeWrap: { marginTop: 6 },
   orderMetaRow: { marginTop: spacing.sm, flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   orderMeta: { fontSize: 12, color: colors.gray600 },
   orderAmountStack: { alignItems: 'flex-end', gap: 4, maxWidth: 118 },
