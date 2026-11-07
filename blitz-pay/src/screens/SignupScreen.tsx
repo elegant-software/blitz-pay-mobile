@@ -52,7 +52,7 @@ export default function SignupScreen() {
 
     setLoading(true);
     try {
-      const res = await fetch(`${config.apiUrl}/api/register`, {
+      const res = await fetch(`${config.apiUrl}/v1/signup/shopper`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: name.trim(), email: email.trim(), password }),
@@ -66,8 +66,10 @@ export default function SignupScreen() {
 
       await login(email.trim(), password);
     } catch (e) {
-      const key = e instanceof Error ? e.message : 'registration_failed';
-      setError(t(key as 'email_conflict' | 'registration_failed' | 'network_error'));
+      // fetch() rejects with a raw TypeError on network failure; map anything unknown to network_error.
+      const msg = e instanceof Error ? e.message : '';
+      const key = msg === 'email_conflict' || msg === 'registration_failed' ? msg : 'network_error';
+      setError(t(key));
     } finally {
       setLoading(false);
     }
