@@ -13,6 +13,7 @@ import type {
   MerchantPreparationStatus,
   MerchantUpdateOrderLineQuantityInput,
 } from '../types/order';
+import { readApiError } from '../../../lib/apiError';
 
 interface RawOrderItem {
   itemId?: string;
@@ -156,24 +157,6 @@ function parseDetail(raw: RawOrder): MerchantOrderDetail {
   };
 }
 
-async function readError(response: Response): Promise<string> {
-  try {
-    const text = await response.text();
-    if (!text.trim()) return `HTTP ${response.status}`;
-    try {
-      const json = JSON.parse(text) as Record<string, unknown>;
-      const detail = typeof json.error === 'string' ? json.error
-        : typeof json.message === 'string' ? json.message
-        : null;
-      return detail ?? text.slice(0, 500);
-    } catch {
-      return text.slice(0, 500);
-    }
-  } catch {
-    return `HTTP ${response.status}`;
-  }
-}
-
 export class MerchantOrderError extends Error {
   constructor(
     public readonly key: string,
@@ -206,7 +189,7 @@ async function mutateOrder(
   });
 
   if (!response.ok) {
-    const reason = await readError(response);
+    const reason = await readApiError(response);
     observability.error('merchant_order_mutation_failed', {
       orderId,
       path,
@@ -265,7 +248,7 @@ export async function createMerchantOrder(
   });
 
   if (!response.ok) {
-    const reason = await readError(response);
+    const reason = await readApiError(response);
     observability.error('merchant_order_create_failed', { merchantId, branchId, status: response.status, reason });
     throw new MerchantOrderError('merchant_order_create_failed', reason, response.status);
   }
@@ -285,7 +268,7 @@ export async function fetchMerchantOrders(branchId: string): Promise<MerchantOrd
   });
 
   if (!response.ok) {
-    const reason = await readError(response);
+    const reason = await readApiError(response);
     observability.error('merchant_orders_request_failed', { branchId, status: response.status, reason });
     throw new Error('merchant_orders_load_failed');
   }
@@ -327,7 +310,7 @@ export async function fetchMerchantOrderDetail(orderId: string, activeBranchScop
   });
 
   if (!response.ok) {
-    const reason = await readError(response);
+    const reason = await readApiError(response);
     observability.error('merchant_order_detail_failed', {
       orderId,
       merchantId: activeBranchScope.merchantId,
@@ -378,7 +361,7 @@ export async function fetchMerchantOrderInvoice(
   });
   if (response.status === 404) return null;
   if (!response.ok) {
-    const reason = await readError(response);
+    const reason = await readApiError(response);
     observability.warn('merchant_order_invoice_fetch_failed', {
       orderId,
       merchantId: activeBranchScope.merchantId,
@@ -463,7 +446,7 @@ export async function fetchBranchCustomers(branchId: string): Promise<BranchCust
   );
 
   if (!response.ok) {
-    const reason = await readError(response);
+    const reason = await readApiError(response);
     observability.error('branch_customers_request_failed', { branchId, status: response.status, reason });
     throw new MerchantOrderError('branch_customers_load_failed', reason, response.status);
   }
@@ -490,7 +473,7 @@ export async function searchShopperByEmail(email: string): Promise<BranchCustome
     return null;
   }
   if (!response.ok) {
-    const reason = await readError(response);
+    const reason = await readApiError(response);
     observability.error('shopper_search_failed', { email, status: response.status, reason });
     throw new MerchantOrderError('shopper_search_failed', reason, response.status);
   }

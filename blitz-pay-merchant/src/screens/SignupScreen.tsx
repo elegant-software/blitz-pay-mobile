@@ -18,6 +18,7 @@ import { useLanguage } from '../lib/LanguageContext';
 import { config } from '../lib/config';
 import { colors, spacing, radius } from '../lib/theme';
 import type { RootStackNav } from '../types';
+import { readApiProblem } from '../lib/apiError';
 
 type Vertical = { code: string; displayName: string };
 
@@ -79,8 +80,7 @@ export default function SignupScreen() {
       });
 
       if (!res.ok) {
-        const body = await res.json().catch(() => ({})) as { error?: string };
-        if (body.error === 'email_conflict') throw new Error('email_conflict');
+        if ((await readApiProblem(res)).code === 'EMAIL_CONFLICT') throw new Error('email_conflict');
         throw new Error('registration_failed');
       }
 

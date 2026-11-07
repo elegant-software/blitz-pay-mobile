@@ -6,6 +6,7 @@ import type {
   RescheduleAppointmentRequest,
   OverrideAppointmentRequest,
 } from '../types/appointment';
+import { readApiError } from '../../../lib/apiError';
 
 export type AppointmentErrorKey =
   | 'appointment_book_failed'
@@ -24,29 +25,6 @@ export class AppointmentError extends Error {
   ) {
     super(i18nKey);
     this.name = 'AppointmentError';
-  }
-}
-
-async function readError(response: Response): Promise<string> {
-  try {
-    const text = await response.text();
-    if (!text.trim()) return `HTTP ${response.status}`;
-    try {
-      const json = JSON.parse(text) as Record<string, unknown>;
-      const detail =
-        typeof json.error === 'string'
-          ? json.error
-          : typeof json.message === 'string'
-          ? json.message
-          : typeof json.detail === 'string'
-          ? json.detail
-          : null;
-      return detail ?? text.slice(0, 500);
-    } catch {
-      return text.slice(0, 500);
-    }
-  } catch {
-    return `HTTP ${response.status}`;
   }
 }
 
@@ -98,7 +76,7 @@ export async function fetchMerchantAppointments(
   );
 
   if (!response.ok) {
-    const reason = await readError(response);
+    const reason = await readApiError(response);
     observability.error('merchant_appointments_request_failed', {
       merchantId,
       status: response.status,
@@ -136,7 +114,7 @@ export async function fetchEmployeeAppointments(
   );
 
   if (!response.ok) {
-    const reason = await readError(response);
+    const reason = await readApiError(response);
     observability.error('employee_appointments_request_failed', {
       merchantId,
       employeeId,
@@ -191,7 +169,7 @@ export async function bookMerchantAppointment(
   }
 
   if (!response.ok) {
-    const reason = await readError(response);
+    const reason = await readApiError(response);
     observability.error('merchant_appointment_book_failed', {
       merchantId,
       branchId: request.branchId,
@@ -243,7 +221,7 @@ export async function cancelAppointment(
   );
 
   if (!response.ok) {
-    const reason = await readError(response);
+    const reason = await readApiError(response);
     observability.error('merchant_appointment_cancel_failed', {
       merchantId,
       appointmentId,
@@ -268,7 +246,7 @@ export async function completeAppointment(
   );
 
   if (!response.ok) {
-    const reason = await readError(response);
+    const reason = await readApiError(response);
     observability.error('merchant_appointment_complete_failed', {
       merchantId,
       appointmentId,
@@ -304,7 +282,7 @@ export async function rescheduleAppointment(
   );
 
   if (!response.ok) {
-    const reason = await readError(response);
+    const reason = await readApiError(response);
     observability.error('merchant_appointment_reschedule_failed', {
       merchantId,
       appointmentId,
@@ -338,7 +316,7 @@ export async function overrideAppointment(
   );
 
   if (!response.ok) {
-    const reason = await readError(response);
+    const reason = await readApiError(response);
     observability.error('merchant_appointment_override_failed', {
       merchantId,
       appointmentId,

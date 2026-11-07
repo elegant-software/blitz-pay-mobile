@@ -52,7 +52,7 @@ Three similar lines beat a premature abstraction. No framework-ish helpers, feat
 
 When a backend API call fails with a non-2xx response, the service layer MUST:
 
-1. **Parse the error body** — attempt to extract a human-readable detail from the response JSON (`error` field first, then `message`). Fall back to raw text, then `HTTP <status>`.
+1. **Parse the error body with `src/lib/apiError.ts`** — the backend returns every error as an RFC 9457 `ProblemDetail`: `{ status, title, detail, code }` (see the backend's `reference/api-error-responses.md`). Use `readApiError(response)` for the display text (`detail`, else `HTTP <status>`) and `readApiProblem(response)` when you need `code`. **Branch on `code`** (e.g. `EMAIL_CONFLICT`, `OUTSIDE_GEOFENCE`), never on `detail` text — its wording can change. There is no `error` or `message` field; never write a local `readError` parser.
 2. **Log before throwing** — call `observability.error` with the raw detail and HTTP status *before* throwing. Never swallow the backend's reason.
 3. **Throw a typed domain error** — e.g. `MerchantOrderError`, `MerchantProductError` — that carries both an `i18nKey` (for telemetry/fallback) and the extracted `detail` string (for display).
 
@@ -64,7 +64,7 @@ The calling screen/hook MUST:
 **Pattern (service layer)**:
 ```typescript
 if (!response.ok) {
-  const reason = await readError(response); // extracts json.error ?? json.message ?? raw text
+  const reason = await readApiError(response); // ProblemDetail `detail`, else `HTTP <status>`
   observability.error('my_operation_failed', { status: response.status, reason });
   throw new MyDomainError('my_operation_failed', reason, response.status);
 }
@@ -80,6 +80,7 @@ if (!response.ok) {
 **Forbidden**:
 - `catch { setError(t('generic_key')) }` when the service already has the backend reason.
 - Throwing `new Error('some_key')` from a service without attaching the backend detail.
+- Reading `json.error` / `json.message`, or comparing `detail` text — use `code` from `readApiProblem`.
 
 ### IX. App Targeting Must Follow Product Intent
 Changes must be applied to the product that matches the business domain named in the request. Merchant-facing features, fixes, and catalog/admin workflows belong in `blitz-pay-merchant/`. Consumer-facing discovery, checkout, payment, and shopper flows belong in `blitz-pay/`. If the target app is ambiguous, stop and confirm before editing code.

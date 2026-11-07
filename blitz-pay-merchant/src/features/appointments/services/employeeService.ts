@@ -1,5 +1,6 @@
 import { authedFetch } from '../../../lib/api';
 import { observability } from '../../../lib/observability';
+import { readApiError } from '../../../lib/apiError';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -85,29 +86,6 @@ export interface AppointmentPolicy {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-async function readError(response: Response): Promise<string> {
-  try {
-    const text = await response.text();
-    if (!text.trim()) return `HTTP ${response.status}`;
-    try {
-      const json = JSON.parse(text) as Record<string, unknown>;
-      const detail =
-        typeof json.error === 'string'
-          ? json.error
-          : typeof json.message === 'string'
-          ? json.message
-          : typeof json.detail === 'string'
-          ? json.detail
-          : null;
-      return detail ?? text.slice(0, 500);
-    } catch {
-      return text.slice(0, 500);
-    }
-  } catch {
-    return `HTTP ${response.status}`;
-  }
-}
-
 // ─── Employee CRUD ────────────────────────────────────────────────────────────
 
 export async function fetchEmployees(merchantId: string): Promise<EmployeeResponse[]> {
@@ -117,7 +95,7 @@ export async function fetchEmployees(merchantId: string): Promise<EmployeeRespon
     { method: 'GET', headers: { Accept: 'application/json' } },
   );
   if (!response.ok) {
-    const reason = await readError(response);
+    const reason = await readApiError(response);
     observability.error('employees_fetch_failed', { merchantId, status: response.status, reason });
     throw new Error('employees_load_failed');
   }
@@ -137,7 +115,7 @@ export async function createEmployee(merchantId: string, name: string): Promise<
     },
   );
   if (!response.ok) {
-    const reason = await readError(response);
+    const reason = await readApiError(response);
     observability.error('employee_create_failed', { merchantId, status: response.status, reason });
     throw new Error('employee_create_failed');
   }
@@ -161,7 +139,7 @@ export async function renameEmployee(
     },
   );
   if (!response.ok) {
-    const reason = await readError(response);
+    const reason = await readApiError(response);
     observability.error('employee_rename_failed', { merchantId, employeeId, status: response.status, reason });
     throw new Error('employee_rename_failed');
   }
@@ -180,7 +158,7 @@ export async function activateEmployee(
     { method: 'PUT', headers: { Accept: 'application/json' } },
   );
   if (!response.ok) {
-    const reason = await readError(response);
+    const reason = await readApiError(response);
     observability.error('employee_activate_failed', { merchantId, employeeId, status: response.status, reason });
     throw new Error('employee_activate_failed');
   }
@@ -199,7 +177,7 @@ export async function deactivateEmployee(
     { method: 'PUT', headers: { Accept: 'application/json' } },
   );
   if (!response.ok) {
-    const reason = await readError(response);
+    const reason = await readApiError(response);
     observability.error('employee_deactivate_failed', {
       merchantId,
       employeeId,
@@ -242,7 +220,7 @@ export async function addEmployeeBranchAssignment(
     },
   );
   if (!response.ok) {
-    const reason = await readError(response);
+    const reason = await readApiError(response);
     throw new Error(reason);
   }
 }
@@ -257,7 +235,7 @@ export async function removeEmployeeBranchAssignment(
     { method: 'DELETE', headers: { Accept: 'application/json' } },
   );
   if (!response.ok) {
-    const reason = await readError(response);
+    const reason = await readApiError(response);
     throw new Error(reason);
   }
 }
@@ -300,7 +278,7 @@ export async function addEmployeeServiceAssignment(
     },
   );
   if (!response.ok) {
-    const reason = await readError(response);
+    const reason = await readApiError(response);
     throw new Error(reason);
   }
 }
@@ -315,7 +293,7 @@ export async function removeEmployeeServiceAssignment(
     { method: 'DELETE', headers: { Accept: 'application/json' } },
   );
   if (!response.ok) {
-    const reason = await readError(response);
+    const reason = await readApiError(response);
     throw new Error(reason);
   }
 }
@@ -360,7 +338,7 @@ export async function addWeeklyAvailabilitySlot(
     },
   );
   if (!response.ok) {
-    const reason = await readError(response);
+    const reason = await readApiError(response);
     throw new Error(reason);
   }
   const item = await response.json() as { id: string; dayOfWeek: number; startTime: unknown; endTime: unknown };
@@ -383,7 +361,7 @@ export async function removeWeeklyAvailabilitySlot(
     { method: 'DELETE', headers: { Accept: 'application/json' } },
   );
   if (!response.ok) {
-    const reason = await readError(response);
+    const reason = await readApiError(response);
     throw new Error(reason);
   }
 }
@@ -418,7 +396,7 @@ export async function addAvailabilityException(
     },
   );
   if (!response.ok) {
-    const reason = await readError(response);
+    const reason = await readApiError(response);
     throw new Error(reason);
   }
   return (await response.json()) as AvailabilityException;
@@ -435,7 +413,7 @@ export async function removeAvailabilityException(
     { method: 'DELETE', headers: { Accept: 'application/json' } },
   );
   if (!response.ok) {
-    const reason = await readError(response);
+    const reason = await readApiError(response);
     throw new Error(reason);
   }
 }
@@ -449,7 +427,7 @@ export async function fetchAppointmentPolicy(merchantId: string): Promise<Appoin
     { method: 'GET', headers: { Accept: 'application/json' } },
   );
   if (!response.ok) {
-    const reason = await readError(response);
+    const reason = await readApiError(response);
     observability.error('appointment_policy_fetch_failed', { merchantId, status: response.status, reason });
     throw new Error('appointment_policy_load_failed');
   }
@@ -510,7 +488,7 @@ export async function addBranchOpeningWindow(
     },
   );
   if (!response.ok) {
-    const reason = await readError(response);
+    const reason = await readApiError(response);
     throw new Error(reason);
   }
   const item = await response.json() as { id: string; branchId: string; dayOfWeek: number; startTime: unknown; endTime: unknown };
@@ -527,7 +505,7 @@ export async function removeBranchOpeningWindow(
     { method: 'DELETE', headers: { Accept: 'application/json' } },
   );
   if (!response.ok) {
-    const reason = await readError(response);
+    const reason = await readApiError(response);
     throw new Error(reason);
   }
 }
@@ -558,7 +536,7 @@ export async function addBranchOpeningException(
     },
   );
   if (!response.ok) {
-    const reason = await readError(response);
+    const reason = await readApiError(response);
     throw new Error(reason);
   }
   return (await response.json()) as BranchOpeningException;
@@ -574,7 +552,7 @@ export async function removeBranchOpeningException(
     { method: 'DELETE', headers: { Accept: 'application/json' } },
   );
   if (!response.ok) {
-    const reason = await readError(response);
+    const reason = await readApiError(response);
     throw new Error(reason);
   }
 }
@@ -594,7 +572,7 @@ export async function updateProductCategory(
     },
   );
   if (!response.ok) {
-    const reason = await readError(response);
+    const reason = await readApiError(response);
     throw new Error(reason);
   }
 }
@@ -613,7 +591,7 @@ export async function patchAppointmentPolicy(
     },
   );
   if (!response.ok) {
-    const reason = await readError(response);
+    const reason = await readApiError(response);
     observability.error('appointment_policy_patch_failed', { merchantId, status: response.status, reason });
     throw new Error('appointment_policy_save_failed');
   }
@@ -638,7 +616,7 @@ export async function patchAppointment(
     },
   );
   if (!response.ok) {
-    const reason = await readError(response);
+    const reason = await readApiError(response);
     observability.error('appointment_patch_failed', {
       merchantId,
       appointmentId,
