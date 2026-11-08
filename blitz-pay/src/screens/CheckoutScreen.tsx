@@ -370,11 +370,6 @@ export default function CheckoutScreen() {
               <Ionicons name="wallet-outline" size={16} color={colors.primary} />
               <Text style={styles.infoText}>{t('checkout_intent_pay_later_hint')}</Text>
             </View>
-          ) : methods.length === 0 && !tableCode ? (
-            <View style={styles.errorBox}>
-              <Ionicons name="alert-circle-outline" size={16} color={colors.error} />
-              <Text style={styles.errorText}>{t('payment_option_unavailable')}</Text>
-            </View>
           ) : null}
           {selectedIntent === 'PAY_LATER'
             ? null
@@ -406,7 +401,7 @@ export default function CheckoutScreen() {
               </View>
             </TouchableOpacity>
             ))}
-          {selectedIntent === 'PAY_NOW' && tableCode ? (
+          {selectedIntent === 'PAY_NOW' ? (
             <TouchableOpacity
               style={[styles.methodRow, payCash && styles.methodRowSelected]}
               onPress={() => {

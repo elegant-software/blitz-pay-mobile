@@ -447,7 +447,7 @@ export function useOrderPayment() {
     async (args: ConfirmCheckoutArgs): Promise<void> => {
       if (!args.merchantId) throw new Error('merchant_unavailable');
       if (!args.branchId) throw new Error('merchant_branch_unavailable');
-      const payWithCash = args.selectedIntent === 'PAY_NOW' && args.payWithCash === true && Boolean(args.table);
+      const payWithCash = args.selectedIntent === 'PAY_NOW' && args.payWithCash === true;
       if (args.selectedIntent === 'PAY_NOW' && !args.selectedMethod && !payWithCash) {
         throw new Error('payment_option_required');
       }
