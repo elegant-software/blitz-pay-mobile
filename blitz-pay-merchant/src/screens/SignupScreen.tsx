@@ -8,6 +8,7 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -40,6 +41,7 @@ export default function SignupScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [verticals, setVerticals] = useState<Vertical[]>([]);
   const [businessType, setBusinessType] = useState('');
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -55,7 +57,7 @@ export default function SignupScreen() {
 
   const handleRegister = async () => {
     setError('');
-    if (!ownerName.trim() || !merchantName.trim() || !email.trim() || !password.trim() || !confirmPassword.trim() || !businessType) return;
+    if (!ownerName.trim() || !merchantName.trim() || !email.trim() || !password.trim() || !confirmPassword.trim() || !businessType || !acceptedTerms) return;
     if (!validatePassword(password)) {
       setError(t('password_hint'));
       return;
@@ -76,6 +78,7 @@ export default function SignupScreen() {
           email: email.trim(),
           password,
           businessType,
+          acceptedTermsVersion: config.termsVersion,
         }),
       });
 
@@ -97,7 +100,7 @@ export default function SignupScreen() {
 
   const canSubmit =
     ownerName.trim() && merchantName.trim() && email.trim() && businessType &&
-    validatePassword(password) && password === confirmPassword;
+    validatePassword(password) && password === confirmPassword && acceptedTerms;
 
   return (
     <LinearGradient colors={['#000000', '#0A0A1E', '#0D0D2B']} style={styles.gradient}>
@@ -213,6 +216,24 @@ export default function SignupScreen() {
               />
             </View>
 
+            {/* GDPR Art. 7: an explicit, unticked-by-default acceptance; the backend stores the version. */}
+            <View style={styles.consentRow}>
+              <TouchableOpacity
+                onPress={() => setAcceptedTerms(!acceptedTerms)}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: acceptedTerms }}
+                hitSlop={8}
+              >
+                <Ionicons name={acceptedTerms ? 'checkbox' : 'square-outline'} size={22} color={acceptedTerms ? colors.primary : colors.gray500} />
+              </TouchableOpacity>
+              <Text style={styles.consentText}>
+                {t('signup_consent_prefix')}
+                <Text style={styles.consentLink} onPress={() => Linking.openURL(config.termsUrl)}>{t('signup_consent_terms')}</Text>
+                {t('signup_consent_and')}
+                <Text style={styles.consentLink} onPress={() => Linking.openURL(config.privacyUrl)}>{t('signup_consent_privacy')}</Text>
+              </Text>
+            </View>
+
             <TouchableOpacity
               style={[styles.registerBtn, (!canSubmit || loading) && styles.registerBtnDisabled]}
               onPress={handleRegister}
@@ -240,6 +261,9 @@ export default function SignupScreen() {
 }
 
 const styles = StyleSheet.create({
+  consentRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginBottom: spacing.md },
+  consentText: { flex: 1, color: colors.gray400, fontSize: 13, lineHeight: 19 },
+  consentLink: { color: colors.primary, textDecorationLine: 'underline' },
   gradient: { flex: 1 },
   flex: { flex: 1 },
   scroll: {
