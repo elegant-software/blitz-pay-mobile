@@ -19,6 +19,12 @@ export type RootStackParamList = {
     branchName?: string;
     merchantLogoUrl?: string;
     distanceMeters?: number;
+    /** Set after a Table check-in; orders become Walk-In orders brought to this Table. */
+    tableCode?: string;
+    tableName?: string;
+    guestCount?: number;
+    /** Deactivated Table link: branch storefront without a Table, collected at the counter. */
+    counterPickup?: boolean;
   };
   Checkout: {
     amount?: number;
@@ -33,7 +39,11 @@ export type RootStackParamList = {
     basketItemCount?: number;
     basketItems?: BasketCheckoutItemSummary[];
     invoiceId?: string;
+    tableCode?: string;
+    tableName?: string;
+    guestCount?: number;
   };
+  TableCheckIn: { code?: string } | undefined;
   MyQRCode: undefined;
   QRScanner: undefined;
   Notifications: undefined;

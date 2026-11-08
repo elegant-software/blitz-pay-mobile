@@ -7,6 +7,8 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useLanguage } from '../lib/LanguageContext';
 import { colors, spacing, radius } from '../lib/theme';
 import type { RootStackNav } from '../types';
+import { config } from '../lib/config';
+import { parseTableLink } from '../features/table-checkin/tableLink';
 
 export default function QRScannerScreen() {
   const { t } = useLanguage();
@@ -20,7 +22,10 @@ export default function QRScannerScreen() {
   const handleBarcodeScanned = ({ data }: { data: string }) => {
     if (scanned) return;
     setScanned(true);
-    if (data.startsWith('blitzpay://order/')) {
+    const tableCode = parseTableLink(data, config.storefrontUrl, config.trueLayerRedirectScheme);
+    if (tableCode) {
+      navigation.replace('TableCheckIn', { code: tableCode });
+    } else if (data.startsWith('blitzpay://order/')) {
       const orderId = data.replace('blitzpay://order/', '');
       navigation.replace('OrderDetail', { orderId });
     } else if (data.includes('blitzpay://merchant/')) {

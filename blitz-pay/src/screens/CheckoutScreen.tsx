@@ -70,12 +70,18 @@ export default function CheckoutScreen() {
   const basketItemCount = route.params?.basketItemCount ?? route.params?.basketItems?.length ?? 0;
   const basketItems = route.params?.basketItems ?? [];
   const invoiceId = route.params?.invoiceId;
-  const delayedPaymentEnabled = route.params?.delayedPaymentEnabled ?? false;
+  const tableCode = route.params?.tableCode;
+  const tableName = route.params?.tableName;
+  const guestCount = route.params?.guestCount;
+  // At a Table, signed-in shoppers may always defer payment or pay cash to staff.
+  const delayedPaymentEnabled = (route.params?.delayedPaymentEnabled ?? false) || Boolean(tableCode);
 
   const [selectedIntent, setSelectedIntent] = useState<CheckoutIntent>(
-    delayedPaymentEnabled ? 'PAY_LATER' : 'PAY_NOW',
+    route.params?.delayedPaymentEnabled ? 'PAY_LATER' : 'PAY_NOW',
   );
   const [selectedMethod, setSelectedMethod] = useState<CheckoutPaymentMethod | null>(null);
+  const [payCash, setPayCash] = useState(false);
+  const canConfirm = selectedIntent === 'PAY_LATER' || Boolean(selectedMethod) || payCash;
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState('');
   const routePaymentChannels = useMemo(
@@ -193,9 +199,11 @@ export default function CheckoutScreen() {
         invoiceId,
         user,
         selectedIntent,
-        selectedMethod,
+        selectedMethod: payCash ? null : selectedMethod,
         availableChannels: activePaymentChannels,
         navigation,
+        table: tableCode ? { tableCode, guestCount } : undefined,
+        payWithCash: payCash,
       });
 
       observability.info('checkout_confirm_succeeded', {
@@ -260,6 +268,7 @@ export default function CheckoutScreen() {
           <Text style={styles.amountLabel}>{t('total_due')}</Text>
           <Text style={styles.amountValue}>€{amount.toFixed(2)}</Text>
           <Text style={styles.amountMerchant}>{merchantName}</Text>
+          {tableName ? <Text style={styles.amountSummary}>{t('table_banner', { name: tableName })}</Text> : null}
           {basketSummary ? <Text style={styles.amountSummary}>{basketSummary}</Text> : null}
           {basketItems.length > 0 ? (
             <View style={styles.basketSummaryCard}>
@@ -361,7 +370,7 @@ export default function CheckoutScreen() {
               <Ionicons name="wallet-outline" size={16} color={colors.primary} />
               <Text style={styles.infoText}>{t('checkout_intent_pay_later_hint')}</Text>
             </View>
-          ) : methods.length === 0 ? (
+          ) : methods.length === 0 && !tableCode ? (
             <View style={styles.errorBox}>
               <Ionicons name="alert-circle-outline" size={16} color={colors.error} />
               <Text style={styles.errorText}>{t('payment_option_unavailable')}</Text>
@@ -373,7 +382,10 @@ export default function CheckoutScreen() {
             <TouchableOpacity
               key={method.key}
               style={[styles.methodRow, selectedMethod === method.key && styles.methodRowSelected]}
-              onPress={() => setSelectedMethod(method.key)}
+              onPress={() => {
+                setSelectedMethod(method.key);
+                setPayCash(false);
+              }}
               activeOpacity={0.8}
             >
               <View style={[styles.methodIcon, selectedMethod === method.key && styles.methodIconSelected]}>
@@ -394,6 +406,27 @@ export default function CheckoutScreen() {
               </View>
             </TouchableOpacity>
             ))}
+          {selectedIntent === 'PAY_NOW' && tableCode ? (
+            <TouchableOpacity
+              style={[styles.methodRow, payCash && styles.methodRowSelected]}
+              onPress={() => {
+                setPayCash(true);
+                setSelectedMethod(null);
+              }}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.methodIcon, payCash && styles.methodIconSelected]}>
+                <Ionicons name="cash-outline" size={20} color={payCash ? colors.primary : colors.gray600} />
+              </View>
+              <View style={styles.methodInfo}>
+                <Text style={[styles.methodLabel, payCash && styles.methodLabelSelected]}>{t('checkout_cash')}</Text>
+                <Text style={styles.methodSub}>{t('checkout_cash_hint')}</Text>
+              </View>
+              <View style={[styles.radio, payCash && styles.radioSelected]}>
+                {payCash && <View style={styles.radioDot} />}
+              </View>
+            </TouchableOpacity>
+          ) : null}
         </View>
 
         {error ? (
@@ -423,10 +456,10 @@ export default function CheckoutScreen() {
         <TouchableOpacity
           style={[
             styles.confirmBtn,
-            (processing || (selectedIntent === 'PAY_NOW' && !selectedMethod)) && styles.confirmBtnDisabled,
+            (processing || !canConfirm) && styles.confirmBtnDisabled,
           ]}
           onPress={handleConfirm}
-          disabled={processing || (selectedIntent === 'PAY_NOW' && !selectedMethod)}
+          disabled={processing || !canConfirm}
           activeOpacity={0.85}
         >
           {processing ? (
@@ -437,7 +470,9 @@ export default function CheckoutScreen() {
               <Text style={styles.confirmBtnText}>
                 {selectedIntent === 'PAY_LATER'
                   ? `${t('checkout_intent_pay_later')} · €${amount.toFixed(2)}`
-                  : `${selectedMethod === 'bank'
+                  : payCash
+                    ? `${t('checkout_cash_confirm')} · €${amount.toFixed(2)}`
+                    : `${selectedMethod === 'bank'
                       ? t('pay_with_truelayer')
                       : selectedMethod === 'pay_by_bank'
                         ? t('pay_with_stripe_pay_by_bank')

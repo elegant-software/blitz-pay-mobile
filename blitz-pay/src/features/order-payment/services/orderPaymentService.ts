@@ -93,7 +93,8 @@ function normalizePaymentSource(source: unknown): 'APP_PAYMENT' | 'MANUAL_SETTLE
 
 function normalizeCheckoutPaymentMethod(
   method: unknown,
-): 'BANK_ACCOUNT' | 'CARD' | 'PAY_BY_BANK' | 'TERMINAL' | 'PAYPAL' | undefined {
+): 'BANK_ACCOUNT' | 'CARD' | 'PAY_BY_BANK' | 'TERMINAL' | 'PAYPAL' | 'CASH' | undefined {
+  if (method === 'CASH') return 'CASH';
   if (method === 'BANK_ACCOUNT') return 'BANK_ACCOUNT';
   if (method === 'CARD') return 'CARD';
   if (method === 'PAY_BY_BANK') return 'PAY_BY_BANK';
@@ -227,9 +228,14 @@ export async function createOrder(input: CreateOrderInput): Promise<OrderSummary
     })),
     paymentMethod: input.paymentMethod,
     checkoutPaymentMethod: input.checkoutPaymentMethod,
+    tableCode: input.tableCode,
+    guestCount: input.guestCount,
+    customerLocation: input.customerLocation,
   };
 
   observability.info('order_create_started', {
+    hasTable: Boolean(input.tableCode),
+    hasCustomerLocation: Boolean(input.customerLocation),
     checkoutIntent: input.checkoutIntent,
     branchId: input.branchId,
     orderType: input.orderType,
@@ -274,7 +280,7 @@ export async function createOrder(input: CreateOrderInput): Promise<OrderSummary
       message,
       usesDeferredPayment: requestBody.usesDeferredPayment,
       itemCount: requestBody.items.length,
-      requestBodyJson: JSON.stringify(requestBody),
+      requestBodyJson: JSON.stringify({ ...requestBody, customerLocation: requestBody.customerLocation ? '[redacted]' : undefined }),
     });
     observability.warn('order_create_failed', {
       checkoutIntent: input.checkoutIntent,

@@ -115,6 +115,12 @@ export default function AccountScreen() {
           showArrow: true,
         }] : []),
         {
+          icon: 'grid-outline' as const,
+          label: t('floor_view_title'),
+          onPress: () => navigation.navigate('FloorView' as never),
+          showArrow: true,
+        },
+        {
           icon: 'qr-code-outline' as const,
           label: t('merchant_qr'),
           onPress: () => (navigation as any).navigate('MerchantQRCode', {}),

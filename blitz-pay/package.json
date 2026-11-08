@@ -12,7 +12,7 @@
     "build:eas:async:clear-cache": "EAS_CLEAR_CACHE=1 node ./scripts/eas-build-async.js",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit --pretty false",
-    "test": "node ./scripts/run-tests.js",
+    "test": "jest --testPathPattern=__tests__",
     "test:device": "node ./scripts/device-tests.js",
     "test:contract": "jest --testPathPattern=__contract__"
   },
@@ -78,7 +78,8 @@
   "jest": {
     "testEnvironment": "node",
     "testMatch": [
-      "**/__contract__/**/*.test.ts"
+      "**/__contract__/**/*.test.ts",
+      "**/__tests__/**/*.test.ts"
     ],
     "transform": {
       "^.+\\.tsx?$": "babel-jest"

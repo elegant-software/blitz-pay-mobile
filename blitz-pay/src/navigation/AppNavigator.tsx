@@ -26,6 +26,7 @@ import BookingConfirmationScreen from '../screens/BookingConfirmationScreen';
 import MyAppointmentsScreen from '../screens/MyAppointmentsScreen';
 import AppointmentDetailScreen from '../screens/AppointmentDetailScreen';
 import InvoicePdfScreen from '../screens/InvoicePdfScreen';
+import TableCheckInScreen from '../screens/TableCheckInScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -60,6 +61,7 @@ export default function AppNavigator() {
         <>
           <Stack.Screen name="Main" component={TabNavigator} options={{ animation: 'fade' }} />
           <Stack.Screen name="Merchant" component={MerchantScreen} />
+          <Stack.Screen name="TableCheckIn" component={TableCheckInScreen} />
           <Stack.Screen name="Checkout" component={CheckoutScreen} />
           <Stack.Screen name="MyQRCode" component={MyQRCodeScreen} />
           <Stack.Screen name="QRScanner" component={QRScannerScreen} />

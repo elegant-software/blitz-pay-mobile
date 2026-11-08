@@ -55,6 +55,12 @@ export type RootStackParamList = {
     url: string;
     title?: string;
   };
+  FloorView: undefined;
+  Tables: undefined;
+  TableSettings: { tableId: string };
+  FloorPlans: undefined;
+  FloorPlanEditor: { floorPlanId: string };
+  TableDetail: { tableId: string };
 };
 
 export type TabParamList = {

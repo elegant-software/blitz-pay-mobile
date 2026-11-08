@@ -46,6 +46,9 @@ Login, Signup, Explore, Assistant, Vault, Account, Merchant, Checkout, MyQRCode,
 ### Auth bypass for demos
 Set `EXPO_PUBLIC_AUTH_BYPASS=true` in `blitz-pay/.env`.
 
+### Table check-in
+`EXPO_PUBLIC_STOREFRONT_URL` (e.g. the storefront base URL) enables universal/app links for `https://<storefront host>/t/{code}` (iOS `associatedDomains`, Android `autoVerify` intent filter, derived in `app.config.js`) and is the only host accepted by `features/table-checkin/tableLink.ts`. Table Links also work via QR scan, `blitzpay://t/{code}` and the "Enter table code" screen (`TableCheckIn`).
+
 ---
 
 ## blitz-pay-merchant (Merchant Portal)
@@ -66,6 +69,7 @@ Same stack as blitz-pay. No payment SDKs (Stripe/TrueLayer/Braintree), no voice/
 
 - **Tabs**: Dashboard, Orders, Products, Account
 - **Stack screens**: Login, OrderDetail, ProductEdit, MerchantQRCode, PaymentsHistory, Notifications
+- **Tables & Floor** (Account → Tables & Floor): FloorView (live floor over the `/floor/events` SSE stream), TableDetail (Guest Count, clear, Tap to Pay, confirm cash); Merchant Manager only: Tables, TableSettings (QR, NFC write + lock via `react-native-nfc-manager`), FloorPlans, FloorPlanEditor
 - **i18n**: `useLanguage()` from `src/lib/LanguageContext.tsx`; merchant-specific translation keys in `src/lib/translations.ts`
 - **Design tokens**: identical `src/lib/theme.ts`
 - **Auth**: same Keycloak ROPC pattern; separate session key `blitzpay_merchant_session`

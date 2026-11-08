@@ -28,6 +28,12 @@ import AppointmentPolicyScreen from '../screens/AppointmentPolicyScreen';
 import BranchOpeningHoursScreen from '../screens/BranchOpeningHoursScreen';
 import MerchantKpiDashboardScreen from '../screens/MerchantKpiDashboardScreen';
 import InvoicePdfScreen from '../screens/InvoicePdfScreen';
+import FloorViewScreen from '../screens/FloorViewScreen';
+import TablesScreen from '../screens/TablesScreen';
+import TableSettingsScreen from '../screens/TableSettingsScreen';
+import FloorPlansScreen from '../screens/FloorPlansScreen';
+import FloorPlanEditorScreen from '../screens/FloorPlanEditorScreen';
+import TableDetailScreen from '../screens/TableDetailScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -79,6 +85,12 @@ export default function AppNavigator() {
           <Stack.Screen name="BranchOpeningHours" component={BranchOpeningHoursScreen} />
           <Stack.Screen name="MerchantKpiDashboard" component={MerchantKpiDashboardScreen} />
           <Stack.Screen name="InvoicePdf" component={InvoicePdfScreen} />
+          <Stack.Screen name="FloorView" component={FloorViewScreen} />
+          <Stack.Screen name="Tables" component={TablesScreen} />
+          <Stack.Screen name="TableSettings" component={TableSettingsScreen} />
+          <Stack.Screen name="FloorPlans" component={FloorPlansScreen} />
+          <Stack.Screen name="FloorPlanEditor" component={FloorPlanEditorScreen} />
+          <Stack.Screen name="TableDetail" component={TableDetailScreen} />
         </>
       )}
     </Stack.Navigator>

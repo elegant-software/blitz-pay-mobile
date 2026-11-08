@@ -83,6 +83,10 @@ module.exports = {
       ["expo-notifications", { sounds: [] }],
       "expo-font",
       ["@stripe/stripe-terminal-react-native", { appDelegate: true, tapToPayCheck: true }],
+      ["react-native-nfc-manager", {
+        nfcPermission: "BlitzPay Merchant writes your table links to NFC stickers so guests can tap to order.",
+        includeNdefEntitlement: true,
+      }],
     ],
     extra: {
       eas: {

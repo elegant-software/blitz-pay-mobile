@@ -149,6 +149,10 @@ export default function MerchantScreen() {
   const preferredBranchName = route.params?.branchName;
   const initialMerchantLogoUrl = route.params?.merchantLogoUrl;
   const merchantDistance = route.params?.distanceMeters;
+  const tableCode = route.params?.tableCode;
+  const tableName = route.params?.tableName;
+  const guestCount = route.params?.guestCount;
+  const counterPickup = route.params?.counterPickup ?? false;
   const { loading, errorKey, branch, merchantLogoUrl, appointmentsEnabled, products, retry } = useMerchantCatalog({
     merchantId,
     merchantName,
@@ -203,6 +207,9 @@ export default function MerchantScreen() {
         basketSummary: checkoutContext.itemSummary,
         basketItemCount: checkoutContext.itemCount,
         basketItems: checkoutContext.basketItems,
+        tableCode,
+        tableName,
+        guestCount,
       });
     } catch (err) {
       setBasketError(err instanceof Error ? err.message : 'basket_empty');
@@ -248,6 +255,24 @@ export default function MerchantScreen() {
             {branch?.addressSummary ? <Text style={styles.branchAddress}>{branch.addressSummary}</Text> : null}
           </View>
         </View>
+
+        {tableCode && tableName ? (
+          <View style={styles.tableBanner}>
+            <Ionicons name="restaurant" size={18} color={colors.secondary} />
+            <View style={styles.tableBannerText}>
+              <Text style={styles.tableBannerTitle}>{t('table_banner', { name: tableName })}</Text>
+              <Text style={styles.tableBannerBody}>{t('table_banner_hint')}</Text>
+            </View>
+          </View>
+        ) : counterPickup ? (
+          <View style={styles.tableBanner}>
+            <Ionicons name="storefront-outline" size={18} color={colors.secondary} />
+            <View style={styles.tableBannerText}>
+              <Text style={styles.tableBannerTitle}>{t('table_counter_pickup_title')}</Text>
+              <Text style={styles.tableBannerBody}>{t('table_counter_pickup_body')}</Text>
+            </View>
+          </View>
+        ) : null}
 
         {loading ? (
           <View style={styles.stateCard}>
@@ -438,6 +463,21 @@ const styles = StyleSheet.create({
     marginHorizontal: spacing.sm,
   },
   shareBtn: {},
+  tableBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    backgroundColor: `${colors.secondary}12`,
+    borderWidth: 1,
+    borderColor: `${colors.secondary}40`,
+  },
+  tableBannerText: { flex: 1 },
+  tableBannerTitle: { fontSize: 16, fontWeight: '800', color: colors.onSurface },
+  tableBannerBody: { marginTop: 2, fontSize: 13, color: colors.gray600 },
   banner: {
     flexDirection: 'row',
     padding: spacing.md,
