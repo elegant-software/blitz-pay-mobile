@@ -1,20 +1,38 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Image, PanResponder, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Svg, { Circle, G, Rect, Text as SvgText } from 'react-native-svg';
 import { observability } from '../../../lib/observability';
 import { colors, radius } from '../../../lib/theme';
-import { dragFraction, fractionToPoint, pinCaption, type TablePinTone } from '../tableLogic';
+import { dragFraction, fractionToPoint, pinCaption, tableChairs, type TablePinTone } from '../tableLogic';
+import type { FloorArea } from '../types/table';
 
 const DEFAULT_ASPECT = 4 / 3;
 export const PIN_WIDTH = 84;
 export const PIN_HEIGHT = 30;
 
-export const PIN_COLORS: Record<TablePinTone, string> = {
-  free: colors.success,
-  unpaid: colors.warning,
-  paid: colors.primary,
-  reserved: colors.secondary,
+/** Same colours as the admin live floor: grey free, teal occupied (amber € badge while unpaid), purple reserved. */
+const FLOOR = {
+  free: '#B4B2A9',
+  freeText: '#444441',
+  occupied: '#1D9E75',
+  occupiedTop: '#E1F5EE',
+  occupiedText: '#04342C',
+  reserved: '#7F77DD',
+  unpaid: '#EF9F27',
+  unpaidText: '#412402',
+  area: '#B4B2A9',
+  areaText: '#5F5E5A',
 };
+
+export const PIN_COLORS: Record<TablePinTone, string> = {
+  free: '#888780',
+  unpaid: FLOOR.occupied,
+  paid: FLOOR.occupied,
+  reserved: FLOOR.reserved,
+};
+
+export const LIVE_PIN_SIZE = 56;
 
 export interface CanvasSize {
   width: number;
@@ -28,12 +46,16 @@ export interface CanvasSize {
 export function FloorPlanCanvas({
   imageUrl,
   emptyLabel,
+  areas = [],
   children,
 }: {
   imageUrl: string | null;
   emptyLabel: string;
+  /** Floor Areas traced in the admin dashboard; when present they are drawn instead of the picture. */
+  areas?: FloorArea[];
   children: (size: CanvasSize) => React.ReactNode;
 }) {
+  const drawn = areas.length > 0;
   const [aspect, setAspect] = useState(DEFAULT_ASPECT);
   const [size, setSize] = useState<CanvasSize>({ width: 0, height: 0 });
 
@@ -53,13 +75,30 @@ export function FloorPlanCanvas({
 
   return (
     <View
-      style={[styles.canvas, { aspectRatio: aspect }]}
+      style={[styles.canvas, drawn && styles.canvasDrawn, { aspectRatio: aspect }]}
       onLayout={(event) => {
         const { width, height } = event.nativeEvent.layout;
         setSize({ width, height });
       }}
     >
-      {imageUrl ? (
+      {drawn ? (
+        areas.map((area, index) => (
+          <View
+            key={`${area.name}-${index}`}
+            style={[
+              styles.area,
+              {
+                left: area.x * size.width,
+                top: area.y * size.height,
+                width: area.width * size.width,
+                height: area.height * size.height,
+              },
+            ]}
+          >
+            <Text style={styles.areaText} numberOfLines={1}>{area.name}</Text>
+          </View>
+        ))
+      ) : imageUrl ? (
         <Image source={{ uri: imageUrl }} style={StyleSheet.absoluteFill} resizeMode="stretch" />
       ) : (
         <View style={styles.empty}>
@@ -88,42 +127,88 @@ function PinLabel({ name, seats, guests }: { name: string; seats: number | null;
   );
 }
 
-export function TablePin({
+/**
+ * A live Table drawn as a table with a chair per seat; seated guests fill chairs. Occupied tables get a
+ * teal top, unpaid ones an amber € badge, reserved ones a dashed purple outline. Below: time seated.
+ */
+export function LiveTablePin({
   label,
   seats,
   guests,
   tone,
+  caption,
   x,
   y,
   size,
   onPress,
-  badge,
 }: {
   label: string;
   seats: number | null;
   guests: number | null;
   tone: TablePinTone;
+  caption?: string;
   x: number;
   y: number;
   size: CanvasSize;
   onPress?: () => void;
-  badge?: number;
 }) {
   const { left, top } = fractionToPoint(x, y, size.width, size.height);
+  const occupied = tone === 'paid' || tone === 'unpaid';
+  const reserved = tone === 'reserved';
+  const outline = reserved ? FLOOR.reserved : occupied ? FLOOR.occupied : FLOOR.free;
+  const dash = reserved ? '4 3' : undefined;
   return (
     <TouchableOpacity
       accessibilityRole="button"
       accessibilityLabel={pinCaption(label, seats, guests)}
-      activeOpacity={0.8}
+      activeOpacity={0.7}
       onPress={onPress}
-      style={[styles.pin, { left: left - PIN_WIDTH / 2, top: top - PIN_HEIGHT / 2, backgroundColor: PIN_COLORS[tone] }]}
+      style={[styles.livePin, { left: left - LIVE_PIN_SIZE / 2, top: top - LIVE_PIN_SIZE / 2 }]}
     >
-      <PinLabel name={label} seats={seats} guests={guests} />
-      {badge ? (
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>{badge}</Text>
-        </View>
-      ) : null}
+      <Svg width={LIVE_PIN_SIZE} height={LIVE_PIN_SIZE} viewBox="0 0 60 60">
+        {tableChairs(seats, guests).map((chair, index) => (
+          <Circle
+            key={index}
+            cx={chair.cx}
+            cy={chair.cy}
+            r={5.5}
+            fill={chair.seated ? FLOOR.occupied : colors.white}
+            stroke={chair.seated ? FLOOR.occupied : outline}
+            strokeWidth={1.5}
+            strokeDasharray={dash}
+          />
+        ))}
+        <Rect
+          x={15}
+          y={15}
+          width={30}
+          height={30}
+          rx={7}
+          fill={occupied ? FLOOR.occupiedTop : colors.white}
+          stroke={outline}
+          strokeWidth={1.5}
+          strokeDasharray={dash}
+        />
+        <SvgText
+          x={30}
+          y={34.5}
+          textAnchor="middle"
+          fontSize={12}
+          fontWeight="700"
+          fill={occupied ? FLOOR.occupiedText : FLOOR.freeText}
+          textLength={label.length > 3 ? 26 : undefined}
+          lengthAdjust="spacingAndGlyphs"
+        >
+          {label}
+        </SvgText>
+        {tone === 'unpaid' ? (
+          <G>
+            <Circle cx={49} cy={11} r={7.5} fill={FLOOR.unpaid} />
+            <SvgText x={49} y={14.5} textAnchor="middle" fontSize={10} fontWeight="700" fill={FLOOR.unpaidText}>€</SvgText>
+          </G>
+        ) : null}
+      </Svg>
+      {caption ? <Text style={styles.liveCaption}>{caption}</Text> : null}
     </TouchableOpacity>
   );
 }
@@ -200,6 +285,24 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.gray200,
   },
+  canvasDrawn: { backgroundColor: colors.white },
+  area: {
+    position: 'absolute',
+    borderWidth: 2,
+    borderColor: FLOOR.area,
+    borderRadius: 6,
+  },
+  areaText: { position: 'absolute', left: 6, top: 2, fontSize: 11, color: FLOOR.areaText },
+  livePin: { position: 'absolute', width: LIVE_PIN_SIZE, alignItems: 'center' },
+  liveCaption: {
+    marginTop: -4,
+    paddingHorizontal: 4,
+    borderRadius: 4,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    fontSize: 10,
+    color: FLOOR.areaText,
+  },
   empty: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', gap: 8, padding: 16 },
   emptyText: { fontSize: 13, color: colors.gray600, textAlign: 'center' },
   pin: {
@@ -224,17 +327,4 @@ const styles = StyleSheet.create({
   pinText: { flexShrink: 1, fontSize: 12, fontWeight: '800', color: colors.white },
   pinSep: { fontSize: 12, fontWeight: '800', color: colors.white },
   pinUnknown: { textDecorationLine: 'underline' },
-  badge: {
-    position: 'absolute',
-    top: -6,
-    right: -6,
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
-    paddingHorizontal: 4,
-    backgroundColor: colors.onSurface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  badgeText: { fontSize: 10, fontWeight: '800', color: colors.white },
 });

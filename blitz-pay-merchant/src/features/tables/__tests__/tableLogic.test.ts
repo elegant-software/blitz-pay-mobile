@@ -10,6 +10,8 @@ import {
   pinCaption,
   pointToFraction,
   seatedCapacity,
+  seatedFor,
+  tableChairs,
   tablePinTone,
 } from '../tableLogic';
 import { classifyNfcError, ndefUriMessageSize, NfcWriteError } from '../nfcTag';
@@ -111,5 +113,22 @@ describe('nfc tag', () => {
     expect(classifyNfcError(new Error('exceeds capacity'))).toBe('nfc_error_tag_too_small');
     expect(classifyNfcError(new NfcWriteError('nfc_error_unsupported_tag', 'x'))).toBe('nfc_error_unsupported_tag');
     expect(classifyNfcError(new Error('io'))).toBe('nfc_error_write_failed');
+  });
+});
+
+describe('drawn live floor', () => {
+  it('puts one chair per seat round the table, seated guests first', () => {
+    const chairs = tableChairs(4, 3);
+    expect(chairs.map((chair) => [chair.cx, chair.cy])).toEqual([[30, 6], [54, 30], [30, 54], [6, 30]]);
+    expect(chairs.map((chair) => chair.seated)).toEqual([true, true, true, false]);
+    expect(tableChairs(null, 2)).toEqual([]);
+    expect(tableChairs(40, 0)).toHaveLength(12);
+  });
+
+  it('says how long guests have been seated', () => {
+    const now = new Date('2026-11-08T12:00:00Z');
+    expect(seatedFor('2026-11-08T11:52:00Z', now)).toBe('8 min');
+    expect(seatedFor('2026-11-08T10:50:00Z', now)).toBe('1 h 10');
+    expect(seatedFor(null, now)).toBe('');
   });
 });
