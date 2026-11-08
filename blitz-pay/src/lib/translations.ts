@@ -443,7 +443,7 @@ export const translations = {
     table_counter_pickup_body: 'This table is not in use right now. Order here and collect it at the counter.',
     table_location_required: 'To order at a table we need your current location. Please allow location access and try again.',
     checkout_cash: 'Cash',
-    checkout_cash_hint: 'Pay the staff in cash at your table',
+    checkout_cash_hint: 'Pay the staff in cash at your table or the counter',
     checkout_cash_confirm: 'Order, pay cash',
   },
   de: {
@@ -837,7 +837,7 @@ export const translations = {
     table_counter_pickup_body: 'Dieser Tisch ist gerade nicht in Betrieb. Bestelle hier und hole die Bestellung an der Theke ab.',
     table_location_required: 'Für eine Bestellung am Tisch brauchen wir deinen aktuellen Standort. Bitte erlaube den Standortzugriff und versuche es erneut.',
     checkout_cash: 'Bar',
-    checkout_cash_hint: 'Bezahle bar beim Personal an deinem Tisch',
+    checkout_cash_hint: 'Bezahle bar beim Personal am Tisch oder an der Theke',
     checkout_cash_confirm: 'Bestellen, bar zahlen',
   },
 };

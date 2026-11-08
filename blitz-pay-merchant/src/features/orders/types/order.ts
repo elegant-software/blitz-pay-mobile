@@ -7,7 +7,7 @@ export type MerchantOrderStatus =
   | 'cancelled';
 export type MerchantCheckoutIntent = 'PAY_NOW' | 'PAY_LATER';
 export type MerchantPaymentSource = 'APP_PAYMENT' | 'MANUAL_SETTLEMENT';
-export type MerchantCheckoutPaymentMethod = 'BANK_ACCOUNT' | 'CARD' | 'PAY_BY_BANK' | 'TERMINAL' | 'PAYPAL';
+export type MerchantCheckoutPaymentMethod = 'BANK_ACCOUNT' | 'CARD' | 'PAY_BY_BANK' | 'TERMINAL' | 'PAYPAL' | 'CASH';
 export type MerchantPaymentProvider =
   | 'STRIPE'
   | 'STRIPE_TERMINAL'

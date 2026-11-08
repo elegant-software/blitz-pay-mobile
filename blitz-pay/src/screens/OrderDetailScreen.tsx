@@ -132,11 +132,11 @@ export default function OrderDetailScreen() {
     void reloadOrder().finally(() => setRefreshing(false));
   }, [reloadOrder]);
 
-  // The backend sends an ORDER_READY push when the kitchen marks the order ready for pickup.
+  // The backend pushes ORDER_READY when the kitchen marks the order ready, and ORDER_PAID when staff confirm cash.
   useEffect(() => {
     const sub = Notifications.addNotificationReceivedListener((notification) => {
       const data = notification.request.content.data as Record<string, unknown> | undefined;
-      if (data?.type === 'ORDER_READY' && data.orderId === route.params.orderId) {
+      if ((data?.type === 'ORDER_READY' || data?.type === 'ORDER_PAID') && data.orderId === route.params.orderId) {
         void reloadOrder();
       }
     });
