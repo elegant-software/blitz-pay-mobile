@@ -65,7 +65,7 @@ function getPaymentMethodMeta(
   t: (key: TranslationKeys) => string,
   order: MerchantOrderSummary,
 ): { icon: React.ComponentProps<typeof Ionicons>['name']; label: string; color: string } {
-  if (order.paymentSource === 'MANUAL_SETTLEMENT') {
+  if (order.paymentSource === 'MANUAL_SETTLEMENT' || order.checkoutPaymentMethod === 'CASH') {
     return { icon: 'cash', label: t('merchant_payment_method_CASH'), color: colors.success };
   }
   if (order.checkoutPaymentMethod === 'TERMINAL') {

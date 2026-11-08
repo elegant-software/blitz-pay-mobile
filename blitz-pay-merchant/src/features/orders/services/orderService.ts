@@ -4,6 +4,7 @@ import type { ActiveBranchScope } from '../../../lib/auth';
 import type {
   BranchCustomer,
   MerchantAddOrderItemInput,
+  MerchantCheckoutPaymentMethod,
   MerchantManualSettlementInput,
   MerchantOrderDetail,
   MerchantOrderItem,
@@ -78,7 +79,8 @@ function mapPaymentProvider(
   return undefined;
 }
 
-function mapCheckoutPaymentMethod(method: unknown): 'BANK_ACCOUNT' | 'CARD' | 'PAY_BY_BANK' | 'TERMINAL' | 'PAYPAL' | undefined {
+function mapCheckoutPaymentMethod(method: unknown): MerchantCheckoutPaymentMethod | undefined {
+  if (method === 'CASH') return 'CASH';
   if (method === 'BANK_ACCOUNT') return 'BANK_ACCOUNT';
   if (method === 'CARD') return 'CARD';
   if (method === 'PAY_BY_BANK') return 'PAY_BY_BANK';
