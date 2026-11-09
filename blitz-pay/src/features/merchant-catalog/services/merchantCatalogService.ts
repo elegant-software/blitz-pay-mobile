@@ -1,8 +1,45 @@
 import type { BasketItem } from '../../basket/types/basket';
-import { fetchMerchantCommerceJson } from '../../../lib/api/merchantCommerce';
 import { authedFetch } from '../../../lib/api/authedFetch';
+import { readApiProblem } from '../../../lib/apiError';
 import { observability } from '../../../lib/observability';
-import type { ActiveProduct, CatalogValidationIssue, MerchantBranch } from '../types/catalog';
+import type { ActiveProduct, BranchCatalogCategories, CatalogProductPage, CatalogProductFilter, CatalogValidationIssue, MerchantBranch } from '../types/catalog';
+
+export class MerchantCatalogError extends Error {
+  constructor(
+    public readonly i18nKey: 'merchant_catalog_load_failed' | 'merchant_branch_unavailable',
+    public readonly detail?: string,
+    public readonly status?: number,
+    public readonly code?: string,
+  ) {
+    super(i18nKey);
+    this.name = 'MerchantCatalogError';
+  }
+}
+
+async function fetchCatalogJson<T>(path: string): Promise<T> {
+  observability.info('merchant_catalog_request_started', { path });
+  let response: Response;
+  try {
+    response = await authedFetch(`/v1${path}`);
+  } catch (error) {
+    observability.error('merchant_catalog_request_failed', { path, reason: error instanceof Error ? error.message : String(error) });
+    throw new MerchantCatalogError('merchant_catalog_load_failed');
+  }
+  if (!response.ok) {
+    const problem = await readApiProblem(response);
+    const detail = problem.detail ?? `HTTP ${response.status}`;
+    observability.error('merchant_catalog_request_failed', { path, status: response.status, code: problem.code, reason: detail });
+    throw new MerchantCatalogError('merchant_catalog_load_failed', detail, response.status, problem.code);
+  }
+  try {
+    const result = await response.json() as T;
+    observability.info('merchant_catalog_request_completed', { path, status: response.status });
+    return result;
+  } catch (error) {
+    observability.error('merchant_catalog_response_invalid', { path, status: response.status, reason: error instanceof Error ? error.message : String(error) });
+    throw new MerchantCatalogError('merchant_catalog_load_failed');
+  }
+}
 
 type BranchResponse = {
   id?: string;
@@ -47,7 +84,8 @@ type ProductResponse = {
   name?: string;
   description?: string;
   unitPrice?: number;
-  imageUrl?: string;
+  imageUrl?: string | null;
+  thumbnailUrl?: string | null;
   active?: boolean;
   categoryId?: string;
   categoryName?: string;
@@ -103,9 +141,10 @@ function resolveCategory(product: ProductResponse): { categoryId?: string; categ
 }
 
 export async function fetchMerchantBranches(merchantId: string): Promise<MerchantBranch[]> {
-  const response = await fetchMerchantCommerceJson<BranchResponse[]>(`/merchants/${merchantId}/branches`);
+  const response = await fetchCatalogJson<BranchResponse[]>(`/merchants/${merchantId}/branches`);
+  if (!Array.isArray(response)) throw invalidCatalogResponse('branches');
   return response
-    .filter((branch) => branch.id && branch.merchantId && branch.name && branch.active)
+    .filter((branch) => branch.id && branch.merchantId === merchantId && branch.name && branch.active)
     .map((branch) => ({
       branchId: branch.id!,
       merchantId: branch.merchantId!,
@@ -119,10 +158,14 @@ export async function fetchMerchantBranches(merchantId: string): Promise<Merchan
     }));
 }
 
+function invalidCatalogResponse(resource: string): MerchantCatalogError {
+  observability.error('merchant_catalog_response_invalid', { resource });
+  return new MerchantCatalogError('merchant_catalog_load_failed');
+}
+
 export async function fetchMerchantDetails(merchantId: string): Promise<MerchantDetails> {
   try {
-    const details = await fetchMerchantCommerceJson<MerchantDetailsResponse>(`/merchants/${merchantId}`);
-    console.log('[catalog] raw merchant details:', JSON.stringify(details, null, 2));
+    const details = await fetchCatalogJson<MerchantDetailsResponse>(`/merchants/${merchantId}`);
     const offerings = Array.isArray(details.offerings) ? details.offerings : [];
     const appointmentsEnabled =
       typeof details.appointmentsEnabled === 'boolean'
@@ -234,32 +277,75 @@ export function resolveMerchantBranch(
 export async function fetchActiveProducts(
   merchantId: string,
   branchId: string,
+  categoryId?: string,
 ): Promise<ActiveProduct[]> {
   const search = new URLSearchParams({ branchId });
-  const response = await fetchMerchantCommerceJson<ProductResponse[]>(
+  if (categoryId) search.set('categoryId', categoryId);
+  const response = await fetchCatalogJson<ProductResponse[]>(
     `/merchants/${merchantId}/products?${search.toString()}`,
   );
-  return response
-    .filter((product) => product.productId && product.branchId && product.name && typeof product.unitPrice === 'number')
-    .map((product) => {
-      const { categoryId, categoryName } = resolveCategory(product);
-      return {
-        productId: product.productId!,
-        merchantId,
-        branchId: product.branchId!,
-        name: product.name!,
-        description: product.description,
-        unitPrice: product.unitPrice!,
-        imageUrl: product.imageUrl,
-        active: Boolean(product.active),
-        categoryId,
-        categoryName,
-        productCode: product.productCode,
-        updatedAt: product.updatedAt,
-      };
-    })
-    .filter((product) => product.active)
+  if (!Array.isArray(response)) throw invalidCatalogResponse('products');
+  return normalizeProducts(response, merchantId, branchId)
+    .filter(product => !categoryId || product.categoryId === categoryId)
     .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function normalizeProducts(response: ProductResponse[], merchantId: string, branchId: string): ActiveProduct[] {
+  return response
+    .filter(product => product && product.productId && product.branchId === branchId && product.name && typeof product.unitPrice === 'number' && Number.isFinite(product.unitPrice))
+    .map(product => ({
+      productId: product.productId!, merchantId, branchId,
+      name: product.name!, description: product.description,
+      unitPrice: product.unitPrice!, imageUrl: product.imageUrl ?? undefined,
+      thumbnailUrl: product.thumbnailUrl ?? undefined,
+      active: product.active === true, ...resolveCategory(product),
+      productCode: product.productCode, updatedAt: product.updatedAt,
+    }))
+    .filter(product => product.active);
+}
+
+export async function fetchCatalogProductPage(
+  merchantId: string, branchId: string, filter: CatalogProductFilter = {},
+): Promise<CatalogProductPage> {
+  const search = new URLSearchParams({ branchId, limit: '24' });
+  if (filter.categoryId) search.set('categoryId', filter.categoryId);
+  if (filter.uncategorized) search.set('uncategorized', 'true');
+  if (filter.cursor) search.set('cursor', filter.cursor);
+  const response = await fetchCatalogJson<Omit<CatalogProductPage, 'items'> & { items: ProductResponse[] }>(
+    `/merchants/${merchantId}/catalog/products?${search.toString()}`,
+  );
+  if (!response || !Array.isArray(response.items) || typeof response.hasMore !== 'boolean' ||
+      response.limit !== 24 || (response.hasMore ? typeof response.nextCursor !== 'string' || !response.nextCursor || response.nextCursor === filter.cursor : response.nextCursor != null)) {
+    throw invalidCatalogResponse('product-page');
+  }
+  const items = normalizeProducts(response.items, merchantId, branchId)
+    .filter(product => (!filter.categoryId || product.categoryId === filter.categoryId) && (!filter.uncategorized || !product.categoryId));
+  return { ...response, items, nextCursor: response.nextCursor ?? null };
+}
+
+export async function fetchBranchCatalogCategories(merchantId: string, branchId: string): Promise<BranchCatalogCategories> {
+  const search = new URLSearchParams({ branchId });
+  const response = await fetchCatalogJson<BranchCatalogCategories>(`/merchants/${merchantId}/catalog/categories?${search.toString()}`);
+  if (!response || !Array.isArray(response.categories) || !Number.isSafeInteger(response.totalCount) || response.totalCount < 0 ||
+      !Number.isSafeInteger(response.uncategorizedCount) || response.uncategorizedCount < 0 ||
+      response.categories.some(category => !category || !category.id || !category.name || !Number.isSafeInteger(category.productCount) || category.productCount <= 0)) {
+    throw invalidCatalogResponse('branch-categories');
+  }
+  return response;
+}
+
+export async function fetchCatalogProductDetail(merchantId: string, branchId: string, productId: string): Promise<ActiveProduct> {
+  const search = new URLSearchParams({ branchId });
+  const response = await fetchCatalogJson<ProductResponse>(`/merchants/${merchantId}/products/${productId}?${search.toString()}`);
+  const product = normalizeProducts([response], merchantId, branchId).find(value => value.productId === productId);
+  if (!product) throw invalidCatalogResponse('product-detail');
+  return product;
+}
+
+export async function fetchProductCategories(merchantId: string): Promise<{ id: string; name: string }[]> {
+  const response = await fetchCatalogJson<{ id: string; name: string }[]>(`/merchants/${merchantId}/product-categories`);
+  if (!Array.isArray(response)) throw invalidCatalogResponse('categories');
+  return response.filter(category => category.id && category.name).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export async function revalidateBasketItems(

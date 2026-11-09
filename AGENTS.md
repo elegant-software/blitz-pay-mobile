@@ -18,6 +18,15 @@ Operating manual for AI coding agents (Claude Code, Codex, etc.) working in this
 - **No new `.md` files** unless the user asks. `CONSTITUTION.md`, `AGENTS.md`, and `CLAUDE.md` are the exception because they were explicitly requested.
 - **Target the correct app by default.** Merchant-facing requests go in `blitz-pay-merchant/`. Consumer-facing requests go in `blitz-pay/`. If the request does not make the target app obvious, ask before editing.
 
+## PR Descriptions
+
+- Keep PR descriptions short, simple, and readable for a non-technical manager.
+- Use two short lines by default: `Problem: ...` and `Fix: ...` for bug fixes, or `Feat: ...` and `Add: ...` for features.
+- Explain the user-facing problem or feature and the resulting behavior in plain language.
+- Omit file lists, implementation details, long summaries, and conversational history.
+- Add a short `Testing: ...` line or an essential deployment/migration note only when needed for review.
+- Keep PR titles in the repository's existing conventional format.
+
 ## Payment / TrueLayer Work — Special Rules
 
 When touching `mobile/src/lib/truelayer.ts`, `mobile/src/screens/CheckoutScreen.tsx`, or anything under a `specs/*truelayer*` / `specs/*payment*` folder:

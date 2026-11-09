@@ -97,6 +97,7 @@ export interface Product {
   description?: string;
   unitPrice: number;
   imageUrl?: string;
+  thumbnailUrl?: string;
   categoryId?: string;
   categoryName?: string;
   productCode?: number;

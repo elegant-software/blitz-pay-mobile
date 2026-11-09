@@ -33,8 +33,8 @@ function loadHook(app, client, fetchProducts, logs) {
       if (name.includes('observability')) return { observability: {
         info: (...args) => logs.push(args), warn: (...args) => logs.push(args),
       } };
-      if (name.includes('merchantCatalogService')) return { fetchActiveProducts: fetchProducts };
-      if (name.includes('merchantProducts')) return { fetchBranchProducts: fetchProducts };
+      if (name.includes('merchantCatalogService')) return { fetchCatalogProductDetail: fetchProducts };
+      if (name.includes('merchantProducts')) return { fetchProductDetail: fetchProducts };
       throw new Error(`Unexpected import: ${name}`);
     },
   };
@@ -54,37 +54,44 @@ async function check(app) {
   const logs = [];
   const expired = 'https://storage.example/image.jpg?X-Amz-Signature=expired-secret';
   const renewed = 'https://storage.example/image.jpg?X-Amz-Signature=renewed-secret';
+  const renewedThumbnail = 'https://storage.example/thumbnail.jpg?X-Amz-Signature=renewed-secret';
   let calls = 0;
   let fail = false;
-  const hook = loadHook(app, client, async (merchantId, branchId) => {
+  const hook = loadHook(app, client, async (merchantId, branchId, productId) => {
     calls++;
     assert.equal(merchantId, 'merchant');
     assert.equal(branchId, 'branch');
     if (fail) throw new Error('backend unavailable');
-    return ['one', 'two'].map(id => ({ id, productId: id, branchId, imageUrl: renewed }));
+    assert(['one', 'two'].includes(productId));
+    return { id: productId, productId, branchId, imageUrl: renewed, thumbnailUrl: renewedThumbnail };
   }, logs);
   const params = { merchantId: 'merchant', branchId: 'branch', productId: 'one', imageUrl: expired };
   const first = hook(params);
   const second = hook({ ...params, productId: 'two' });
   assert.equal(first().imageUrl, expired);
   await Promise.all([first().refresh(), first().refresh(), second().refresh()]);
-  assert.equal(calls, 1, 'Concurrent failures share a branch request');
+  assert.equal(calls, 2, 'Concurrent failures for one product share a detail request');
   assert.equal(first().imageUrl, renewed);
   assert.equal(second().imageUrl, renewed);
   await first().refresh();
-  assert.equal(calls, 1, 'A renewed image failure cannot loop');
+  assert.equal(calls, 2, 'A renewed image failure cannot loop');
+  const thumbnail = hook({ ...params, variant: 'thumbnail' });
+  await thumbnail().refresh();
+  assert.equal(thumbnail().imageUrl, renewedThumbnail, 'List images renew the thumbnail variant');
+  assert.equal(first().imageUrl, renewed, 'Detail images retain the larger variant');
+  assert.equal(calls, 2, 'Variants reuse the same product-detail response');
   assert.equal(first({ ...params, branchId: 'another-branch' }).imageUrl, expired, 'Old result cannot cross branch scope');
   assert.equal(first({ ...params, imageUrl: 'file:///picked.jpg' }).imageUrl, 'file:///picked.jpg', 'Replacement cannot overwrite a selected local photo');
   await hook({ ...params, imageUrl: 'file:///picked.jpg' })().refresh();
   await hook({ ...params, imageUrl: 'https://storage.example/public.jpg' })().refresh();
   await hook({ ...params, merchantId: undefined })().refresh();
-  assert.equal(calls, 1, 'Local, unsigned, and unscoped images do not fetch');
+  assert.equal(calls, 2, 'Local, unsigned, and unscoped images do not fetch');
 
   client.clear();
   const unchanged = hook({ ...params, imageUrl: renewed });
   await unchanged().refresh();
   await unchanged().refresh();
-  assert.equal(calls, 2, 'An unchanged backend URL is attempted only once');
+  assert.equal(calls, 3, 'An unchanged backend URL is attempted only once');
   assert.equal(unchanged().imageUrl, renewed);
 
   client.clear();
@@ -92,7 +99,7 @@ async function check(app) {
   const failing = hook(params);
   await failing().refresh();
   await failing().refresh();
-  assert.equal(calls, 3, 'Backend failures are bounded and handled');
+  assert.equal(calls, 4, 'Backend failures are bounded and handled');
   assert.equal(failing().imageUrl, expired);
   assert(logs.some(([event]) => event === 'product_image_url_refresh_failed'));
   assert(!JSON.stringify(logs).includes('secret'), 'Signed URLs never enter telemetry');

@@ -221,6 +221,9 @@ export default function ProductEditScreen() {
       void queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.products(activeBranchScope.merchantId, activeBranchScope.branchId),
       });
+      void queryClient.invalidateQueries({
+        queryKey: ['branch-catalog-categories-v1', activeBranchScope.merchantId, activeBranchScope.branchId],
+      });
 
       // Update category duration if a category is selected and duration is provided
       const parsedDuration = form.categoryDurationMinutes.trim()
