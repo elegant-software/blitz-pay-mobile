@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  View, Text, TouchableOpacity, ScrollView, StyleSheet, Switch, Modal, Alert, Linking,
+  View, Text, TouchableOpacity, ScrollView, StyleSheet, Switch, Modal, Alert, Linking, Share,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,6 +8,8 @@ import { useNavigation } from '@react-navigation/native';
 import { useLanguage } from '../lib/LanguageContext';
 import { useAuth } from '../lib/auth';
 import { useGeofence } from '../hooks/useGeofence';
+import { authedFetch } from '../lib/api';
+import { fetchLegal } from '../lib/legal';
 import { colors, spacing, radius, shadow } from '../lib/theme';
 import type { Language } from '../lib/translations';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
@@ -34,11 +36,49 @@ export default function AccountScreen() {
     }
   };
 
+  // GDPR Art. 13: say what is collected and why before the OS permission prompt.
+  const confirmLocationNotice = () => new Promise<boolean>((resolve) =>
+    Alert.alert(t('location_notice_title'), t('location_notice_body'), [
+      { text: t('cancel'), style: 'cancel', onPress: () => resolve(false) },
+      { text: t('continue_label'), onPress: () => resolve(true) },
+    ], { cancelable: true, onDismiss: () => resolve(false) }),
+  );
+
+  const handleDataExport = async () => {
+    try {
+      const res = await authedFetch('/v1/me/data-export');
+      if (!res.ok) throw new Error(String(res.status));
+      await Share.share({ title: t('download_my_data'), message: JSON.stringify(await res.json(), null, 2) });
+    } catch {
+      Alert.alert(t('download_my_data'), t('data_export_failed'));
+    }
+  };
+
+  const handleDeleteAccount = () =>
+    Alert.alert(t('delete_account'), t('delete_account_desc'), [
+      { text: t('cancel'), style: 'cancel' },
+      {
+        text: t('delete_account'),
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            const res = await authedFetch('/v1/me', { method: 'DELETE' });
+            if (!res.ok) throw new Error(String(res.status));
+            try { await disableGeofence(); } catch { /* nothing running */ }
+            await logout();
+          } catch {
+            Alert.alert(t('delete_account'), t('delete_account_failed'));
+          }
+        },
+      },
+    ]);
+
   const handleGeofenceToggle = async (value: boolean) => {
     if (!value) {
       try { await disableGeofence(); } catch { /* state already reset inside disable() */ }
       return;
     }
+    if (!(await confirmLocationNotice())) return;
     const result = await enableGeofence();
     if (result === 'not_available') {
       Alert.alert(
@@ -80,6 +120,7 @@ export default function AccountScreen() {
       );
       return;
     }
+    if (!(await confirmLocationNotice())) return;
     const result = await enablePolling();
     if (result === 'not_available') {
       Alert.alert(
@@ -227,6 +268,14 @@ export default function AccountScreen() {
             />
           ),
         }] : []),
+      ],
+    },
+    {
+      title: t('privacy'),
+      rows: [
+        { icon: 'document-text-outline' as const, label: t('privacy_policy'), onPress: () => fetchLegal(language).then((l) => Linking.openURL(l.privacyUrl)).catch(() => Alert.alert(t('privacy_policy'), t('network_error'))), showArrow: true },
+        { icon: 'download-outline' as const, label: t('download_my_data'), onPress: handleDataExport, showArrow: true },
+        { icon: 'trash-outline' as const, label: t('delete_account'), onPress: handleDeleteAccount, showArrow: true },
       ],
     },
     {

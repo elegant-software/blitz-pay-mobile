@@ -8,6 +8,7 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,6 +20,7 @@ import { config } from '../lib/config';
 import { colors, spacing, radius } from '../lib/theme';
 import type { RootStackNav } from '../types';
 import { readApiProblem } from '../lib/apiError';
+import { useLegal } from '../lib/legal';
 
 type Vertical = { code: string; displayName: string };
 
@@ -27,7 +29,8 @@ function validatePassword(pw: string): boolean {
 }
 
 export default function SignupScreen() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const { legal, reload: reloadLegal } = useLegal(language);
   const { login } = useAuth();
   const navigation = useNavigation<RootStackNav>();
   const insets = useSafeAreaInsets();
@@ -40,6 +43,7 @@ export default function SignupScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [verticals, setVerticals] = useState<Vertical[]>([]);
   const [businessType, setBusinessType] = useState('');
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -55,7 +59,7 @@ export default function SignupScreen() {
 
   const handleRegister = async () => {
     setError('');
-    if (!ownerName.trim() || !merchantName.trim() || !email.trim() || !password.trim() || !confirmPassword.trim() || !businessType) return;
+    if (!ownerName.trim() || !merchantName.trim() || !email.trim() || !password.trim() || !confirmPassword.trim() || !businessType || !acceptedTerms || !legal) return;
     if (!validatePassword(password)) {
       setError(t('password_hint'));
       return;
@@ -76,11 +80,19 @@ export default function SignupScreen() {
           email: email.trim(),
           password,
           businessType,
+          acceptedTermsVersion: legal.termsVersion,
         }),
       });
 
       if (!res.ok) {
-        if ((await readApiProblem(res)).code === 'EMAIL_CONFLICT') throw new Error('email_conflict');
+        const { code } = await readApiProblem(res);
+        if (code === 'EMAIL_CONFLICT') throw new Error('email_conflict');
+        if (code === 'TERMS_OUTDATED') {
+          // The text changed since this screen loaded: show the new links and ask again.
+          setAcceptedTerms(false);
+          reloadLegal();
+          throw new Error('terms_outdated');
+        }
         throw new Error('registration_failed');
       }
 
@@ -88,7 +100,8 @@ export default function SignupScreen() {
     } catch (e) {
       // fetch() rejects with a raw TypeError on network failure; map anything unknown to network_error.
       const msg = e instanceof Error ? e.message : '';
-      const key = msg === 'email_conflict' || msg === 'registration_failed' ? msg : 'network_error';
+      const known = ['email_conflict', 'registration_failed', 'terms_outdated'] as const;
+      const key = known.find((k) => k === msg) ?? 'network_error';
       setError(t(key));
     } finally {
       setLoading(false);
@@ -97,7 +110,7 @@ export default function SignupScreen() {
 
   const canSubmit =
     ownerName.trim() && merchantName.trim() && email.trim() && businessType &&
-    validatePassword(password) && password === confirmPassword;
+    validatePassword(password) && password === confirmPassword && acceptedTerms && legal;
 
   return (
     <LinearGradient colors={['#000000', '#0A0A1E', '#0D0D2B']} style={styles.gradient}>
@@ -213,6 +226,24 @@ export default function SignupScreen() {
               />
             </View>
 
+            {/* GDPR Art. 7: an explicit, unticked-by-default acceptance; the backend stores the version. */}
+            {legal && <View style={styles.consentRow}>
+              <TouchableOpacity
+                onPress={() => setAcceptedTerms(!acceptedTerms)}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: acceptedTerms }}
+                hitSlop={8}
+              >
+                <Ionicons name={acceptedTerms ? 'checkbox' : 'square-outline'} size={22} color={acceptedTerms ? colors.primary : colors.gray500} />
+              </TouchableOpacity>
+              <Text style={styles.consentText}>
+                {t('signup_consent_prefix')}
+                <Text style={styles.consentLink} onPress={() => Linking.openURL(legal.termsUrl)}>{t('signup_consent_terms')}</Text>
+                {t('signup_consent_and')}
+                <Text style={styles.consentLink} onPress={() => Linking.openURL(legal.privacyUrl)}>{t('signup_consent_privacy')}</Text>
+              </Text>
+            </View>}
+
             <TouchableOpacity
               style={[styles.registerBtn, (!canSubmit || loading) && styles.registerBtnDisabled]}
               onPress={handleRegister}
@@ -240,6 +271,9 @@ export default function SignupScreen() {
 }
 
 const styles = StyleSheet.create({
+  consentRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginBottom: spacing.md },
+  consentText: { flex: 1, color: colors.gray400, fontSize: 13, lineHeight: 19 },
+  consentLink: { color: colors.primary, textDecorationLine: 'underline' },
   gradient: { flex: 1 },
   flex: { flex: 1 },
   scroll: {
