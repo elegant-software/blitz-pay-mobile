@@ -14,6 +14,7 @@ import OrderDetailScreen from '../screens/OrderDetailScreen';
 import ProductEditScreen from '../screens/ProductEditScreen';
 import MerchantQRCodeScreen from '../screens/MerchantQRCodeScreen';
 import PaymentsHistoryScreen from '../screens/PaymentsHistoryScreen';
+import CardReaderScreen from '../screens/CardReaderScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import AppearancesScreen from '../screens/AppearancesScreen';
 import CreateAppearanceScreen from '../screens/CreateAppearanceScreen';
@@ -71,6 +72,7 @@ export default function AppNavigator() {
           <Stack.Screen name="ProductEdit" component={ProductEditScreen} />
           <Stack.Screen name="MerchantQRCode" component={MerchantQRCodeScreen} />
           <Stack.Screen name="PaymentsHistory" component={PaymentsHistoryScreen} />
+          <Stack.Screen name="CardReader" component={CardReaderScreen} />
           <Stack.Screen name="Notifications" component={NotificationsScreen} />
           <Stack.Screen name="Appearances" component={AppearancesScreen} />
           <Stack.Screen name="CreateAppearance" component={CreateAppearanceScreen} />
