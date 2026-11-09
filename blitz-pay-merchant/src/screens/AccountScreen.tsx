@@ -9,7 +9,7 @@ import { useLanguage } from '../lib/LanguageContext';
 import { useAuth } from '../lib/auth';
 import { useGeofence } from '../hooks/useGeofence';
 import { authedFetch } from '../lib/api';
-import { config } from '../lib/config';
+import { fetchLegal } from '../lib/legal';
 import { colors, spacing, radius, shadow } from '../lib/theme';
 import type { Language } from '../lib/translations';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
@@ -273,7 +273,7 @@ export default function AccountScreen() {
     {
       title: t('privacy'),
       rows: [
-        { icon: 'document-text-outline' as const, label: t('privacy_policy'), onPress: () => Linking.openURL(config.privacyUrl), showArrow: true },
+        { icon: 'document-text-outline' as const, label: t('privacy_policy'), onPress: () => fetchLegal(language).then((l) => Linking.openURL(l.privacyUrl)).catch(() => Alert.alert(t('privacy_policy'), t('network_error'))), showArrow: true },
         { icon: 'download-outline' as const, label: t('download_my_data'), onPress: handleDataExport, showArrow: true },
         { icon: 'trash-outline' as const, label: t('delete_account'), onPress: handleDeleteAccount, showArrow: true },
       ],
