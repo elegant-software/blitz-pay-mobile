@@ -10,6 +10,8 @@ import {
   Alert,
   TextInput,
   ActivityIndicator,
+  Linking,
+  Share,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,6 +19,8 @@ import { useLanguage } from '../lib/LanguageContext';
 import { useAuth } from '../lib/auth';
 import { useGeofence } from '../hooks/useGeofence';
 import { colors, spacing, radius, shadow } from '../lib/theme';
+import { fetchLegal } from '../lib/legal';
+import { authedFetch } from '../lib/api/authedFetch';
 import type { Language } from '../lib/translations';
 import { useNavigation } from '@react-navigation/native';
 import type { RootStackNav } from '../types';
@@ -152,6 +156,35 @@ export default function AccountScreen() {
     }
   };
 
+  const handleDataExport = async () => {
+    try {
+      const res = await authedFetch('/v1/me/data-export');
+      if (!res.ok) throw new Error(String(res.status));
+      await Share.share({ title: t('download_my_data'), message: JSON.stringify(await res.json(), null, 2) });
+    } catch {
+      Alert.alert(t('download_my_data'), t('data_export_failed'));
+    }
+  };
+
+  const handleDeleteAccount = () =>
+    Alert.alert(t('delete_account'), t('delete_account_desc'), [
+      { text: t('cancel'), style: 'cancel' },
+      {
+        text: t('delete_account'),
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            const res = await authedFetch('/v1/me', { method: 'DELETE' });
+            if (!res.ok) throw new Error(String(res.status));
+            try { await disableGeofence(); } catch { /* nothing running */ }
+            await logout();
+          } catch {
+            Alert.alert(t('delete_account'), t('delete_account_failed'));
+          }
+        },
+      },
+    ]);
+
   const handleLogout = async () => {
     setShowLogoutModal(false);
     await logout();
@@ -276,6 +309,14 @@ export default function AccountScreen() {
             />
           ),
         }] : []),
+      ],
+    },
+    {
+      title: t('privacy'),
+      rows: [
+        { icon: 'document-text-outline', label: t('privacy_policy'), onPress: () => fetchLegal(language).then((l) => Linking.openURL(l.privacyUrl)).catch(() => Alert.alert(t('privacy_policy'), t('network_error'))), showArrow: true },
+        { icon: 'download-outline', label: t('download_my_data'), onPress: handleDataExport, showArrow: true },
+        { icon: 'trash-outline', label: t('delete_account'), onPress: handleDeleteAccount, showArrow: true },
       ],
     },
     {
