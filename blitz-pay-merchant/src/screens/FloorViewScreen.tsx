@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -8,14 +8,14 @@ import { colors, radius, spacing } from '../lib/theme';
 import type { RootStackNav } from '../types';
 import { useLiveFloor } from '../features/tables/hooks/useLiveFloor';
 import { useBranchRef } from '../features/tables/hooks/useBranchRef';
-import { FloorPlanCanvas, PIN_COLORS, TablePin } from '../features/tables/components/FloorPlanCanvas';
+import { FloorPlanCanvas, LiveTablePin, PIN_COLORS } from '../features/tables/components/FloorPlanCanvas';
 import {
   CenterState,
   TablesScreenFrame,
   tableStyles,
   useErrorText,
 } from '../features/tables/components/TablesChrome';
-import { exceedsBranchCapacity, isOrderOpenForPayment, tablePinTone, type TablePinTone } from '../features/tables/tableLogic';
+import { exceedsBranchCapacity, seatedFor, tablePinTone, type TablePinTone } from '../features/tables/tableLogic';
 
 const TONE_LABELS: Record<TablePinTone, TranslationKeys> = {
   free: 'table_status_free',
@@ -31,6 +31,12 @@ export default function FloorViewScreen() {
   const vm = useLiveFloor({ live: true });
   const errorText = useErrorText();
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+  // Ticks every minute so "seated for" stays current between table events.
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
 
   const frame = (children: React.ReactNode) => (
     <TablesScreenFrame
@@ -102,31 +108,39 @@ export default function FloorViewScreen() {
 
       {plan ? (
         <View style={tableStyles.card}>
-          <FloorPlanCanvas imageUrl={plan.imageUrl} emptyLabel={t('floor_plan_no_photo')}>
+          <FloorPlanCanvas imageUrl={plan.imageUrl} areas={plan.areas} emptyLabel={t('floor_plan_no_photo')}>
             {(size) =>
               onPlan.map((live) => (
-                <TablePin
+                <LiveTablePin
                   key={live.table.id}
                   label={live.table.name}
                   seats={live.table.seats}
                   guests={live.guestCount}
                   tone={tablePinTone(live)}
+                  caption={live.status === 'OCCUPIED' ? seatedFor(live.occupiedSince, now) : undefined}
                   x={live.table.placement!.x}
                   y={live.table.placement!.y}
                   size={size}
-                  badge={live.orders.filter(isOrderOpenForPayment).length}
                   onPress={() => openTable(live.table.id)}
                 />
               ))
             }
           </FloorPlanCanvas>
           <View style={styles.legend}>
-            {(['free', 'unpaid', 'paid'] as TablePinTone[]).map((tone) => (
-              <View key={tone} style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: PIN_COLORS[tone] }]} />
-                <Text style={styles.legendText}>{t(TONE_LABELS[tone])}</Text>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, styles.legendFree]} />
+              <Text style={styles.legendText}>{t('table_status_free')}</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: PIN_COLORS.paid }]} />
+              <Text style={styles.legendText}>{t('table_status_occupied')}</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, styles.legendUnpaid]}>
+                <Text style={styles.legendEuro}>€</Text>
               </View>
-            ))}
+              <Text style={styles.legendText}>{t('table_status_unpaid')}</Text>
+            </View>
           </View>
         </View>
       ) : null}
@@ -205,7 +219,10 @@ const styles = StyleSheet.create({
   tabTextActive: { color: colors.white },
   legend: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: spacing.md },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  legendDot: { width: 10, height: 10, borderRadius: 5 },
+  legendDot: { width: 12, height: 12, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
+  legendFree: { backgroundColor: colors.white, borderWidth: 1.5, borderColor: '#B4B2A9' },
+  legendUnpaid: { backgroundColor: '#EF9F27' },
+  legendEuro: { fontSize: 8, fontWeight: '800', color: '#412402' },
   legendText: { fontSize: 12, color: colors.gray700 },
   listTitle: {
     marginTop: spacing.lg,

@@ -95,7 +95,19 @@ function parseTable(raw: RawTable): BranchTable {
 }
 
 function parseFloorPlan(raw: Partial<FloorPlan>): FloorPlan {
-  return { id: String(raw.id ?? ''), name: String(raw.name ?? ''), imageUrl: raw.imageUrl ?? null };
+  const areas = Array.isArray(raw.areas) ? raw.areas : [];
+  return {
+    id: String(raw.id ?? ''),
+    name: String(raw.name ?? ''),
+    imageUrl: raw.imageUrl ?? null,
+    areas: areas.map((area) => ({
+      name: String(area.name ?? ''),
+      x: Number(area.x),
+      y: Number(area.y),
+      width: Number(area.width),
+      height: Number(area.height),
+    })),
+  };
 }
 
 function parseStatus(status: unknown): TableStatus {

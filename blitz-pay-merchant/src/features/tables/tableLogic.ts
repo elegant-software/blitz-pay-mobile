@@ -75,6 +75,36 @@ export function tablePinTone(live: Pick<TableLive, 'status' | 'orders'>): TableP
   return 'free';
 }
 
+export interface Chair {
+  cx: number;
+  cy: number;
+  seated: boolean;
+}
+
+/** ponytail: chairs past 12 would overlap at this size, so a bigger Table still shows 12. */
+const MAX_CHAIRS = 12;
+
+/**
+ * Chairs around a live Table drawn in a 60×60 box: one per seat, evenly round the table, starting at the
+ * top. The first `guests` chairs are seated. Unknown seats draw no chairs.
+ */
+export function tableChairs(seats: number | null | undefined, guests: number | null | undefined): Chair[] {
+  const count = Math.min(seats ?? 0, MAX_CHAIRS);
+  return Array.from({ length: count }, (_, index) => {
+    const angle = (index / count) * 2 * Math.PI - Math.PI / 2;
+    const round = (value: number) => Math.round(value * 10) / 10;
+    return { cx: round(30 + 24 * Math.cos(angle)), cy: round(30 + 24 * Math.sin(angle)), seated: index < (guests ?? 0) };
+  });
+}
+
+/** How long a Table has been occupied: "8 min", "1 h 10". */
+export function seatedFor(since: string | null | undefined, now: Date): string {
+  if (!since) return '';
+  const minutes = Math.max(0, Math.floor((now.getTime() - new Date(since).getTime()) / 60000));
+  if (minutes < 60) return `${minutes} min`;
+  return `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, '0')}`;
+}
+
 /**
  * Turns the bulk-create input into Table Names. Entries are separated by commas or new lines;
  * a range such as "1-10" or "Terrace 1-4" expands to one Table per number.

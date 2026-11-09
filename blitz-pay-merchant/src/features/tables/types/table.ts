@@ -19,10 +19,21 @@ export interface BranchTable {
   nfcTagWrittenAt: string | null;
 }
 
+/** A named rectangle traced over the Floor Plan picture in the admin dashboard; fractions 0..1, like Placements. */
+export interface FloorArea {
+  name: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export interface FloorPlan {
   id: string;
   name: string;
   imageUrl: string | null;
+  /** When non-empty the live floor draws these instead of the picture. */
+  areas: FloorArea[];
 }
 
 export type TableStatus = 'FREE' | 'OCCUPIED' | 'RESERVED';
