@@ -1,6 +1,8 @@
 import { authedFetch } from './api';
 import { observability } from './observability';
+import { readApiProblem } from './apiError';
 import type { Product } from '../types';
+import type { BranchCatalogCategories, CatalogProductPage, CatalogProductFilter } from '../features/products/types/catalog';
 
 const API_VERSION = 'v1';
 
@@ -32,6 +34,7 @@ type MerchantProductResponse = {
   description?: string;
   unitPrice?: number;
   imageUrl?: string;
+  thumbnailUrl?: string;
   categoryId?: string;
   categoryName?: string;
   productCode?: number;
@@ -86,12 +89,15 @@ export type MerchantScope = {
 };
 
 export class MerchantProductError extends Error {
+  public readonly detail?: string;
   constructor(
     public readonly key: string,
     message: string,
     public readonly status?: number,
+    public readonly code?: string,
   ) {
     super(message);
+    this.detail = status && message !== key ? message : undefined;
     this.name = 'MerchantProductError';
   }
 }
@@ -132,7 +138,8 @@ function mapProduct(response: MerchantProductResponse): Product | null {
     name: response.name,
     description: response.description,
     unitPrice: response.unitPrice,
-    imageUrl: response.imageUrl,
+    imageUrl: response.imageUrl ?? undefined,
+    thumbnailUrl: response.thumbnailUrl ?? undefined,
     categoryId: response.categoryId,
     categoryName: response.categoryName,
     productCode: response.productCode,
@@ -186,9 +193,16 @@ async function requestJson<T>(
     method: init.method ?? 'GET',
   });
 
-  const response = await authedFetch(buildPath(path), init);
+  let response: Response;
+  try {
+    response = await authedFetch(buildPath(path), init);
+  } catch (error) {
+    observability.error('merchant_products_request_failed', { event: meta.event, reason: error instanceof Error ? error.message : String(error) });
+    throw new MerchantProductError(meta.failureKey, error instanceof Error ? error.message : meta.failureKey);
+  }
   if (!response.ok) {
-    const body = await response.text().catch(() => '');
+    const problem = await readApiProblem(response);
+    const body = problem.detail ?? `HTTP ${response.status}`;
     observability.error('merchant_products_request_failed', {
       event: meta.event,
       merchantId: meta.merchantId,
@@ -197,7 +211,7 @@ async function requestJson<T>(
       status: response.status,
       reason: body.slice(0, 500) || 'empty_body',
     });
-    throw new MerchantProductError(meta.failureKey, body || meta.failureKey, response.status);
+    throw new MerchantProductError(meta.failureKey, body || meta.failureKey, response.status, problem.code);
   }
 
   observability.info('merchant_products_request_succeeded', {
@@ -208,7 +222,12 @@ async function requestJson<T>(
     status: response.status,
   });
 
-  return response.json() as Promise<T>;
+  try {
+    return await response.json() as T;
+  } catch (error) {
+    observability.error('merchant_products_response_invalid', { event: meta.event, reason: error instanceof Error ? error.message : String(error) });
+    throw new MerchantProductError(meta.failureKey, meta.failureKey, response.status);
+  }
 }
 
 function mapSaveFailureKey(status?: number): string {
@@ -409,9 +428,10 @@ export async function resolveNearbyMerchantScope(
   };
 }
 
-export async function fetchBranchProducts(merchantId: string, branchId: string): Promise<Product[]> {
+export async function fetchBranchProducts(merchantId: string, branchId: string, categoryId?: string): Promise<Product[]> {
   assertAuthorizedBranchIdentifiers(merchantId, branchId);
   const search = new URLSearchParams({ branchId });
+  if (categoryId) search.set('categoryId', categoryId);
   const response = await requestJson<MerchantProductResponse[]>(
     `/merchants/${merchantId}/products?${search.toString()}`,
     { method: 'GET' },
@@ -422,6 +442,11 @@ export async function fetchBranchProducts(merchantId: string, branchId: string):
       failureKey: 'merchant_products_load_failed',
     },
   );
+
+  if (!Array.isArray(response)) {
+    observability.error('merchant_products_response_invalid', { merchantId, branchId });
+    throw new MerchantProductError('merchant_products_load_failed', 'merchant_products_load_failed');
+  }
 
   observability.info('merchant_products_payload', {
     event: 'fetch_branch_products',
@@ -436,6 +461,7 @@ export async function fetchBranchProducts(merchantId: string, branchId: string):
   const products = response
     .map(mapProduct)
     .filter((product): product is Product => product != null)
+    .filter(product => product.branchId === branchId && (!categoryId || product.categoryId === categoryId))
     .sort((a, b) => a.name.localeCompare(b.name));
 
   observability.info('merchant_products_mapped', {
@@ -447,6 +473,18 @@ export async function fetchBranchProducts(merchantId: string, branchId: string):
   });
 
   return products;
+}
+
+export async function fetchProductCategories(merchantId: string): Promise<{ id: string; name: string }[]> {
+  const categories = await requestJson<{ id: string; name: string }[]>(
+    `/merchants/${merchantId}/product-categories`, { method: 'GET' },
+    { event: 'fetch_product_categories', merchantId, failureKey: 'merchant_products_load_failed' },
+  );
+  if (!Array.isArray(categories)) {
+    observability.error('merchant_product_categories_response_invalid', { merchantId });
+    throw new MerchantProductError('merchant_products_load_failed', 'merchant_products_load_failed');
+  }
+  return categories.filter(category => category.id && category.name).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export async function fetchProductDetail(merchantId: string, branchId: string, productId: string): Promise<Product> {
@@ -465,10 +503,52 @@ export async function fetchProductDetail(merchantId: string, branchId: string, p
   );
 
   const product = mapProduct(response);
-  if (!product) {
+  if (!product || product.branchId !== branchId || product.id !== productId) {
     throw new MerchantProductError('merchant_product_load_failed', 'invalid_product_response');
   }
   return product;
+}
+
+function invalidCatalogResponse(merchantId: string, branchId: string): MerchantProductError {
+  observability.error('merchant_catalog_response_invalid', { merchantId, branchId });
+  return new MerchantProductError('merchant_products_load_failed', 'merchant_products_load_failed');
+}
+
+export async function fetchCatalogProductPage(
+  merchantId: string, branchId: string, filter: CatalogProductFilter = {},
+): Promise<CatalogProductPage> {
+  assertAuthorizedBranchIdentifiers(merchantId, branchId);
+  const search = new URLSearchParams({ branchId, includeInactive: 'true', limit: '24' });
+  if (filter.categoryId) search.set('categoryId', filter.categoryId);
+  if (filter.uncategorized) search.set('uncategorized', 'true');
+  if (filter.cursor) search.set('cursor', filter.cursor);
+  const response = await requestJson<Omit<CatalogProductPage, 'items'> & { items: MerchantProductResponse[] }>(
+    `/merchants/${merchantId}/catalog/products?${search.toString()}`, { method: 'GET' },
+    { event: 'fetch_catalog_page', merchantId, branchId, failureKey: 'merchant_products_load_failed' },
+  );
+  if (!response || !Array.isArray(response.items) || typeof response.hasMore !== 'boolean' ||
+      response.limit !== 24 || (response.hasMore ? typeof response.nextCursor !== 'string' || !response.nextCursor || response.nextCursor === filter.cursor : response.nextCursor != null)) {
+    throw invalidCatalogResponse(merchantId, branchId);
+  }
+  const items = response.items.filter(product => product && Number.isFinite(product.unitPrice)).map(mapProduct)
+    .filter((product): product is Product => product != null && product.branchId === branchId)
+    .filter(product => (!filter.categoryId || product.categoryId === filter.categoryId) && (!filter.uncategorized || !product.categoryId));
+  return { ...response, items, nextCursor: response.nextCursor ?? null };
+}
+
+export async function fetchBranchCatalogCategories(merchantId: string, branchId: string): Promise<BranchCatalogCategories> {
+  assertAuthorizedBranchIdentifiers(merchantId, branchId);
+  const search = new URLSearchParams({ branchId, includeInactive: 'true' });
+  const response = await requestJson<BranchCatalogCategories>(
+    `/merchants/${merchantId}/catalog/categories?${search.toString()}`, { method: 'GET' },
+    { event: 'fetch_branch_catalog_categories', merchantId, branchId, failureKey: 'merchant_products_load_failed' },
+  );
+  if (!response || !Array.isArray(response.categories) || !Number.isSafeInteger(response.totalCount) || response.totalCount < 0 ||
+      !Number.isSafeInteger(response.uncategorizedCount) || response.uncategorizedCount < 0 ||
+      response.categories.some(category => !category || !category.id || !category.name || !Number.isSafeInteger(category.productCount) || category.productCount <= 0)) {
+    throw invalidCatalogResponse(merchantId, branchId);
+  }
+  return response;
 }
 
 async function buildProductFormData(input: MerchantProductInput): Promise<FormData> {

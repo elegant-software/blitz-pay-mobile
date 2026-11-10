@@ -1,5 +1,12 @@
 export const translations = {
   en: {
+    catalog_all: 'All',
+    catalog_uncategorized: 'Uncategorized',
+    catalog_load_more: 'Load more products',
+    catalog_loading_more: 'Loading more products',
+    catalog_category_empty: 'No products in this category',
+    catalog_category_empty_hint: 'Choose another category or view all products.',
+    catalog_loading: 'Loading products',
     explore: "Explore",
     vault: "Vault",
     account: "Account",
@@ -459,6 +466,13 @@ export const translations = {
     checkout_cash_confirm: 'Order, pay cash',
   },
   de: {
+    catalog_all: 'Alle',
+    catalog_uncategorized: 'Ohne Kategorie',
+    catalog_load_more: 'Weitere Produkte laden',
+    catalog_loading_more: 'Weitere Produkte werden geladen',
+    catalog_category_empty: 'Keine Produkte in dieser Kategorie',
+    catalog_category_empty_hint: 'Wähle eine andere Kategorie oder zeige alle Produkte an.',
+    catalog_loading: 'Produkte werden geladen',
     explore: "Entdecken",
     vault: "Tresor",
     account: "Konto",

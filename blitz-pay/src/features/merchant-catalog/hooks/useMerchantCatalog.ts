@@ -8,6 +8,7 @@ import {
   fetchMerchantDetails,
   fetchMerchantStripeConnectStatus,
   resolveMerchantBranch,
+  MerchantCatalogError,
 } from '../services/merchantCatalogService';
 import type { ActiveProduct, MerchantBranch } from '../types/catalog';
 import { setBasketMerchantContext } from '../../basket/store/basketStore';
@@ -24,6 +25,7 @@ async function loadCatalog(
   merchantId: string,
   merchantName: string,
   preferredBranchId?: string,
+  includeProducts = true,
 ): Promise<CatalogResult> {
   const [branches, merchantDetails, stripeStatus] = await Promise.all([
     fetchMerchantBranches(merchantId),
@@ -42,9 +44,9 @@ async function loadCatalog(
   const branch =
     branches.find((value) => value.branchId === preferredBranchId)
     ?? resolveMerchantBranch(branches, coords);
-  if (!branch) throw new Error('merchant_branch_unavailable');
+  if (!branch) throw new MerchantCatalogError('merchant_branch_unavailable');
 
-  const products = await fetchActiveProducts(merchantId, branch.branchId);
+  const products = includeProducts ? await fetchActiveProducts(merchantId, branch.branchId) : [];
   const branchWithPolicy = {
     ...branch,
     delayedPaymentEnabled: merchantDetails.delayedPaymentEnabled,
@@ -69,12 +71,13 @@ export function useMerchantCatalog(params: {
   merchantId?: string;
   merchantName?: string;
   preferredBranchId?: string;
+  contextOnly?: boolean;
 }) {
-  const { merchantId, merchantName = 'Merchant', preferredBranchId } = params;
+  const { merchantId, merchantName = 'Merchant', preferredBranchId, contextOnly = false } = params;
 
   const { data, isLoading, error, refetch, isStale } = useQuery({
-    queryKey: QUERY_KEYS.catalog(merchantId!, preferredBranchId),
-    queryFn: () => loadCatalog(merchantId!, merchantName, preferredBranchId),
+    queryKey: contextOnly ? [...QUERY_KEYS.catalog(merchantId!, preferredBranchId), 'context'] : QUERY_KEYS.catalog(merchantId!, preferredBranchId),
+    queryFn: () => loadCatalog(merchantId!, merchantName, preferredBranchId, !contextOnly),
     enabled: !!merchantId,
     staleTime: STALE_TIMES.PRODUCTS,
   });
@@ -96,6 +99,7 @@ export function useMerchantCatalog(params: {
   return {
     loading: isLoading,
     errorKey,
+    errorDetail: error instanceof MerchantCatalogError ? error.detail : undefined,
     branch: data?.branch ?? null,
     merchantLogoUrl: data?.merchantLogoUrl,
     appointmentsEnabled: data?.appointmentsEnabled ?? false,

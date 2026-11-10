@@ -4,6 +4,13 @@ export type TranslationKeys = keyof typeof translations.en;
 
 export const translations = {
   en: {
+    catalog_all: 'All',
+    catalog_uncategorized: 'Uncategorized',
+    catalog_load_more: 'Load more products',
+    catalog_loading_more: 'Loading more products',
+    catalog_category_empty: 'No products in this category',
+    catalog_category_empty_hint: 'Choose another category or view all products.',
+    catalog_loading: 'Loading products',
     // Auth
     log_in: 'Log In',
     sign_up: 'Sign Up',
@@ -652,6 +659,13 @@ export const translations = {
     branch_table_guests_failed: 'The Guest Count could not be saved.',
   },
   de: {
+    catalog_all: 'Alle',
+    catalog_uncategorized: 'Ohne Kategorie',
+    catalog_load_more: 'Weitere Produkte laden',
+    catalog_loading_more: 'Weitere Produkte werden geladen',
+    catalog_category_empty: 'Keine Produkte in dieser Kategorie',
+    catalog_category_empty_hint: 'Wähle eine andere Kategorie oder zeige alle Produkte an.',
+    catalog_loading: 'Produkte werden geladen',
     // Auth
     log_in: 'Anmelden',
     sign_up: 'Registrieren',

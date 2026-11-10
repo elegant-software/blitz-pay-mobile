@@ -5,15 +5,18 @@ import {
   View,
   Text,
   TouchableOpacity,
-  ScrollView,
+  FlatList,
   StyleSheet,
-  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import { useLanguage } from '../lib/LanguageContext';
 import { useAuth } from '../lib/auth';
+import { CatalogCategories } from '../features/merchant-catalog/components/CatalogCategories';
+import { CatalogListFooter } from '../features/merchant-catalog/components/CatalogListFooter';
+import { CatalogSkeleton } from '../features/merchant-catalog/components/CatalogSkeleton';
+import { useCatalogBrowser } from '../features/merchant-catalog/hooks/useCatalogBrowser';
 import { useMerchantCatalog } from '../features/merchant-catalog/hooks/useMerchantCatalog';
 import { useBasket } from '../features/basket/hooks/useBasket';
 import { resolveImageUri } from '../lib/imageUri';
@@ -36,12 +39,13 @@ type ProductRowProps = {
 };
 
 function ProductRow({ product, quantity, token, merchantId, branch, onPress, onDecrement, onIncrement, onBookAppointment }: ProductRowProps) {
-  const productImage = resolveImageUri(product.imageUrl);
+  const productImage = resolveImageUri(product.thumbnailUrl ?? product.imageUrl);
   const imageMeta = summarizeImageUri(productImage?.uri);
   return (
     <TouchableOpacity style={styles.productRow} activeOpacity={0.75} onPress={onPress}>
       {productImage ? (
         <ProductImage
+          variant="thumbnail"
           merchantId={merchantId}
           branchId={branch?.branchId}
           productId={product.productId}
@@ -97,7 +101,7 @@ function ProductRow({ product, quantity, token, merchantId, branch, onPress, onD
             ) : null}
           </View>
         ) : null}
-        {product.description ? <Text style={styles.productDesc}>{product.description}</Text> : null}
+        {product.description ? <Text numberOfLines={2} style={styles.productDesc}>{product.description}</Text> : null}
         <View style={styles.productMeta}>
           <Text style={styles.productPrice}>€{product.unitPrice.toFixed(2)}</Text>
         </View>
@@ -153,32 +157,23 @@ export default function MerchantScreen() {
   const tableName = route.params?.tableName;
   const guestCount = route.params?.guestCount;
   const counterPickup = route.params?.counterPickup ?? false;
-  const { loading, errorKey, branch, merchantLogoUrl, appointmentsEnabled, products, retry } = useMerchantCatalog({
+  const catalog = useMerchantCatalog({
     merchantId,
     merchantName,
     preferredBranchId,
+    contextOnly: true,
   });
+  const { branch, merchantLogoUrl, appointmentsEnabled } = catalog;
+  const browser = useCatalogBrowser(merchantId, branch?.branchId);
+  const { categories, uncategorizedCount, categoryId, selectCategory, products, loadingMore, hasMore, loadMore, pageErrorKey, pageErrorDetail } = browser;
+  const loading = catalog.loading || browser.loading;
+  const errorKey = catalog.errorKey ?? browser.errorKey;
+  const errorDetail = catalog.errorDetail ?? browser.errorDetail;
+  const retry = catalog.errorKey ? catalog.retry : browser.retry;
   const { itemCount, subtotal, quantityByProductId, setMerchantContext, setProductQuantity, buildCheckoutContext } = useBasket();
   const [basketError, setBasketError] = useState<string | null>(null);
   const visibleBranchName = branch?.name ?? preferredBranchName ?? merchantName;
   const visibleLogoUrl = branch?.imageUrl ?? merchantLogoUrl ?? initialMerchantLogoUrl;
-
-  // Group products: categorized first (sorted alphabetically), uncategorized at the end
-  const categoryGroups: { name: string; items: typeof products }[] = [];
-  const uncategorizedProducts: typeof products = [];
-  {
-    const grouped: Record<string, typeof products> = {};
-    for (const p of products) {
-      if (p.categoryName) {
-        (grouped[p.categoryName] ??= []).push(p);
-      } else {
-        uncategorizedProducts.push(p);
-      }
-    }
-    for (const name of Object.keys(grouped).sort((a, b) => a.localeCompare(b))) {
-      categoryGroups.push({ name, items: grouped[name] });
-    }
-  }
 
   useEffect(() => {
     if (merchantId && branch) {
@@ -228,203 +223,156 @@ export default function MerchantScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: 100 + insets.bottom }} showsVerticalScrollIndicator={false}>
-        <View style={styles.banner}>
-          {visibleLogoUrl ? (
-            <Image source={{ uri: visibleLogoUrl }} style={styles.bannerLogo} contentFit="contain" cachePolicy="memory-disk" />
-          ) : (
-            <View style={styles.bannerIcon}>
-              <Ionicons name="storefront" size={40} color={colors.secondary} />
-            </View>
-          )}
-          <View style={styles.bannerInfo}>
-            <Text style={styles.bannerName}>{visibleBranchName}</Text>
-            <View style={styles.verifiedRow}>
-              <Ionicons name="checkmark-circle" size={14} color={colors.primary} />
-              <Text style={styles.verifiedText}>{t('blitz_verified')}</Text>
-            </View>
-            <View style={styles.ratingRow}>
-              <Ionicons name="navigate-outline" size={13} color={colors.gray600} />
-              <Text style={styles.ratingText}>
-                {merchantName}
-                {merchantDistance != null
-                  ? ` · ${merchantDistance < 1000 ? `${Math.round(merchantDistance)} m` : `${(merchantDistance / 1000).toFixed(1)} km`}`
-                  : ''}
-              </Text>
-            </View>
-            {branch?.addressSummary ? <Text style={styles.branchAddress}>{branch.addressSummary}</Text> : null}
-          </View>
-        </View>
-
-        {tableCode && tableName ? (
-          <View style={styles.tableBanner}>
-            <Ionicons name="restaurant" size={18} color={colors.secondary} />
-            <View style={styles.tableBannerText}>
-              <Text style={styles.tableBannerTitle}>{t('table_banner', { name: tableName })}</Text>
-              <Text style={styles.tableBannerBody}>{t('table_banner_hint')}</Text>
-            </View>
-          </View>
-        ) : counterPickup ? (
-          <View style={styles.tableBanner}>
-            <Ionicons name="storefront-outline" size={18} color={colors.secondary} />
-            <View style={styles.tableBannerText}>
-              <Text style={styles.tableBannerTitle}>{t('table_counter_pickup_title')}</Text>
-              <Text style={styles.tableBannerBody}>{t('table_counter_pickup_body')}</Text>
-            </View>
-          </View>
-        ) : null}
-
-        {loading ? (
-          <View style={styles.stateCard}>
-            <ActivityIndicator color={colors.primary} />
-            <Text style={styles.stateTitle}>{t('merchant_catalog_loading')}</Text>
-          </View>
-        ) : errorKey ? (
-          <View style={styles.stateCard}>
-            <Ionicons name="alert-circle-outline" size={24} color={colors.secondary} />
-            <Text style={styles.stateTitle}>{t(errorKey as Parameters<typeof t>[0])}</Text>
-            <TouchableOpacity style={styles.retryAction} onPress={() => void retry()}>
-              <Text style={styles.retryActionText}>{t('retry')}</Text>
-            </TouchableOpacity>
-          </View>
-        ) : products.length === 0 ? (
-          <View style={styles.stateCard}>
-            <Ionicons name="cube-outline" size={24} color={colors.secondary} />
-            <Text style={styles.stateTitle}>{t('merchant_products_empty_title')}</Text>
-            <Text style={styles.stateBody}>{t('merchant_products_empty_body')}</Text>
-          </View>
-        ) : (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{t('more_from_merchant')}</Text>
-
-            {categoryGroups.map(({ name, items }) => (
-              <View key={name}>
-                <View style={styles.categoryHeader}>
-                  <Text style={styles.categoryHeaderText}>{name}</Text>
-                </View>
-                {items.map((product) => (
-                  <ProductRow
-                    key={product.productId}
-                    product={product}
-                    quantity={quantityByProductId[product.productId] ?? 0}
-                    token={token}
-                    merchantId={merchantId}
-                    merchantName={merchantName}
-                    branch={branch}
-                    onPress={() => {
-                      if (!merchantId || !branch) return;
-                      navigation.navigate('ProductDetail', {
-                        productId: product.productId,
-                        name: product.name,
-                        description: product.description,
-                        unitPrice: product.unitPrice,
-                        imageUrl: product.imageUrl,
-                        merchantId,
-                        merchantName,
-                        branchId: branch.branchId,
-                        branchName: branch.name,
-                        merchantLogoUrl: visibleLogoUrl,
-                        categoryName: product.categoryName,
-                        productCode: product.productCode,
-                      });
-                    }}
-                    onDecrement={() => {
-                      if (!merchantId || !branch) return;
-                      setProductQuantity(
-                        { merchantId, merchantName, branchId: branch.branchId, branchName: branch.name },
-                        product,
-                        Math.max(0, (quantityByProductId[product.productId] ?? 0) - 1),
-                      );
-                    }}
-                    onIncrement={() => {
-                      if (!merchantId || !branch) return;
-                      setProductQuantity(
-                        { merchantId, merchantName, branchId: branch.branchId, branchName: branch.name },
-                        product,
-                        (quantityByProductId[product.productId] ?? 0) + 1,
-                      );
-                    }}
-                    onBookAppointment={appointmentsEnabled && product.categoryId && branch ? () => {
-                      navigation.navigate('AvailableSlots', {
-                        branchId: branch.branchId,
-                        productId: product.productId,
-                        productCategoryId: product.categoryId!,
-                        productName: product.name,
-                        merchantName,
-                        branchName: branch.name,
-                      });
-                    } : undefined}
-                  />
-                ))}
+      <CatalogCategories uncategorizedCount={uncategorizedCount} categories={categories} selectedId={categoryId} onSelect={selectCategory} />
+      <FlatList
+        key={JSON.stringify([merchantId, branch?.branchId, categoryId])}
+        data={loading || errorKey ? [] : products}
+        keyExtractor={product => product.productId}
+        extraData={quantityByProductId}
+        initialNumToRender={8}
+        maxToRenderPerBatch={8}
+        windowSize={5}
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.5}
+        refreshing={browser.refreshing}
+        onRefresh={() => void browser.reload()}
+        contentContainerStyle={{ paddingBottom: 100 + insets.bottom }}
+        showsVerticalScrollIndicator={false}
+        ListHeaderComponent={<>
+          <View style={styles.banner}>
+            {visibleLogoUrl ? (
+              <Image source={{ uri: visibleLogoUrl }} style={styles.bannerLogo} contentFit="contain" cachePolicy="memory-disk" />
+            ) : (
+              <View style={styles.bannerIcon}>
+                <Ionicons name="storefront" size={40} color={colors.secondary} />
               </View>
-            ))}
-
-            {uncategorizedProducts.map((product) => (
-              <ProductRow
-                key={product.productId}
-                product={product}
-                quantity={quantityByProductId[product.productId] ?? 0}
-                token={token}
-                merchantId={merchantId}
-                merchantName={merchantName}
-                branch={branch}
-                onPress={() => {
-                  if (!merchantId || !branch) return;
-                  navigation.navigate('ProductDetail', {
-                    productId: product.productId,
-                    name: product.name,
-                    description: product.description,
-                    unitPrice: product.unitPrice,
-                    imageUrl: product.imageUrl,
-                    merchantId,
-                    merchantName,
-                    branchId: branch.branchId,
-                    branchName: branch.name,
-                    merchantLogoUrl: visibleLogoUrl,
-                    categoryName: product.categoryName,
-                    productCode: product.productCode,
-                  });
-                }}
-                onDecrement={() => {
-                  if (!merchantId || !branch) return;
-                  setProductQuantity(
-                    { merchantId, merchantName, branchId: branch.branchId, branchName: branch.name },
-                    product,
-                    Math.max(0, (quantityByProductId[product.productId] ?? 0) - 1),
-                  );
-                }}
-                onIncrement={() => {
-                  if (!merchantId || !branch) return;
-                  setProductQuantity(
-                    { merchantId, merchantName, branchId: branch.branchId, branchName: branch.name },
-                    product,
-                    (quantityByProductId[product.productId] ?? 0) + 1,
-                  );
-                }}
-                onBookAppointment={appointmentsEnabled && product.categoryId && branch ? () => {
-                  navigation.navigate('AvailableSlots', {
-                    branchId: branch.branchId,
-                    productId: product.productId,
-                    productCategoryId: product.categoryId!,
-                    productName: product.name,
-                    merchantName,
-                    branchName: branch.name,
-                  });
-                } : undefined}
-              />
-            ))}
+            )}
+            <View style={styles.bannerInfo}>
+              <Text style={styles.bannerName}>{visibleBranchName}</Text>
+              <View style={styles.verifiedRow}>
+                <Ionicons name="checkmark-circle" size={14} color={colors.primary} />
+                <Text style={styles.verifiedText}>{t('blitz_verified')}</Text>
+              </View>
+              <View style={styles.ratingRow}>
+                <Ionicons name="navigate-outline" size={13} color={colors.gray600} />
+                <Text style={styles.ratingText}>
+                  {merchantName}
+                  {merchantDistance != null
+                    ? ` · ${merchantDistance < 1000 ? `${Math.round(merchantDistance)} m` : `${(merchantDistance / 1000).toFixed(1)} km`}`
+                    : ''}
+                </Text>
+              </View>
+              {branch?.addressSummary ? <Text style={styles.branchAddress}>{branch.addressSummary}</Text> : null}
+            </View>
           </View>
-        )}
 
-        <View style={styles.section}>
-          <View style={styles.basketCard}>
-            <Text style={styles.sectionTitle}>{t('basket_total')}</Text>
-            <Text style={styles.basketMeta}>{t('selected_items_count', { count: itemCount })}</Text>
-            <Text style={styles.basketTotal}>€{subtotal.toFixed(2)}</Text>
-            {basketError ? <Text style={styles.basketError}>{t(basketError as Parameters<typeof t>[0])}</Text> : null}
+          {tableCode && tableName ? (
+            <View style={styles.tableBanner}>
+              <Ionicons name="restaurant" size={18} color={colors.secondary} />
+              <View style={styles.tableBannerText}>
+                <Text style={styles.tableBannerTitle}>{t('table_banner', { name: tableName })}</Text>
+                <Text style={styles.tableBannerBody}>{t('table_banner_hint')}</Text>
+              </View>
+            </View>
+          ) : counterPickup ? (
+            <View style={styles.tableBanner}>
+              <Ionicons name="storefront-outline" size={18} color={colors.secondary} />
+              <View style={styles.tableBannerText}>
+                <Text style={styles.tableBannerTitle}>{t('table_counter_pickup_title')}</Text>
+                <Text style={styles.tableBannerBody}>{t('table_counter_pickup_body')}</Text>
+              </View>
+            </View>
+          ) : null}
+
+            <View style={styles.section}><Text style={styles.sectionTitle}>{t('more_from_merchant')}</Text></View>
+        </>}
+        ListEmptyComponent={<>
+          {loading ? (
+            <CatalogSkeleton />
+          ) : errorKey ? (
+            <View style={styles.stateCard}>
+              <Ionicons name="alert-circle-outline" size={24} color={colors.secondary} />
+              <Text style={styles.stateTitle}>{t(errorKey as Parameters<typeof t>[0])}</Text>
+              {errorDetail ? <Text style={styles.stateBody}>{errorDetail}</Text> : null}
+              <TouchableOpacity style={styles.retryAction} onPress={() => void retry()}>
+                <Text style={styles.retryActionText}>{t('retry')}</Text>
+              </TouchableOpacity>
+            </View>
+          ) : products.length === 0 ? (
+            <View style={styles.stateCard}>
+              <Ionicons name="cube-outline" size={24} color={colors.secondary} />
+              <Text style={styles.stateTitle}>{t(categoryId ? 'catalog_category_empty' : 'merchant_products_empty_title')}</Text>
+              <Text style={styles.stateBody}>{t(categoryId ? 'catalog_category_empty_hint' : 'merchant_products_empty_body')}</Text>
+            </View>
+          ) : null}
+        </>}
+        renderItem={({ item: product }) => <View style={{ paddingHorizontal: spacing.md }}>
+          <ProductRow
+            product={product}
+            quantity={quantityByProductId[product.productId] ?? 0}
+            token={token}
+            merchantId={merchantId}
+            merchantName={merchantName}
+            branch={branch}
+            onPress={() => {
+              if (!merchantId || !branch) return;
+              navigation.navigate('ProductDetail', {
+                productId: product.productId,
+                name: product.name,
+                description: product.description,
+                unitPrice: product.unitPrice,
+                imageUrl: product.imageUrl,
+                merchantId,
+                merchantName,
+                branchId: branch.branchId,
+                branchName: branch.name,
+                merchantLogoUrl: visibleLogoUrl,
+                categoryName: product.categoryName,
+                productCode: product.productCode,
+              });
+            }}
+            onDecrement={() => {
+              if (!merchantId || !branch) return;
+              setProductQuantity(
+                { merchantId, merchantName, branchId: branch.branchId, branchName: branch.name },
+                product,
+                Math.max(0, (quantityByProductId[product.productId] ?? 0) - 1),
+              );
+            }}
+            onIncrement={() => {
+              if (!merchantId || !branch) return;
+              setProductQuantity(
+                { merchantId, merchantName, branchId: branch.branchId, branchName: branch.name },
+                product,
+                (quantityByProductId[product.productId] ?? 0) + 1,
+              );
+            }}
+            onBookAppointment={appointmentsEnabled && product.categoryId && branch ? () => {
+              navigation.navigate('AvailableSlots', {
+                branchId: branch.branchId,
+                productId: product.productId,
+                productCategoryId: product.categoryId!,
+                productName: product.name,
+                merchantName,
+                branchName: branch.name,
+              });
+            } : undefined}
+          />
+        </View>}
+        ListFooterComponent={<>
+          <CatalogListFooter loading={loadingMore} hasMore={hasMore} onLoadMore={loadMore}
+            error={pageErrorDetail ?? (pageErrorKey ? t(pageErrorKey as Parameters<typeof t>[0]) : undefined)}
+            onRetry={() => void browser.retry()} />
+          <View style={styles.section}>
+            <View style={styles.basketCard}>
+              <Text style={styles.sectionTitle}>{t('basket_total')}</Text>
+              <Text style={styles.basketMeta}>{t('selected_items_count', { count: itemCount })}</Text>
+              <Text style={styles.basketTotal}>€{subtotal.toFixed(2)}</Text>
+              {basketError ? <Text style={styles.basketError}>{t(basketError as Parameters<typeof t>[0])}</Text> : null}
+            </View>
           </View>
-        </View>
-      </ScrollView>
+        </>}
+      />
 
       {!appointmentsEnabled ? (
         <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 12 }]}>

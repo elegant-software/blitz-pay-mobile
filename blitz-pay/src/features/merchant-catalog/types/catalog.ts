@@ -22,6 +22,7 @@ export interface ActiveProduct {
   description?: string;
   unitPrice: number;
   imageUrl?: string;
+  thumbnailUrl?: string;
   active: boolean;
   categoryId?: string;
   categoryName?: string;
@@ -29,8 +30,30 @@ export interface ActiveProduct {
   updatedAt?: string;
 }
 
+export interface CatalogCategory {
+  id: string;
+  name: string;
+  productCount: number;
+}
+
+export interface BranchCatalogCategories {
+  categories: CatalogCategory[];
+  uncategorizedCount: number;
+  totalCount: number;
+}
+
+export interface CatalogProductPage {
+  items: ActiveProduct[];
+  nextCursor: string | null;
+  hasMore: boolean;
+  limit: number;
+}
+
+export type CatalogProductFilter = { categoryId?: string; uncategorized?: boolean; cursor?: string };
+
 export interface CatalogValidationIssue {
   productId: string;
   type: 'missing' | 'inactive' | 'price_changed';
   latestUnitPrice?: number;
 }
+export const UNCATEGORIZED_CATEGORY = 'uncategorized';

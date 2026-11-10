@@ -11,6 +11,7 @@ type UseMerchantProductsResult = {
   loading: boolean;
   refreshing: boolean;
   errorKey: string | null;
+  errorDetail?: string;
   reload: () => Promise<unknown>;
 };
 
@@ -37,10 +38,11 @@ export function useMerchantProducts(activeBranchScope: ActiveBranchScope | null,
     }, [activeBranchScope, isStale, refetch]),
   );
 
+  const failure = error;
   const errorKey = !activeBranchScope
     ? (branchScopeError ?? 'merchant_products_branch_missing')
-    : error
-      ? (error instanceof MerchantProductError ? error.key : 'merchant_products_load_failed')
+    : failure
+      ? (failure instanceof MerchantProductError ? failure.key : 'merchant_products_load_failed')
       : null;
 
   return {
@@ -48,6 +50,7 @@ export function useMerchantProducts(activeBranchScope: ActiveBranchScope | null,
     loading: isLoading && !data,
     refreshing: isFetching && !!data,
     errorKey,
+    errorDetail: failure instanceof MerchantProductError ? failure.detail : undefined,
     reload: refetch,
   };
 }

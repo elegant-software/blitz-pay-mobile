@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { fetchActiveProducts as fetchProducts } from '../services/merchantCatalogService';
+import { fetchCatalogProductDetail as fetchProductDetail } from '../services/merchantCatalogService';
 import { observability } from '../../../lib/observability';
 
 type ProductImageContext = {
@@ -8,13 +8,14 @@ type ProductImageContext = {
   branchId?: string;
   productId?: string;
   imageUrl?: string;
+  variant?: 'thumbnail' | 'detail';
 };
 
-export function useProductImage({ merchantId, branchId, productId, imageUrl }: ProductImageContext) {
+export function useProductImage({ merchantId, branchId, productId, imageUrl, variant = 'detail' }: ProductImageContext) {
   const queryClient = useQueryClient();
   const attempted = useRef(new Set<string>());
   const [replacement, setReplacement] = useState<{ key: string; uri: string } | null>(null);
-  const key = JSON.stringify([merchantId, branchId, productId, imageUrl]);
+  const key = JSON.stringify([merchantId, branchId, productId, imageUrl, variant]);
 
   const refresh = useCallback(async () => {
     if (!merchantId || !branchId || !productId || !imageUrl || attempted.current.has(key)) return;
@@ -27,15 +28,15 @@ export function useProductImage({ merchantId, branchId, productId, imageUrl }: P
     const context = { merchantId, branchId, productId };
     observability.info('product_image_url_refresh_requested', context);
     try {
-      const products = await queryClient.fetchQuery({
-        queryKey: ['product-image-refresh', merchantId, branchId],
-        queryFn: () => fetchProducts(merchantId, branchId),
+      const product = await queryClient.fetchQuery({
+        queryKey: ['product-image-refresh', merchantId, branchId, productId],
+        queryFn: () => fetchProductDetail(merchantId, branchId, productId),
         staleTime: 5_000,
         gcTime: 60_000,
         retry: false,
       });
-      const product = products.find(value => value.productId === productId && value.branchId === branchId);
-      const freshUrl = product?.imageUrl;
+      const freshUrl = variant === 'thumbnail' && product.thumbnailUrl !== imageUrl
+        ? product.thumbnailUrl ?? product.imageUrl : product.imageUrl;
       const changed = Boolean(freshUrl && freshUrl !== imageUrl);
       if (changed) setReplacement({ key, uri: freshUrl! });
       observability.info('product_image_url_refresh_completed', { ...context, changed });
@@ -45,7 +46,7 @@ export function useProductImage({ merchantId, branchId, productId, imageUrl }: P
         reason: error instanceof Error ? error.name : 'unknown_error',
       });
     }
-  }, [merchantId, branchId, productId, imageUrl, key, queryClient]);
+  }, [merchantId, branchId, productId, imageUrl, variant, key, queryClient]);
 
   return { imageUrl: replacement?.key === key ? replacement.uri : imageUrl, refresh };
 }

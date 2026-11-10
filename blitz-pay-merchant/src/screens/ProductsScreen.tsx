@@ -1,7 +1,7 @@
 import React from 'react';
 import { ProductImage } from '../features/products/components/ProductImage';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator,
+  View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,39 +9,24 @@ import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../lib/auth';
 import { useLanguage } from '../lib/LanguageContext';
 import { colors, spacing, radius, shadow } from '../lib/theme';
-import { useMerchantProducts } from '../features/products/hooks/useMerchantProducts';
-import type { RootStackNav, Product } from '../types';
+import { useMerchantCatalogBrowser } from '../features/products/hooks/useMerchantCatalogBrowser';
+import { CatalogCategories } from '../features/products/components/CatalogCategories';
+import { CatalogListFooter } from '../features/products/components/CatalogListFooter';
+import { CatalogSkeleton } from '../features/products/components/CatalogSkeleton';
+import type { RootStackNav } from '../types';
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(amount);
 }
 
 
-function groupByCategory(products: Product[], uncategorizedLabel: string): { category: string; items: Product[] }[] {
-  const map = new Map<string, Product[]>();
-  for (const p of products) {
-    const key = p.categoryName ?? uncategorizedLabel;
-    const existing = map.get(key);
-    if (existing) existing.push(p);
-    else map.set(key, [p]);
-  }
-  const groups = Array.from(map.entries()).map(([category, items]) => ({ category, items }));
-  groups.sort((a, b) => {
-    if (a.category === uncategorizedLabel) return 1;
-    if (b.category === uncategorizedLabel) return -1;
-    return a.category.localeCompare(b.category);
-  });
-  return groups;
-}
-
 export default function ProductsScreen() {
   const { t } = useLanguage();
   const { activeBranchScope, branchScopeError, retryBranchScope } = useAuth();
   const navigation = useNavigation<RootStackNav>();
   const insets = useSafeAreaInsets();
-  const { products, loading, refreshing, errorKey, reload } = useMerchantProducts(activeBranchScope, branchScopeError);
+  const { products, loading, refreshing, errorKey, errorDetail, categories, uncategorizedCount, categoryId, selectCategory, reload, loadingMore, hasMore, loadMore, pageErrorKey, pageErrorDetail, retry } = useMerchantCatalogBrowser(activeBranchScope, branchScopeError);
 
-  const groups = groupByCategory(products, t('product_uncategorized'));
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -67,70 +52,77 @@ export default function ProductsScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView
+      <CatalogCategories uncategorizedCount={uncategorizedCount} categories={categories} selectedId={categoryId} onSelect={selectCategory} />
+      <FlatList
+        key={JSON.stringify([activeBranchScope?.merchantId, activeBranchScope?.branchId, categoryId])}
+        data={loading || errorKey ? [] : products}
+        keyExtractor={product => product.id}
+        initialNumToRender={10}
+        maxToRenderPerBatch={8}
+        windowSize={5}
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.5}
+        refreshing={refreshing}
+        onRefresh={() => void reload()}
         contentContainerStyle={{ paddingHorizontal: spacing.md, paddingBottom: 90 + insets.bottom, paddingTop: spacing.sm }}
         showsVerticalScrollIndicator={false}
-      >
-        {loading ? (
-          <View style={[styles.stateCard, shadow.sm]}>
-            <ActivityIndicator color={colors.primary} />
-            <Text style={styles.stateTitle}>{t('merchant_products_loading')}</Text>
-          </View>
-        ) : errorKey ? (
-          <View style={[styles.stateCard, shadow.sm]}>
-            <Ionicons name="alert-circle-outline" size={24} color={colors.error} />
-            <Text style={styles.stateTitle}>{t(errorKey as Parameters<typeof t>[0])}</Text>
-            <TouchableOpacity
-              style={styles.retryBtn}
-              onPress={() => void (branchScopeError ? retryBranchScope() : reload())}
-            >
-              <Text style={styles.retryBtnText}>{t('retry')}</Text>
-            </TouchableOpacity>
-          </View>
-        ) : products.length === 0 ? (
-          <View style={[styles.stateCard, shadow.sm]}>
-            <Ionicons name="cube-outline" size={24} color={colors.gray500} />
-            <Text style={styles.stateTitle}>{t('merchant_products_empty')}</Text>
-          </View>
-        ) : (
-          groups.map(({ category, items }) => (
-            <View key={category}>
-              <Text style={styles.categoryHeader}>{category}</Text>
-              {items.map((product) => (
-                <TouchableOpacity
-                  key={product.id}
-                  style={[styles.productCard, shadow.sm, !product.active && styles.productCardInactive]}
-                  onPress={() => navigation.navigate('ProductEdit', { productId: product.id, mode: 'edit' })}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.productLeft}>
-                    {product.imageUrl ? (
-                      <ProductImage merchantId={activeBranchScope?.merchantId} branchId={product.branchId} productId={product.id}
-                        source={{ uri: product.imageUrl }} style={styles.productIcon} contentFit="cover" cachePolicy="memory-disk" />
-                    ) : (
-                      <View style={[styles.productIcon, { backgroundColor: product.active ? `${colors.primary}15` : colors.surface }]}>
-                        <Ionicons name="cube-outline" size={22} color={product.active ? colors.primary : colors.gray400} />
-                      </View>
-                    )}
-                    <View style={styles.productInfo}>
-                      <Text style={[styles.productName, !product.active && styles.textMuted]}>{product.name}</Text>
-                      {product.productCode != null ? <Text style={styles.productMeta}>#{product.productCode}</Text> : null}
-                    </View>
-                  </View>
-                  <View style={styles.productRight}>
-                    <Text style={[styles.productPrice, !product.active && styles.textMuted]}>
-                      {formatCurrency(product.unitPrice)}
-                    </Text>
-                    <Text style={[styles.productStatus, !product.active && styles.productStatusInactive]}>
-                      {product.active ? t('product_status_active') : t('product_status_inactive')}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
+        ListFooterComponent={<CatalogListFooter loading={loadingMore} hasMore={hasMore} onLoadMore={loadMore}
+          error={pageErrorDetail ?? (pageErrorKey ? t(pageErrorKey as Parameters<typeof t>[0]) : undefined)}
+          onRetry={() => void retry()} />}
+        ListEmptyComponent={<>
+          {loading ? (
+            <CatalogSkeleton />
+          ) : errorKey ? (
+            <View style={[styles.stateCard, shadow.sm]}>
+              <Ionicons name="alert-circle-outline" size={24} color={colors.error} />
+              <Text style={styles.stateTitle}>{errorDetail ?? t(errorKey as Parameters<typeof t>[0])}</Text>
+              <TouchableOpacity
+                style={styles.retryBtn}
+                onPress={() => void (branchScopeError ? retryBranchScope() : reload())}
+              >
+                <Text style={styles.retryBtnText}>{t('retry')}</Text>
+              </TouchableOpacity>
             </View>
-          ))
+          ) : products.length === 0 ? (
+            <View style={[styles.stateCard, shadow.sm]}>
+              <Ionicons name="cube-outline" size={24} color={colors.gray500} />
+              <Text style={styles.stateTitle}>{t(categoryId ? 'catalog_category_empty' : 'merchant_products_empty')}</Text>
+              {categoryId ? <Text style={styles.stateTitle}>{t('catalog_category_empty_hint')}</Text> : null}
+            </View>
+          ) : null}
+        </>}
+        renderItem={({ item: product }) => (
+          <TouchableOpacity
+            style={[styles.productCard, shadow.sm, !product.active && styles.productCardInactive]}
+            onPress={() => navigation.navigate('ProductEdit', { productId: product.id, mode: 'edit' })}
+            activeOpacity={0.7}
+          >
+            <View style={styles.productLeft}>
+              {product.thumbnailUrl || product.imageUrl ? (
+                <ProductImage variant="thumbnail" merchantId={activeBranchScope?.merchantId} branchId={product.branchId} productId={product.id}
+                  source={{ uri: product.thumbnailUrl ?? product.imageUrl }} style={styles.productIcon} contentFit="cover" cachePolicy="memory-disk" />
+              ) : (
+                <View style={[styles.productIcon, { backgroundColor: product.active ? `${colors.primary}15` : colors.surface }]}>
+                  <Ionicons name="cube-outline" size={22} color={product.active ? colors.primary : colors.gray400} />
+                </View>
+              )}
+              <View style={styles.productInfo}>
+                <Text style={[styles.productName, !product.active && styles.textMuted]}>{product.name}</Text>
+                {product.categoryName ? <Text style={styles.productMeta}>{product.categoryName}</Text> : null}
+                {product.productCode != null ? <Text style={styles.productMeta}>#{product.productCode}</Text> : null}
+              </View>
+            </View>
+            <View style={styles.productRight}>
+              <Text style={[styles.productPrice, !product.active && styles.textMuted]}>
+                {formatCurrency(product.unitPrice)}
+              </Text>
+              <Text style={[styles.productStatus, !product.active && styles.productStatusInactive]}>
+                {product.active ? t('product_status_active') : t('product_status_inactive')}
+              </Text>
+            </View>
+          </TouchableOpacity>
         )}
-      </ScrollView>
+      />
     </View>
   );
 }

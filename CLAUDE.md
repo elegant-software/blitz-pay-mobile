@@ -86,6 +86,17 @@ Set `EXPO_PUBLIC_AUTH_BYPASS=true` in `blitz-pay-merchant/.env`.
 
 ## Shared patterns
 
+Catalog browsing in both apps uses the backend #224 endpoints:
+`GET /v1/merchants/{merchantId}/catalog/products` (24 products per page, opaque cursor)
+and `GET /v1/merchants/{merchantId}/catalog/categories` (branch counts).
+Both require `branchId`; merchant management also requests `includeInactive=true`.
+Category selection supports All and Uncategorized without sending a synthetic category ID.
+Lists use `thumbnailUrl ?? imageUrl`; product details and editing retain the full `imageUrl`.
+Expired image URLs refresh through the single-product endpoint.
+These APIs require deployment of backend PR #225. Basket validation, order product pickers,
+and appointment product pickers retain their existing complete-catalog calls.
+
+
 **Auth flow**: ROPC grant → `expo-secure-store` → proactive refresh 60s before expiry. `AuthProvider` wraps the navigator; `useAuth()` returns `{ initialized, authenticated, token, user, login, loginWithBiometric, logout, enrollBiometric }`.
 
 **i18n**: `LanguageProvider` at root; `t('key')` via `useLanguage()`; both `de` and `en` translations required.
