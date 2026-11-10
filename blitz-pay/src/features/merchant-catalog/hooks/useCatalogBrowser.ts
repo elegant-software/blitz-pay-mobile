@@ -1,3 +1,4 @@
+import { useLanguage } from '../../../lib/LanguageContext';
 import { useCallback, useMemo } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
@@ -7,11 +8,12 @@ import { UNCATEGORIZED_CATEGORY } from '../types/catalog';
 import { STALE_TIMES } from '../../../lib/queryClient';
 
 export function useCatalogBrowser(merchantId?: string, branchId?: string) {
+  const { language } = useLanguage();
   const enabled = !!merchantId && !!branchId;
   const selection = useCatalogSelection(JSON.stringify([merchantId, branchId]));
   const categories = useQuery({
-    queryKey: ['branch-catalog-categories-v1', merchantId, branchId],
-    queryFn: () => fetchBranchCatalogCategories(merchantId!, branchId!),
+    queryKey: ['branch-catalog-categories-v1', merchantId, branchId, language],
+    queryFn: () => fetchBranchCatalogCategories(merchantId!, branchId!, language),
     enabled,
     staleTime: STALE_TIMES.PRODUCTS,
   });
@@ -21,13 +23,13 @@ export function useCatalogBrowser(merchantId?: string, branchId?: string) {
     categories.data?.categories.some(category => category.id === selected);
   const categoryId = selected !== undefined && validSelection ? selected : categories.data?.categories[0]?.id ?? '';
   const products = useInfiniteQuery({
-    queryKey: ['catalog-pages-v1', merchantId, branchId, categoryId],
+    queryKey: ['catalog-pages-v1', merchantId, branchId, categoryId, language],
     initialPageParam: undefined as string | undefined,
     queryFn: ({ pageParam }) => fetchCatalogProductPage(merchantId!, branchId!, {
       categoryId: categoryId && categoryId !== UNCATEGORIZED_CATEGORY ? categoryId : undefined,
       uncategorized: categoryId === UNCATEGORIZED_CATEGORY,
       cursor: pageParam,
-    }),
+    }, language),
     getNextPageParam: page => page.hasMore ? page.nextCursor ?? undefined : undefined,
     enabled: enabled && !!categories.data,
     staleTime: STALE_TIMES.PRODUCTS,

@@ -13,7 +13,7 @@ beforeEach(() => { jest.clearAllMocks(); });
 it('requests a scoped page and keeps backend ordering and separate thumbnail/detail images', async () => {
   jest.mocked(authedFetch).mockResolvedValueOnce(json(page([product, { ...product, productId: 'second', name: 'Alphabetically earlier' }], 'next+/=')));
   const result = await fetchCatalogProductPage('merchant', 'branch', { categoryId: 'food' });
-  expect(authedFetch).toHaveBeenLastCalledWith('/v1/merchants/merchant/catalog/products?branchId=branch&limit=24&categoryId=food');
+  expect(authedFetch).toHaveBeenLastCalledWith('/v1/merchants/merchant/catalog/products?branchId=branch&limit=24&categoryId=food', { headers: { 'Accept-Language': 'de' } });
   expect(result.items.map(item => item.productId)).toEqual(['meal', 'second']);
   expect(result.items[0]).toMatchObject({ imageUrl: 'detail.jpg', thumbnailUrl: 'thumb.jpg' });
   expect(result.nextCursor).toBe('next+/=');
@@ -52,7 +52,7 @@ it('loads only branch categories and preserves counts', async () => {
   const categories = { categories: [{ id: 'food', name: 'Food', productCount: 3 }], uncategorizedCount: 2, totalCount: 5 };
   jest.mocked(authedFetch).mockResolvedValueOnce(json(categories));
   await expect(fetchBranchCatalogCategories('merchant', 'branch')).resolves.toEqual(categories);
-  expect(authedFetch).toHaveBeenLastCalledWith('/v1/merchants/merchant/catalog/categories?branchId=branch');
+  expect(authedFetch).toHaveBeenLastCalledWith('/v1/merchants/merchant/catalog/categories?branchId=branch', { headers: { 'Accept-Language': 'de' } });
 });
 
 it('preserves backend details and cursor error codes for recovery', async () => {
@@ -63,5 +63,5 @@ it('preserves backend details and cursor error codes for recovery', async () => 
 it('refreshes one product image without fetching the whole catalog', async () => {
   jest.mocked(authedFetch).mockResolvedValueOnce(json(product));
   await expect(fetchCatalogProductDetail('merchant', 'branch', 'meal')).resolves.toMatchObject({ imageUrl: 'detail.jpg', thumbnailUrl: 'thumb.jpg' });
-  expect(authedFetch).toHaveBeenLastCalledWith('/v1/merchants/merchant/products/meal?branchId=branch');
+  expect(authedFetch).toHaveBeenLastCalledWith('/v1/merchants/merchant/products/meal?branchId=branch', { headers: { 'Accept-Language': 'de' } });
 });

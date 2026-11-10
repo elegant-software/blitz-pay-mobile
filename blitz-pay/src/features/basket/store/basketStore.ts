@@ -90,3 +90,16 @@ export function clearBasket() {
 export function markBasketValidated(timestamp: string) {
   mergeState({ lastValidatedAt: timestamp });
 }
+
+export function localizeBasketProducts(merchantId: string, branchId: string, products: ActiveProduct[]) {
+  if (state.merchantId !== merchantId || state.branchId !== branchId) return;
+  const byId = new Map(products.map(product => [product.productId, product]));
+  let changed = false;
+  const items = state.items.map(item => {
+    const product = byId.get(item.productId);
+    if (!product || (item.productName === product.name && item.description === product.description)) return item;
+    changed = true;
+    return { ...item, productName: product.name, description: product.description };
+  });
+  if (changed) mergeState({ items });
+}

@@ -43,19 +43,19 @@ export default function App() {
               },
             }}
           >
+          <AuthProvider>
           <LanguageProvider>
             <>
               {splashVisible ? (
                 <SplashScreen onComplete={() => setSplashVisible(false)} />
               ) : null}
-              <AuthProvider>
                 <NavigationContainer>
                   <StatusBar style="dark" />
                   <AppNavigator />
                 </NavigationContainer>
-              </AuthProvider>
             </>
           </LanguageProvider>
+          </AuthProvider>
           </PersistQueryClientProvider>
           </StripeTerminalProvider>
         </ErrorBoundary>

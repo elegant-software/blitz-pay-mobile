@@ -11,6 +11,7 @@ type BranchResponse = {
   latitude?: number;
   longitude?: number;
   geofenceRadiusMeters?: number;
+  originalMenuLanguage?: string | null;
   status?: string;
 };
 
@@ -21,6 +22,7 @@ export type MerchantBranchDetails = {
   latitude?: number;
   longitude?: number;
   geofenceRadiusMeters?: number;
+  originalMenuLanguage?: string | null;
   status?: string;
 };
 
@@ -91,6 +93,7 @@ export async function fetchMerchantBranchDetails(
     latitude: ensureNumber(branch.latitude),
     longitude: ensureNumber(branch.longitude),
     geofenceRadiusMeters: ensureNumber(branch.geofenceRadiusMeters),
+    originalMenuLanguage: branch.originalMenuLanguage,
     status: branch.status,
   };
 }

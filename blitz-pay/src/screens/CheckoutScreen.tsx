@@ -1,3 +1,4 @@
+import { useLocalizedCheckoutItems } from '../features/basket/hooks/useLocalizedCheckoutItems';
 import React, { useEffect, useMemo, useState } from 'react';
 import { ProductImage } from '../features/merchant-catalog/components/ProductImage';
 import {
@@ -70,6 +71,7 @@ export default function CheckoutScreen() {
   const basketItemCount = route.params?.basketItemCount ?? route.params?.basketItems?.length ?? 0;
   const basketItems = route.params?.basketItems ?? [];
   const invoiceId = route.params?.invoiceId;
+  const displayBasketItems = useLocalizedCheckoutItems(basketItems, merchantId, branchId, !invoiceId);
   const tableCode = route.params?.tableCode;
   const tableName = route.params?.tableName;
   const guestCount = route.params?.guestCount;
@@ -273,7 +275,7 @@ export default function CheckoutScreen() {
           {basketItems.length > 0 ? (
             <View style={styles.basketSummaryCard}>
               <Text style={styles.basketSummaryTitle}>{t('selected_items_count', { count: basketItemCount })}</Text>
-              {basketItems.map((item) => {
+              {displayBasketItems.map((item) => {
                 const productImageUri = resolveImageUri(item.imageUrl);
                 const imageMeta = summarizeImageUri(productImageUri);
                 return (

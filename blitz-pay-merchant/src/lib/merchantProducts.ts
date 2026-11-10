@@ -7,6 +7,7 @@ import type { BranchCatalogCategories, CatalogProductPage, CatalogProductFilter 
 const API_VERSION = 'v1';
 
 type MerchantDetailResponse = {
+  originalMenuLanguage?: string | null;
   merchantName?: string;
   legalBusinessName?: string;
   offerings?: string[];
@@ -14,6 +15,7 @@ type MerchantDetailResponse = {
 };
 
 export type MerchantDetails = {
+  originalMenuLanguage?: string | null;
   name: string | null;
   mobility: 'BRICK_AND_MORTAR' | 'MOBILE' | null;
 };
@@ -278,6 +280,7 @@ export async function fetchMerchantDetails(merchantId: string): Promise<Merchant
     { event: 'fetch_merchant_details', merchantId, failureKey: 'merchant_products_load_failed' },
   );
   return {
+    originalMenuLanguage: response.originalMenuLanguage,
     name: response.merchantName?.trim() || response.legalBusinessName?.trim() || null,
     mobility: response.merchantMobility === 'MOBILE' || response.merchantMobility === 'BRICK_AND_MORTAR'
       ? response.merchantMobility

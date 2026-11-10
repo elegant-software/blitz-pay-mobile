@@ -40,7 +40,9 @@
     "expo-image": "~55.0.11",
     "expo-linear-gradient": "~55.0.15",
     "expo-local-authentication": "~55.0.15",
+    "expo-localization": "~55.0.14",
     "expo-location": "~55.1.11",
+    "expo-network": "~55.0.12",
     "expo-notifications": "~55.0.24",
     "expo-secure-store": "~55.0.15",
     "expo-sharing": "~55.0.21",
@@ -73,6 +75,7 @@
     "babel-jest": "^29.7.0",
     "jest": "^29.7.0",
     "patch-package": "^8.0.1",
+    "react-test-renderer": "^19.2.0",
     "typescript": "^5.3.3"
   },
   "jest": {

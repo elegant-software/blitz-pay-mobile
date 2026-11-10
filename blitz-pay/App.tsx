@@ -86,6 +86,7 @@ export default function App() {
               },
             }}
           >
+          <AuthProvider>
           <LanguageProvider>
             <StripeProvider
               publishableKey={config.stripePublishableKey}
@@ -96,7 +97,6 @@ export default function App() {
                 {splashVisible ? (
                   <SplashScreen onComplete={() => setSplashVisible(false)} />
                 ) : null}
-                <AuthProvider>
                 <NavigationContainer
                   ref={navigationRef}
                   linking={linking}
@@ -108,10 +108,10 @@ export default function App() {
                   <PostAuthEffects />
                   <AppNavigator />
                 </NavigationContainer>
-                </AuthProvider>
               </>
             </StripeProvider>
           </LanguageProvider>
+          </AuthProvider>
           </PersistQueryClientProvider>
         </ErrorBoundary>
       </SafeAreaProvider>

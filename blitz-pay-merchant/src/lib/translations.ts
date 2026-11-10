@@ -4,6 +4,10 @@ export type TranslationKeys = keyof typeof translations.en;
 
 export const translations = {
   en: {
+    language_english: 'English',
+    language_german: 'Deutsch',
+    language_save_failed: 'Your language could not be saved. We will retry when you reconnect.',
+    language_save_retry: 'Retry saving language',
     catalog_all: 'All',
     catalog_uncategorized: 'Uncategorized',
     catalog_load_more: 'Load more products',
@@ -681,6 +685,10 @@ export const translations = {
     branch_table_guests_failed: 'The Guest Count could not be saved.',
   },
   de: {
+    language_english: 'English',
+    language_german: 'Deutsch',
+    language_save_failed: 'Deine Sprache konnte nicht gespeichert werden. Wir versuchen es erneut, sobald du wieder online bist.',
+    language_save_retry: 'Sprache erneut speichern',
     catalog_all: 'Alle',
     catalog_uncategorized: 'Ohne Kategorie',
     catalog_load_more: 'Weitere Produkte laden',

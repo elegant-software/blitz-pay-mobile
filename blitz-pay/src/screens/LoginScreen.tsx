@@ -1,3 +1,4 @@
+import { LanguageSelector } from '../features/app-language/components/LanguageSelector';
 import React, { useState } from 'react';
 import {
   View,
@@ -116,7 +117,8 @@ export default function LoginScreen() {
 
           {/* Card */}
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>{t('log_in')}</Text>
+            <LanguageSelector />
+              <Text style={styles.cardTitle}>{t('log_in')}</Text>
 
             {error ? (
               <View style={styles.errorBox}>

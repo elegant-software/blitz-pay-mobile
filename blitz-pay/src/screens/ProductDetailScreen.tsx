@@ -1,3 +1,4 @@
+import { useLocalizedProduct } from '../features/merchant-catalog/hooks/useLocalizedProduct';
 import React from 'react';
 import { ProductImage } from '../features/merchant-catalog/components/ProductImage';
 import {
@@ -26,18 +27,22 @@ export default function ProductDetailScreen() {
 
   const {
     productId,
-    name,
-    description,
+    name: initialName,
+    description: initialDescription,
     unitPrice,
     imageUrl,
     merchantId,
     merchantName,
     branchId,
     branchName,
-    categoryName,
+    categoryName: initialCategoryName,
     productCode,
   } = route.params;
 
+  const localized = useLocalizedProduct(merchantId, branchId, productId);
+  const name = localized.product?.name ?? initialName;
+  const description = localized.product ? localized.product.description : initialDescription;
+  const categoryName = localized.product ? localized.product.categoryName : initialCategoryName;
   const product = { productId, merchantId, name, description, unitPrice, imageUrl, branchId, active: true };
   const { quantityByProductId, setProductQuantity } = useBasket();
   const quantity = quantityByProductId[productId] ?? 0;
@@ -83,6 +88,14 @@ export default function ProductDetailScreen() {
         )}
 
         <View style={styles.body}>
+          {localized.error ? (
+            <View accessibilityRole="alert">
+              <Text>{localized.errorDetail ?? t('merchant_catalog_load_failed')}</Text>
+              <TouchableOpacity onPress={() => { void localized.retry(); }}>
+                <Text>{t('language_content_retry')}</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
           <Text style={styles.productName}>{name}</Text>
           <Text style={styles.productPrice}>€{unitPrice.toFixed(2)}</Text>
 
