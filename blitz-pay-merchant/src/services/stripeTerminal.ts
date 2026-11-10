@@ -1,5 +1,6 @@
 import { authedFetch } from '../lib/api';
-import { readApiError } from '../lib/apiError';
+import { readApiError, readApiProblem } from '../lib/apiError';
+import { storage } from '../lib/storage';
 
 export interface ConnectionTokenResult {
   secret: string;
@@ -65,7 +66,41 @@ export async function createTerminalIntent(params: {
     body: JSON.stringify({ ...params, paymentMethodType: 'card_present' }),
   });
   if (!res.ok) {
-    throw new Error(`CreateIntent failed: ${await readApiError(res)}`);
+    const problem = await readApiProblem(res);
+    throw new CreateIntentError(`CreateIntent failed: ${problem.detail ?? `HTTP ${problem.status}`}`, problem.status, problem.code);
   }
   return res.json() as Promise<StripeIntentResult>;
+}
+
+/** create-intent failure; `code` is the ProblemDetail code, e.g. `ORDER_ALREADY_PAID` on a 409. */
+export class CreateIntentError extends Error {
+  constructor(message: string, readonly status: number, readonly code?: string) {
+    super(message);
+    this.name = 'CreateIntentError';
+  }
+}
+
+/** The Card Reader paired on this device. Readers are paired on the phone, not registered in our DB. */
+export interface PairedCardReader {
+  serialNumber: string;
+  label?: string;
+}
+
+const PAIRED_CARD_READER_KEY = 'blitzpay_card_reader';
+
+export async function loadPairedCardReader(): Promise<PairedCardReader | null> {
+  try {
+    const raw = await storage.getItem(PAIRED_CARD_READER_KEY);
+    return raw ? (JSON.parse(raw) as PairedCardReader) : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function savePairedCardReader(reader: PairedCardReader): Promise<void> {
+  await storage.setItem(PAIRED_CARD_READER_KEY, JSON.stringify(reader));
+}
+
+export async function clearPairedCardReader(): Promise<void> {
+  await storage.deleteItem(PAIRED_CARD_READER_KEY);
 }

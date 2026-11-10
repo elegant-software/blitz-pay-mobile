@@ -6,6 +6,7 @@ import { useLanguage } from '../lib/LanguageContext';
 import { colors, radius, spacing } from '../lib/theme';
 import type { RootStackNav, RootStackParamList } from '../types';
 import { useLiveFloor, useTableActions } from '../features/tables/hooks/useLiveFloor';
+import { terminalStatusLabelKey } from '../hooks/useStripeTerminalPayment';
 import { PIN_COLORS } from '../features/tables/components/FloorPlanCanvas';
 import {
   CenterState,
@@ -175,14 +176,16 @@ export default function TableDetailScreen() {
                 <TouchableOpacity
                   style={[tableStyles.primaryBtn, styles.flex, busy && tableStyles.disabled]}
                   disabled={!!actions.busyOrderId}
-                  onPress={() => void actions.chargeWithTapToPay(order.orderId)}
+                  onPress={() => void actions.chargeByCard(order.orderId)}
                 >
                   {busy && actions.terminalStatus !== 'idle' ? (
                     <ActivityIndicator size="small" color={colors.black} />
                   ) : (
-                    <Ionicons name="phone-portrait-outline" size={16} color={colors.black} />
+                    <Ionicons name="card-outline" size={16} color={colors.black} />
                   )}
-                  <Text style={tableStyles.primaryBtnText}>{t('table_charge_tap_to_pay')}</Text>
+                  <Text style={tableStyles.primaryBtnText}>
+                    {t(busy ? terminalStatusLabelKey(actions.terminalStatus) : 'merchant_collect_via_terminal')}
+                  </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[tableStyles.secondaryBtn, styles.flex, busy && tableStyles.disabled]}
@@ -193,6 +196,14 @@ export default function TableDetailScreen() {
                   <Text style={tableStyles.secondaryBtnText}>{t('table_confirm_cash_action')}</Text>
                 </TouchableOpacity>
               </View>
+            ) : null}
+            {open && actions.terminalCancelableOrderId === order.orderId ? (
+              <TouchableOpacity
+                style={[tableStyles.secondaryBtn, styles.spaced]}
+                onPress={() => void actions.cancelCardPayment(order.orderId)}
+              >
+                <Text style={tableStyles.secondaryBtnText}>{t('merchant_terminal_cancel_payment')}</Text>
+              </TouchableOpacity>
             ) : null}
           </View>
         );

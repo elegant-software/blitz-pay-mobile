@@ -21,6 +21,7 @@ export type RootStackParamList = {
     label?: string;
   };
   PaymentsHistory: undefined;
+  CardReader: undefined;
   Notifications: undefined;
   Appearances: undefined;
   CreateAppearance: undefined;

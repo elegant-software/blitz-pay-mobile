@@ -14,7 +14,7 @@ import { formatPickupNumber, getMerchantOrderStatusIcon, getMerchantOrderStatusL
 import { PreparationStatusBadge } from '../features/orders/components/PreparationStatusBadge';
 import { useMerchantOrderDetail } from '../features/orders/hooks/useMerchantOrderDetail';
 import { useMerchantProducts } from '../features/products/hooks/useMerchantProducts';
-import { useStripeTerminalPayment } from '../hooks/useStripeTerminalPayment';
+import { terminalStatusLabelKey, useStripeTerminalPayment } from '../hooks/useStripeTerminalPayment';
 import { fetchMerchantOrderInvoice } from '../features/orders/services/orderService';
 
 type RouteProps = RouteProp<RootStackParamList, 'OrderDetail'>;
@@ -51,13 +51,29 @@ export default function OrderDetailScreen() {
     reconcileTerminalPayment,
   } = useMerchantOrderDetail(route.params.orderId, activeBranchScope);
   const { products, loading: productsLoading } = useMerchantProducts(activeBranchScope, branchScopeError);
-  const { status: terminalStatus, errorMessage: terminalError, collectPayment, reset: resetTerminal } = useStripeTerminalPayment();
+  const {
+    status: terminalStatus,
+    errorMessage: terminalError,
+    cancelableOrderId: terminalCancelableOrderId,
+    collectPayment,
+    cancelPayment,
+    reset: resetTerminal,
+  } = useStripeTerminalPayment();
   const [terminalReconciling, setTerminalReconciling] = React.useState(false);
   const [addItemVisible, setAddItemVisible] = React.useState(false);
   const [invoiceUrl, setInvoiceUrl] = React.useState<string | null>(null);
   const [invoiceChecked, setInvoiceChecked] = React.useState(false);
   const isInvoiceOrder = order?.checkoutIntent === 'PAY_LATER';
-  const terminalBusy = terminalReconciling || (terminalStatus !== 'idle' && terminalStatus !== 'succeeded' && terminalStatus !== 'failed');
+  const terminalCollecting = ['discovering', 'connecting', 'collecting', 'insert_card'].includes(terminalStatus);
+  const terminalBusy = terminalReconciling || terminalCollecting;
+  const reconcileTerminal = async () => {
+    setTerminalReconciling(true);
+    try {
+      await reconcileTerminalPayment();
+    } finally {
+      setTerminalReconciling(false);
+    }
+  };
   const existingProductIds = new Set(order?.items.map((item) => item.productId) ?? []);
   const availableProducts = products.filter((product) => product.active && !existingProductIds.has(product.id));
 
@@ -279,41 +295,38 @@ export default function OrderDetailScreen() {
                 onPress={async () => {
                   if (!activeBranchScope?.merchantId || !activeBranchScope?.branchId) return;
                   resetTerminal();
-                  const result = await collectPayment({
+                  await collectPayment({
                     orderId: order.orderId,
                     merchantId: activeBranchScope.merchantId,
                     branchId: activeBranchScope.branchId,
                     simulated: __DEV__,
                   });
-                  if (result.succeeded) {
-                    setTerminalReconciling(true);
-                    try {
-                      await reconcileTerminalPayment();
-                    } finally {
-                      setTerminalReconciling(false);
-                    }
-                  } else {
-                    // Poll for the webhook revert after cancellation. The backend handles
-                    // payment_intent.canceled and reverts the order to awaiting_payment;
-                    // reconcileTerminalPayment exits as soon as it sees that status.
-                    setTerminalReconciling(true);
-                    try {
-                      await reconcileTerminalPayment();
-                    } finally {
-                      setTerminalReconciling(false);
-                    }
-                  }
+                  // The Order status (webhook-driven) is the truth for "paid", whatever the outcome on this screen:
+                  // a failed or disconnected payment can still settle, and a cancel reverts the Order.
+                  await reconcileTerminal();
                 }}
               >
                 {terminalBusy ? (
                   <ActivityIndicator size="small" color={colors.primary} />
                 ) : (
-                  <Ionicons name="phone-portrait-outline" size={16} color={colors.primary} />
+                  <Ionicons name="card-outline" size={16} color={colors.primary} />
                 )}
                 <Text style={styles.terminalActionText}>
-                  {terminalReconciling ? t('merchant_terminal_payment_succeeded') : terminalBusy ? terminalStatus : t('merchant_collect_via_terminal')}
+                  {t(terminalReconciling ? 'merchant_terminal_status_checking' : terminalStatusLabelKey(terminalStatus))}
                 </Text>
               </TouchableOpacity>
+              {terminalCancelableOrderId === order.orderId ? (
+                <TouchableOpacity
+                  style={styles.secondaryAction}
+                  disabled={terminalReconciling}
+                  onPress={async () => {
+                    await cancelPayment();
+                    await reconcileTerminal();
+                  }}
+                >
+                  <Text style={styles.secondaryActionText}>{t('merchant_terminal_cancel_payment')}</Text>
+                </TouchableOpacity>
+              ) : null}
               {terminalError ? (
                 <View style={styles.errorBanner}>
                   <Ionicons name="alert-circle-outline" size={14} color={colors.error} />

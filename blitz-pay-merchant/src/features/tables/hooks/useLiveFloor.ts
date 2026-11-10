@@ -95,7 +95,7 @@ export function useLiveFloor({ live }: { live: boolean }) {
 
 const SETTLE_RECHECK_DELAY_MS = 1_500;
 
-/** Actions staff take at one Table: clear it, confirm cash, or take a card with Tap to Pay. */
+/** Actions staff take at one Table: clear it, confirm cash, or take a Card payment (Card Reader or Tap to Pay). */
 export function useTableActions(tableId: string) {
   const { ref } = useBranchRef();
   const queryClient = useQueryClient();
@@ -146,12 +146,12 @@ export function useTableActions(tableId: string) {
     }
   }, [branchId, refresh, tableId]);
 
-  const chargeWithTapToPay = useCallback(async (orderId: string) => {
+  const chargeByCard = useCallback(async (orderId: string) => {
     if (!ref) return false;
     setBusyOrderId(orderId);
     setActionError(null);
     terminal.reset();
-    observability.info('table_tap_to_pay_requested', { orderId, tableId, branchId: ref.branchId });
+    observability.info('table_card_payment_requested', { orderId, tableId, branchId: ref.branchId });
     try {
       const result = await terminal.collectPayment({
         orderId,
@@ -159,13 +159,12 @@ export function useTableActions(tableId: string) {
         branchId: ref.branchId,
         simulated: __DEV__,
       });
-      observability.info('table_tap_to_pay_result', {
-        orderId,
-        tableId,
-        succeeded: result.succeeded,
-        reason: result.error ?? null,
-      });
-      if (!result.succeeded && result.error) {
+      observability.info('table_card_payment_result', { orderId, tableId, outcome: result.outcome });
+      if (result.outcome === 'already_paid') {
+        setActionError({ key: 'merchant_terminal_already_paid' });
+      } else if (result.outcome === 'in_progress') {
+        setActionError({ key: 'merchant_terminal_payment_in_progress' });
+      } else if (result.outcome === 'failed') {
         setActionError({ key: 'merchant_terminal_payment_failed', detail: result.error });
       }
       // The order becomes paid only when the provider webhook lands; give it a moment, then refresh.
@@ -176,6 +175,12 @@ export function useTableActions(tableId: string) {
       setBusyOrderId(null);
     }
   }, [ref, refresh, tableId, terminal]);
+
+  const cancelCardPayment = useCallback(async (orderId: string) => {
+    await terminal.cancelPayment();
+    await new Promise((resolve) => setTimeout(resolve, SETTLE_RECHECK_DELAY_MS));
+    await refresh(orderId);
+  }, [refresh, terminal]);
 
   const [savingGuests, setSavingGuests] = useState(false);
   const setGuests = useCallback(async (guestCount: number) => {
@@ -202,9 +207,11 @@ export function useTableActions(tableId: string) {
     busyOrderId,
     clearing,
     terminalStatus: terminal.status,
+    terminalCancelableOrderId: terminal.cancelableOrderId,
     actionError,
     clear,
     confirmCash,
-    chargeWithTapToPay,
+    chargeByCard,
+    cancelCardPayment,
   };
 }

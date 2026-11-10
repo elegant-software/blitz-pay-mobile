@@ -173,6 +173,12 @@ export default function AccountScreen() {
           onPress: () => navigation.navigate('PaymentsHistory' as never),
           showArrow: true,
         },
+        {
+          icon: 'card-outline' as const,
+          label: t('card_reader_pair_title'),
+          onPress: () => navigation.navigate('CardReader' as never),
+          showArrow: true,
+        },
       ],
     },
     {
