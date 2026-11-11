@@ -164,6 +164,33 @@ function invalidCatalogResponse(resource: string): MerchantCatalogError {
   return new MerchantCatalogError('merchant_catalog_load_failed');
 }
 
+export async function fetchMerchantBranch(merchantId: string, branchId: string): Promise<MerchantBranch> {
+  let branch: BranchResponse;
+  try {
+    branch = await fetchCatalogJson<BranchResponse>(`/merchants/${merchantId}/branches/${branchId}`);
+  } catch (error) {
+    if (error instanceof MerchantCatalogError && error.status === 404) {
+      throw new MerchantCatalogError('merchant_branch_unavailable', error.detail, error.status, error.code);
+    }
+    throw error;
+  }
+  if (!branch || branch.id !== branchId || branch.merchantId !== merchantId || !branch.name || branch.active !== true) {
+    observability.warn('merchant_catalog_branch_unavailable', { merchantId, branchId });
+    throw new MerchantCatalogError('merchant_branch_unavailable');
+  }
+  return {
+    branchId,
+    merchantId,
+    name: branch.name,
+    active: true,
+    addressSummary: buildAddressSummary(branch),
+    latitude: ensureNumber(branch.latitude),
+    longitude: ensureNumber(branch.longitude),
+    activePaymentChannels: (branch.activePaymentChannels ?? []) as MerchantBranch['activePaymentChannels'],
+    imageUrl: branch.imageUrl,
+  };
+}
+
 export async function fetchMerchantDetails(merchantId: string): Promise<MerchantDetails> {
   try {
     const details = await fetchCatalogJson<MerchantDetailsResponse>(`/merchants/${merchantId}`);

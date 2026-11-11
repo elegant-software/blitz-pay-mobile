@@ -18,6 +18,7 @@ import { useLanguage } from '../lib/LanguageContext';
 import { useAuth } from '../lib/auth';
 import { colors, spacing, radius, shadow } from '../lib/theme';
 import { useOrderPayment } from '../features/order-payment/hooks/useOrderPayment';
+import { useOrderCashPayment } from '../features/order-payment/hooks/useOrderCashPayment';
 import { orderPaymentStore } from '../features/order-payment/store/orderPaymentStore';
 import {
   formatPickupNumber,
@@ -28,7 +29,7 @@ import {
   type OrderSummary,
   type PreparationStatus,
 } from '../features/order-payment/types/orderPayment';
-import { fetchMerchantStripeConnectStatus } from '../features/merchant-catalog/services/merchantCatalogService';
+import { MerchantCatalogError, fetchMerchantStripeConnectStatus } from '../features/merchant-catalog/services/merchantCatalogService';
 import type { PaymentChannel } from '../features/merchant-catalog/types/catalog';
 import { observability } from '../lib/observability';
 import type { RootStackNav, RootStackParamList } from '../types';
@@ -79,7 +80,9 @@ export default function OrderDetailScreen() {
   const route = useRoute<RouteProp<RootStackParamList, 'OrderDetail'>>();
   const insets = useSafeAreaInsets();
   const { resumeOrderPayment, refreshOrder, cancelOrder } = useOrderPayment();
+  const [payCash, setPayCash] = useState(false);
   const [order, setOrder] = useState<OrderSummary | null>(null);
+  const { cashAvailable, payCashToStaff } = useOrderCashPayment(order);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -88,6 +91,10 @@ export default function OrderDetailScreen() {
     route.params.preferredMethod ?? null,
   );
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    setPayCash(false);
+  }, [route.params.orderId]);
   const [activePaymentChannels, setActivePaymentChannels] = useState<PaymentChannel[]>([]);
   const [invoiceUrl, setInvoiceUrl] = useState<string | null>(null);
   const [invoiceChecked, setInvoiceChecked] = useState(false);
@@ -230,11 +237,18 @@ export default function OrderDetailScreen() {
   }, [availableChannels, availableMethods, selectedMethod]);
 
   const onResume = async () => {
-    if (!order || !effectiveSelectedMethod) return;
+    if (!order || (payCash ? !cashAvailable : !effectiveSelectedMethod)) return;
     setSubmitting(true);
     setError(null);
     setNotice(null);
     try {
+      if (payCash) {
+        const current = await payCashToStaff(order.orderId);
+        setOrder(current);
+        setNotice(t('checkout_cash_hint'));
+        return;
+      }
+      if (!effectiveSelectedMethod) return;
       await resumeOrderPayment({
         order,
         merchantName: formatMerchantLabel(route.params.merchantName, route.params.branchName) ?? 'Merchant',
@@ -247,7 +261,7 @@ export default function OrderDetailScreen() {
         user,
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'unknown_error');
+      setError(err instanceof MerchantCatalogError ? err.detail ?? err.i18nKey : err instanceof Error ? err.message : 'unknown_error');
     } finally {
       setSubmitting(false);
     }
@@ -413,7 +427,7 @@ export default function OrderDetailScreen() {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>{t('resume_payment')}</Text>
               <Text style={styles.sectionSubtitle}>{t('order_resume_select_method')}</Text>
-              {availableMethods.length === 0 ? (
+              {availableMethods.length === 0 && !cashAvailable ? (
                 <View style={styles.errorBox}>
                   <Text style={styles.errorText}>{t('payment_option_unavailable')}</Text>
                 </View>
@@ -421,13 +435,22 @@ export default function OrderDetailScreen() {
               {availableMethods.map((method) => (
                 <TouchableOpacity
                   key={method.key}
-                  style={[styles.methodCard, effectiveSelectedMethod === method.key && styles.methodCardSelected]}
-                  onPress={() => setSelectedMethod(method.key)}
+                  style={[styles.methodCard, !payCash && effectiveSelectedMethod === method.key && styles.methodCardSelected]}
+                  onPress={() => { setPayCash(false); setSelectedMethod(method.key); }}
                 >
                   <Ionicons name={method.icon} size={18} color={colors.onSurface} />
                   <Text style={styles.methodLabel}>{t(method.labelKey)}</Text>
                 </TouchableOpacity>
               ))}
+              {cashAvailable ? (
+                <TouchableOpacity
+                  style={[styles.methodCard, payCash && styles.methodCardSelected]}
+                  onPress={() => { setPayCash(true); setSelectedMethod(null); }}
+                >
+                  <Ionicons name="cash-outline" size={18} color={colors.onSurface} />
+                  <Text style={styles.methodLabel}>{t('checkout_cash')}</Text>
+                </TouchableOpacity>
+              ) : null}
             </View>
           ) : (
             <View style={styles.section}>
@@ -466,8 +489,8 @@ export default function OrderDetailScreen() {
       {canResume ? (
         <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
           <TouchableOpacity
-            style={[styles.resumeButton, (!effectiveSelectedMethod || submitting) && styles.resumeButtonDisabled]}
-            disabled={!effectiveSelectedMethod || submitting}
+            style={[styles.resumeButton, ((payCash ? !cashAvailable : !effectiveSelectedMethod) || submitting) && styles.resumeButtonDisabled]}
+            disabled={(payCash ? !cashAvailable : !effectiveSelectedMethod) || submitting}
             onPress={() => void onResume()}
           >
             <Text style={styles.resumeButtonText}>
