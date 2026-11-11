@@ -1,3 +1,4 @@
+import { parseInvoiceDownloadLink } from '../features/order-payment/invoiceQr';
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Linking } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -22,6 +23,11 @@ export default function QRScannerScreen() {
   const handleBarcodeScanned = ({ data }: { data: string }) => {
     if (scanned) return;
     setScanned(true);
+    const invoiceUrl = parseInvoiceDownloadLink(data);
+    if (invoiceUrl) {
+      navigation.replace('InvoicePdf', { url: invoiceUrl, title: t('invoice_view') });
+      return;
+    }
     const tableCode = parseTableLink(data, config.storefrontUrl, config.trueLayerRedirectScheme);
     if (tableCode) {
       navigation.replace('TableCheckIn', { code: tableCode });

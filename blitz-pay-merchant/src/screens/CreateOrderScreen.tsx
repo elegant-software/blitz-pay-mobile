@@ -1,3 +1,4 @@
+import { PaidOrderInvoice } from '../features/orders/components/PaidOrderInvoice';
 import { useTheme } from "../lib/ThemeContext";
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -348,6 +349,7 @@ export default function CreateOrderScreen() {
             <Text style={styles.resultSubtitle}>{t('create_order_paid_subtitle')}</Text>
             <Text style={styles.resultAmount}>{formatCurrency(orderTotal)}</Text>
             <Text style={styles.resultOrderId}>#{createdOrderId}</Text>
+            <PaidOrderInvoice orderId={createdOrderId} paid scope={activeBranchScope} />
           </View>
 
           <View style={styles.qrActions}>

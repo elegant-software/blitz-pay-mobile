@@ -1,5 +1,12 @@
 export const translations = {
   en: {
+    invoice_download_title: 'Your invoice',
+    invoice_download_expiry: 'This link expires in 30 minutes. Refresh to get a new link.',
+    invoice_download_action: 'Download invoice',
+    invoice_download_refresh: 'Refresh invoice',
+    invoice_download_pending: 'The invoice is not ready yet. Please refresh in a moment.',
+    invoice_download_failed: 'Unable to load the invoice. Please try again.',
+
     language_english: 'English',
     language_german: 'Deutsch',
     language_content_retry: 'Retry loading product text',
@@ -481,6 +488,13 @@ export const translations = {
     checkout_cash_confirm: 'Order, pay cash',
   },
   de: {
+    invoice_download_title: 'Ihre Rechnung',
+    invoice_download_expiry: 'Dieser Link ist 30 Minuten g\u00fcltig. Aktualisieren Sie ihn f\u00fcr einen neuen Link.',
+    invoice_download_action: 'Rechnung herunterladen',
+    invoice_download_refresh: 'Rechnung aktualisieren',
+    invoice_download_pending: 'Die Rechnung ist noch nicht bereit. Bitte in K\u00fcrze aktualisieren.',
+    invoice_download_failed: 'Die Rechnung konnte nicht geladen werden. Bitte erneut versuchen.',
+
     language_english: 'English',
     language_german: 'Deutsch',
     language_content_retry: 'Produkttexte erneut laden',
