@@ -1,22 +1,27 @@
+import { useTheme } from "../lib/ThemeContext";
 import React, { useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { useLanguage } from '../lib/LanguageContext';
-import { colors, spacing } from '../lib/theme';
+import { spacing, type ThemeColors } from '../lib/theme';
 import type { RootStackNav } from '../types';
 import { useFloorPlans } from '../features/tables/hooks/useFloorPlans';
 import {
   CenterState,
   ErrorBanner,
   TablesScreenFrame,
-  tableStyles,
+  createTableStyles,
   useErrorText,
 } from '../features/tables/components/TablesChrome';
 import type { FloorPlan } from '../features/tables/types/table';
 
 export default function FloorPlansScreen() {
+  const { colors } = useTheme();
+  const tableStyles = createTableStyles(colors);
+  const styles = createStyles(colors);
+
   const { t } = useLanguage();
   const navigation = useNavigation<RootStackNav>();
   const vm = useFloorPlans();
@@ -152,7 +157,7 @@ export default function FloorPlansScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   flex: { flex: 1 },
   spaced: { marginTop: spacing.md },
   empty: { textAlign: 'center', color: colors.gray600, padding: spacing.lg },

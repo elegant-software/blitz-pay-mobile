@@ -1,7 +1,8 @@
+import { useTheme } from "../../../lib/ThemeContext";
 import React from 'react';
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useLanguage } from '../../../lib/LanguageContext';
-import { colors, radius, spacing } from '../../../lib/theme';
+import { radius, spacing, type ThemeColors } from '../../../lib/theme';
 import { UNCATEGORIZED_CATEGORY } from '../types/catalog';
 
 type Props = {
@@ -12,6 +13,9 @@ type Props = {
 };
 
 export function CatalogCategories({ categories, selectedId, onSelect, uncategorizedCount }: Props) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   const { t } = useLanguage();
   return (
     <View style={styles.container}>
@@ -38,8 +42,8 @@ export function CatalogCategories({ categories, selectedId, onSelect, uncategori
   );
 }
 
-const styles = StyleSheet.create({
-  container: { backgroundColor: colors.white },
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
+  container: { backgroundColor: colors.background },
   content: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, gap: spacing.sm },
   chip: { minHeight: 44, paddingHorizontal: spacing.md, justifyContent: 'center', borderRadius: radius.full, backgroundColor: colors.surface },
   selected: { backgroundColor: colors.primary },

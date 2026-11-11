@@ -43,8 +43,8 @@ export function formatAppointmentTime(startTime: string, endTime: string): strin
   return `${fmt(start)} – ${fmt(end)}`;
 }
 
-export function formatDateHeading(date: Date): string {
-  return date.toLocaleDateString('en-GB', {
+export function formatDateHeading(date: Date, locale = 'en-GB'): string {
+  return date.toLocaleDateString(locale, {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
@@ -52,13 +52,13 @@ export function formatDateHeading(date: Date): string {
   });
 }
 
-export function formatShortDate(date: Date): string {
-  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+export function formatShortDate(date: Date, locale = 'en-GB'): string {
+  return date.toLocaleDateString(locale, { day: 'numeric', month: 'short' });
 }
 
-export function formatWeekRange(from: Date, to: Date): string {
-  const f = formatShortDate(from);
-  const t = formatShortDate(to);
+export function formatWeekRange(from: Date, to: Date, locale = 'en-GB'): string {
+  const f = formatShortDate(from, locale);
+  const t = formatShortDate(to, locale);
   return `${f} – ${t}`;
 }
 

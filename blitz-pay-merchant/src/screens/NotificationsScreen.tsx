@@ -1,10 +1,11 @@
+import { useTheme } from "../lib/ThemeContext";
 import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useLanguage } from '../lib/LanguageContext';
-import { colors, spacing, radius, shadow } from '../lib/theme';
+import { colors, spacing, radius, shadow, type ThemeColors } from '../lib/theme';
 
 interface Notification {
   id: string;
@@ -47,6 +48,9 @@ function timeAgo(iso: string) {
 }
 
 export default function NotificationsScreen() {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   const { t } = useLanguage();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
@@ -82,17 +86,17 @@ export default function NotificationsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.surface },
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
-    backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.gray200,
+    backgroundColor: colors.background, borderBottomWidth: 1, borderBottomColor: colors.gray200,
   },
   backBtn: { width: 40, height: 40, justifyContent: 'center' },
   headerTitle: { fontSize: 17, fontWeight: '700', color: colors.onSurface },
   card: {
-    backgroundColor: colors.white, borderRadius: radius.xl,
+    backgroundColor: colors.cardBg, borderRadius: radius.xl,
     padding: spacing.md, marginBottom: spacing.sm,
     flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start',
   },

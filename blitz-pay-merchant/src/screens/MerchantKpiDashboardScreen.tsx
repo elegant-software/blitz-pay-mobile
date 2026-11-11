@@ -1,3 +1,4 @@
+import { useTheme } from "../lib/ThemeContext";
 import React, { useState } from 'react';
 import {
   View,
@@ -14,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../lib/auth';
 import { useLanguage } from '../lib/LanguageContext';
-import { colors, spacing, radius, shadow } from '../lib/theme';
+import { spacing, radius, shadow, type ThemeColors } from '../lib/theme';
 import { useMerchantKpi, toIsoDate } from '../features/reporting/hooks/useMerchantKpi';
 import type { PaymentMethodFrequency, OrderTypeCount } from '../features/reporting/types/kpi';
 import type { TranslationKeys } from '../lib/translations';
@@ -42,6 +43,9 @@ function defaultTo(): string {
 // ──────────────────────────────────────────────
 
 function SectionHeader({ title, icon }: { title: string; icon: React.ComponentProps<typeof Ionicons>['name'] }) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   return (
     <View style={styles.sectionHeader}>
       <View style={styles.sectionIconWrap}>
@@ -53,6 +57,9 @@ function SectionHeader({ title, icon }: { title: string; icon: React.ComponentPr
 }
 
 function KpiRow({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   return (
     <View style={styles.kpiRow}>
       <Text style={styles.kpiLabel}>{label}</Text>
@@ -62,10 +69,16 @@ function KpiRow({ label, value, highlight }: { label: string; value: string; hig
 }
 
 function KpiCard({ children }: { children: React.ReactNode }) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   return <View style={[styles.card, shadow.sm]}>{children}</View>;
 }
 
 function PaymentMethodBar({ item }: { item: PaymentMethodFrequency }) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   return (
     <View style={styles.methodRow}>
       <Text style={styles.methodName}>{item.paymentMethod}</Text>
@@ -79,6 +92,9 @@ function PaymentMethodBar({ item }: { item: PaymentMethodFrequency }) {
 }
 
 function OrderTypeRow({ item }: { item: OrderTypeCount }) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   return (
     <View style={styles.kpiRow}>
       <Text style={styles.kpiLabel}>{item.orderType.replace(/_/g, ' ')}</Text>
@@ -101,6 +117,9 @@ interface DateRangePickerProps {
 }
 
 function DateRangePicker({ from, to, onFromChange, onToChange, fromLabel, toLabel }: DateRangePickerProps) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   return (
     <View style={styles.dateRangeRow}>
       <View style={styles.dateField}>
@@ -141,6 +160,9 @@ function DateRangePicker({ from, to, onFromChange, onToChange, fromLabel, toLabe
 // ──────────────────────────────────────────────
 
 export default function MerchantKpiDashboardScreen() {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   const { t } = useLanguage();
   const { activeBranchScope, user } = useAuth();
   const navigation = useNavigation();
@@ -304,10 +326,10 @@ export default function MerchantKpiDashboardScreen() {
 // Styles
 // ──────────────────────────────────────────────
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -315,7 +337,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    backgroundColor: colors.white,
+    backgroundColor: colors.background,
     borderBottomWidth: 1,
     borderBottomColor: colors.gray200,
   },
@@ -334,7 +356,7 @@ const styles = StyleSheet.create({
   },
   scopeText: { fontSize: 12, fontWeight: '600', color: colors.primary },
   card: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.cardBg,
     borderRadius: radius.xl,
     padding: spacing.md,
     gap: spacing.sm,

@@ -1,10 +1,11 @@
+import { useTheme } from "../../../lib/ThemeContext";
 import React from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '../../../lib/LanguageContext';
 import type { TranslationKeys } from '../../../lib/translations';
-import { colors, radius, spacing } from '../../../lib/theme';
+import { radius, spacing, type ThemeColors } from '../../../lib/theme';
 import type { TableActionError } from '../hooks/useBranchRef';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -20,6 +21,9 @@ export function TablesScreenFrame({
   right?: { icon: IconName; label: string; onPress: () => void };
   children: React.ReactNode;
 }) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   const insets = useSafeAreaInsets();
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -47,6 +51,9 @@ export function useErrorText() {
 }
 
 export function ErrorBanner({ error }: { error: TableActionError | null }) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   const errorText = useErrorText();
   if (!error) return null;
   return (
@@ -59,6 +66,9 @@ export function ErrorBanner({ error }: { error: TableActionError | null }) {
 
 /** Branch Capacity never blocks; this only tells the manager the seats exceed it. */
 export function CapacityWarning({ seated, capacity }: { seated: number; capacity: number | null }) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   const { t } = useLanguage();
   if (capacity == null || seated <= capacity) return null;
   return (
@@ -80,6 +90,9 @@ export function CenterState({
   text: string;
   action?: { label: string; onPress: () => void };
 }) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   return (
     <View style={styles.center}>
       {loading ? <ActivityIndicator size="large" color={colors.primary} /> : icon ? <Ionicons name={icon} size={36} color={colors.gray500} /> : null}
@@ -93,9 +106,9 @@ export function CenterState({
   );
 }
 
-export const tableStyles = StyleSheet.create({
+export const createTableStyles = (colors: ThemeColors) => StyleSheet.create({
   card: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.cardBg,
     borderRadius: radius.xl,
     padding: spacing.md,
     marginHorizontal: spacing.md,
@@ -111,7 +124,7 @@ export const tableStyles = StyleSheet.create({
     paddingVertical: 10,
     fontSize: 15,
     color: colors.onSurface,
-    backgroundColor: colors.white,
+    backgroundColor: colors.cardBg,
   },
   primaryBtn: {
     backgroundColor: colors.primary,
@@ -132,7 +145,7 @@ export const tableStyles = StyleSheet.create({
     justifyContent: 'center',
     flexDirection: 'row',
     gap: spacing.sm,
-    backgroundColor: colors.white,
+    backgroundColor: colors.cardBg,
     borderWidth: 1,
     borderColor: colors.gray300,
   },
@@ -142,15 +155,15 @@ export const tableStyles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
 });
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.surface },
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    backgroundColor: colors.white,
+    backgroundColor: colors.background,
     borderBottomWidth: 1,
     borderBottomColor: colors.gray200,
   },

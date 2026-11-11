@@ -1,3 +1,4 @@
+import { useTheme } from "../lib/ThemeContext";
 import React, { useState } from 'react';
 import {
   View,
@@ -15,7 +16,7 @@ import { useNavigation, useRoute, type RouteProp } from '@react-navigation/nativ
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../lib/auth';
 import { useLanguage } from '../lib/LanguageContext';
-import { colors, spacing, radius, shadow } from '../lib/theme';
+import { spacing, radius, shadow, type ThemeColors } from '../lib/theme';
 import type { RootStackParamList, RootStackNav } from '../types';
 import { rescheduleAppointment } from '../features/appointments/services/appointmentService';
 import { fetchEmployees, type EmployeeResponse } from '../features/appointments/services/employeeService';
@@ -43,6 +44,9 @@ function buildISODateTime(date: string, time: string): string {
 }
 
 export default function RescheduleAppointmentScreen() {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   const { t } = useLanguage();
   const { activeBranchScope } = useAuth();
   const navigation = useNavigation<RootStackNav>();
@@ -365,16 +369,16 @@ export default function RescheduleAppointmentScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.surface },
-  safeTop: { backgroundColor: colors.white },
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
+  safeTop: { backgroundColor: colors.background },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    backgroundColor: colors.white,
+    backgroundColor: colors.background,
     borderBottomWidth: 1,
     borderBottomColor: colors.gray200,
   },
@@ -394,7 +398,7 @@ const styles = StyleSheet.create({
   field: { gap: 6 },
   fieldLabel: { fontSize: 13, fontWeight: '600', color: colors.gray700 },
   input: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.cardBg,
     borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.gray200,
@@ -412,7 +416,7 @@ const styles = StyleSheet.create({
   },
   inputRowText: { fontSize: 14, color: colors.gray600 },
   selector: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.cardBg,
     borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.gray200,
@@ -427,7 +431,7 @@ const styles = StyleSheet.create({
   selectorText: { flex: 1, fontSize: 15, color: colors.onSurface },
   selectorPlaceholder: { color: colors.gray400 },
   footer: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.cardBg,
     paddingHorizontal: spacing.md,
     paddingTop: spacing.md,
     borderTopWidth: 1,
@@ -445,13 +449,13 @@ const styles = StyleSheet.create({
   submitBtnDisabled: { opacity: 0.55 },
   submitBtnText: { fontSize: 16, fontWeight: '700', color: colors.black },
   pickerOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0,0,0,0.6)',
     justifyContent: 'flex-end',
     zIndex: 20,
   },
   pickerSheet: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.cardBg,
     borderTopLeftRadius: radius.xxl,
     borderTopRightRadius: radius.xxl,
     paddingTop: spacing.lg,

@@ -1,9 +1,10 @@
+import { useTheme } from "../lib/ThemeContext";
 import React, { useState } from 'react';
 import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useLanguage } from '../lib/LanguageContext';
-import { colors, spacing } from '../lib/theme';
+import { spacing, type ThemeColors } from '../lib/theme';
 import type { RootStackNav } from '../types';
 import { useTableSetup } from '../features/tables/hooks/useTableSetup';
 import { parseBulkTableNames, parseSeatsInput } from '../features/tables/tableLogic';
@@ -12,11 +13,15 @@ import {
   CenterState,
   ErrorBanner,
   TablesScreenFrame,
-  tableStyles,
+  createTableStyles,
   useErrorText,
 } from '../features/tables/components/TablesChrome';
 
 export default function TablesScreen() {
+  const { colors } = useTheme();
+  const tableStyles = createTableStyles(colors);
+  const styles = createStyles(colors);
+
   const { t } = useLanguage();
   const navigation = useNavigation<RootStackNav>();
   const vm = useTableSetup();
@@ -118,7 +123,7 @@ export default function TablesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   seatsRow: { marginBottom: spacing.sm },
   seatsLabel: { flex: 1, fontSize: 14, fontWeight: '600', color: colors.onSurface },
   seatsInput: { width: 72, textAlign: 'center' },
@@ -139,7 +144,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    backgroundColor: colors.white,
+    backgroundColor: colors.cardBg,
     paddingHorizontal: spacing.md,
     paddingVertical: 14,
     borderBottomWidth: 1,
