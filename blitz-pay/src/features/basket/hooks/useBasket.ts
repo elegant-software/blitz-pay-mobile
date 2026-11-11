@@ -1,3 +1,4 @@
+import { useLanguage } from '../../../lib/LanguageContext';
 import { useCallback, useMemo, useSyncExternalStore } from 'react';
 import {
   clearBasket,
@@ -12,6 +13,7 @@ import type { ActiveProduct } from '../../merchant-catalog/types/catalog';
 import { revalidateBasketItems } from '../../merchant-catalog/services/merchantCatalogService';
 
 export function useBasket() {
+  const { language } = useLanguage();
   const basket = useSyncExternalStore(subscribeBasket, getBasketSnapshot, getBasketSnapshot);
 
   const itemCount = useMemo(
@@ -50,7 +52,7 @@ export function useBasket() {
       throw new Error('basket_empty');
     }
 
-    const validation = await revalidateBasketItems(basket.merchantId, basket.branchId, basket.items);
+    const validation = await revalidateBasketItems(basket.merchantId, basket.branchId, basket.items, language);
     if (!validation.valid) {
       throw new Error('basket_refresh_required');
     }
@@ -78,7 +80,7 @@ export function useBasket() {
         imageUrl: item.imageUrl,
       })),
     };
-  }, [basket, itemCount, subtotal]);
+  }, [basket, itemCount, subtotal, language]);
 
   return {
     basket,

@@ -1,3 +1,4 @@
+import type { Language } from '../../../lib/translations';
 import type { BasketItem } from '../../basket/types/basket';
 import { authedFetch } from '../../../lib/api/authedFetch';
 import { readApiProblem } from '../../../lib/apiError';
@@ -16,11 +17,11 @@ export class MerchantCatalogError extends Error {
   }
 }
 
-async function fetchCatalogJson<T>(path: string): Promise<T> {
+async function fetchCatalogJson<T>(path: string, language?: Language): Promise<T> {
   observability.info('merchant_catalog_request_started', { path });
   let response: Response;
   try {
-    response = await authedFetch(`/v1${path}`);
+    response = await authedFetch(`/v1${path}`, { headers: language ? { 'Accept-Language': language } : undefined });
   } catch (error) {
     observability.error('merchant_catalog_request_failed', { path, reason: error instanceof Error ? error.message : String(error) });
     throw new MerchantCatalogError('merchant_catalog_load_failed');
@@ -278,11 +279,12 @@ export async function fetchActiveProducts(
   merchantId: string,
   branchId: string,
   categoryId?: string,
+  language: Language = 'de',
 ): Promise<ActiveProduct[]> {
   const search = new URLSearchParams({ branchId });
   if (categoryId) search.set('categoryId', categoryId);
   const response = await fetchCatalogJson<ProductResponse[]>(
-    `/merchants/${merchantId}/products?${search.toString()}`,
+    `/merchants/${merchantId}/products?${search.toString()}`, language,
   );
   if (!Array.isArray(response)) throw invalidCatalogResponse('products');
   return normalizeProducts(response, merchantId, branchId)
@@ -305,14 +307,14 @@ function normalizeProducts(response: ProductResponse[], merchantId: string, bran
 }
 
 export async function fetchCatalogProductPage(
-  merchantId: string, branchId: string, filter: CatalogProductFilter = {},
+  merchantId: string, branchId: string, filter: CatalogProductFilter = {}, language: Language = 'de',
 ): Promise<CatalogProductPage> {
   const search = new URLSearchParams({ branchId, limit: '24' });
   if (filter.categoryId) search.set('categoryId', filter.categoryId);
   if (filter.uncategorized) search.set('uncategorized', 'true');
   if (filter.cursor) search.set('cursor', filter.cursor);
   const response = await fetchCatalogJson<Omit<CatalogProductPage, 'items'> & { items: ProductResponse[] }>(
-    `/merchants/${merchantId}/catalog/products?${search.toString()}`,
+    `/merchants/${merchantId}/catalog/products?${search.toString()}`, language,
   );
   if (!response || !Array.isArray(response.items) || typeof response.hasMore !== 'boolean' ||
       response.limit !== 24 || (response.hasMore ? typeof response.nextCursor !== 'string' || !response.nextCursor || response.nextCursor === filter.cursor : response.nextCursor != null)) {
@@ -323,9 +325,9 @@ export async function fetchCatalogProductPage(
   return { ...response, items, nextCursor: response.nextCursor ?? null };
 }
 
-export async function fetchBranchCatalogCategories(merchantId: string, branchId: string): Promise<BranchCatalogCategories> {
+export async function fetchBranchCatalogCategories(merchantId: string, branchId: string, language: Language = 'de'): Promise<BranchCatalogCategories> {
   const search = new URLSearchParams({ branchId });
-  const response = await fetchCatalogJson<BranchCatalogCategories>(`/merchants/${merchantId}/catalog/categories?${search.toString()}`);
+  const response = await fetchCatalogJson<BranchCatalogCategories>(`/merchants/${merchantId}/catalog/categories?${search.toString()}`, language);
   if (!response || !Array.isArray(response.categories) || !Number.isSafeInteger(response.totalCount) || response.totalCount < 0 ||
       !Number.isSafeInteger(response.uncategorizedCount) || response.uncategorizedCount < 0 ||
       response.categories.some(category => !category || !category.id || !category.name || !Number.isSafeInteger(category.productCount) || category.productCount <= 0)) {
@@ -334,16 +336,16 @@ export async function fetchBranchCatalogCategories(merchantId: string, branchId:
   return response;
 }
 
-export async function fetchCatalogProductDetail(merchantId: string, branchId: string, productId: string): Promise<ActiveProduct> {
+export async function fetchCatalogProductDetail(merchantId: string, branchId: string, productId: string, language: Language = 'de'): Promise<ActiveProduct> {
   const search = new URLSearchParams({ branchId });
-  const response = await fetchCatalogJson<ProductResponse>(`/merchants/${merchantId}/products/${productId}?${search.toString()}`);
+  const response = await fetchCatalogJson<ProductResponse>(`/merchants/${merchantId}/products/${productId}?${search.toString()}`, language);
   const product = normalizeProducts([response], merchantId, branchId).find(value => value.productId === productId);
   if (!product) throw invalidCatalogResponse('product-detail');
   return product;
 }
 
-export async function fetchProductCategories(merchantId: string): Promise<{ id: string; name: string }[]> {
-  const response = await fetchCatalogJson<{ id: string; name: string }[]>(`/merchants/${merchantId}/product-categories`);
+export async function fetchProductCategories(merchantId: string, language: Language = 'de'): Promise<{ id: string; name: string }[]> {
+  const response = await fetchCatalogJson<{ id: string; name: string }[]>(`/merchants/${merchantId}/product-categories`, language);
   if (!Array.isArray(response)) throw invalidCatalogResponse('categories');
   return response.filter(category => category.id && category.name).sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -352,8 +354,9 @@ export async function revalidateBasketItems(
   merchantId: string,
   branchId: string,
   items: BasketItem[],
+  language: Language = 'de',
 ): Promise<{ valid: boolean; issues: CatalogValidationIssue[]; products: ActiveProduct[] }> {
-  const products = await fetchActiveProducts(merchantId, branchId);
+  const products = await fetchActiveProducts(merchantId, branchId, undefined, language);
   const productMap = new Map(products.map((product) => [product.productId, product]));
   const issues: CatalogValidationIssue[] = [];
 

@@ -29,6 +29,7 @@ export interface ActiveBranchScope {
   branchName: string | null;
   merchantName: string | null;
   merchantMobility: 'BRICK_AND_MORTAR' | 'MOBILE' | null;
+  originalMenuLanguage?: string | null;
   branchStatus?: string | null;
   latitude?: number;
   longitude?: number;
@@ -367,7 +368,7 @@ async function enrichBranchScope(scope: ActiveBranchScope | null): Promise<Activ
       branchId: scope.branchId,
       reason: 'branch_details_unavailable',
     });
-    return { ...scope, merchantMobility: merchantDetails?.mobility ?? null };
+    return { ...scope, originalMenuLanguage: merchantDetails?.originalMenuLanguage, merchantMobility: merchantDetails?.mobility ?? null };
   }
 
   observability.info('merchant_branch_scope_enrichment_succeeded', {
@@ -380,6 +381,7 @@ async function enrichBranchScope(scope: ActiveBranchScope | null): Promise<Activ
     ...scope,
     merchantName: merchantDetails?.name ?? scope.merchantName,
     merchantMobility: merchantDetails?.mobility ?? null,
+    originalMenuLanguage: details.originalMenuLanguage ?? merchantDetails?.originalMenuLanguage,
     branchName: details.name,
     branchStatus: details.status ?? null,
     latitude: details.latitude,

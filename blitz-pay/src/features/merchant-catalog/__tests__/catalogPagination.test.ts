@@ -1,9 +1,11 @@
+import { useLanguage } from '../../../lib/LanguageContext';
 import type { InfiniteData, InfiniteQueryObserverOptions } from '@tanstack/react-query';
 import { InfiniteQueryObserver, QueryClient, useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useCatalogBrowser } from '../hooks/useCatalogBrowser';
 import { fetchCatalogProductPage, MerchantCatalogError } from '../services/merchantCatalogService';
 import type { CatalogProductPage } from '../types/catalog';
 
+jest.mock('../../../lib/LanguageContext', () => ({ useLanguage: jest.fn(() => ({ language: 'de' })) }));
 jest.mock('react', () => ({ ...jest.requireActual('react'), useCallback: (fn: unknown) => fn, useMemo: (fn: () => unknown) => fn() }));
 jest.mock('@react-navigation/native', () => ({ useFocusEffect: jest.fn() }));
 jest.mock('@tanstack/react-query', () => ({ ...jest.requireActual('@tanstack/react-query'), useQuery: jest.fn(), useInfiniteQuery: jest.fn() }));
@@ -111,4 +113,22 @@ it('shows an initial category failure once without duplicating it in the paginat
   expect(result.errorDetail).toBe('Catalog unavailable');
   expect(result.pageErrorKey).toBeNull();
   expect(result.pageErrorDetail).toBeUndefined();
+});
+
+it('separates language caches so a late German response cannot replace English content', async () => {
+  let resolveGerman!: (value: CatalogProductPage) => void;
+  jest.mocked(fetchCatalogProductPage).mockImplementation((_merchant, _branch, _filter, language) => language === 'en'
+    ? Promise.resolve(makePage('English text', null))
+    : new Promise(resolve => { resolveGerman = resolve; }));
+  const german = new InfiniteQueryObserver(client, options);
+  const pending = german.refetch();
+  jest.mocked(useLanguage).mockReturnValue({ language: 'en' } as never);
+  useCatalogBrowser('merchant', 'branch');
+  const english = new InfiniteQueryObserver(client, options);
+  await english.refetch();
+  resolveGerman(makePage('Deutscher Text', null));
+  await pending;
+  expect((english.getCurrentResult().data?.pages as CatalogProductPage[])[0].items[0].name).toBe('English text');
+  expect(fetchCatalogProductPage).toHaveBeenLastCalledWith('merchant', 'branch', expect.any(Object), 'en');
+  german.destroy(); english.destroy();
 });

@@ -1,3 +1,4 @@
+import { useLanguage } from '../../../lib/LanguageContext';
 import { useCallback, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { fetchCatalogProductDetail as fetchProductDetail } from '../services/merchantCatalogService';
@@ -12,10 +13,11 @@ type ProductImageContext = {
 };
 
 export function useProductImage({ merchantId, branchId, productId, imageUrl, variant = 'detail' }: ProductImageContext) {
+  const { language } = useLanguage();
   const queryClient = useQueryClient();
   const attempted = useRef(new Set<string>());
   const [replacement, setReplacement] = useState<{ key: string; uri: string } | null>(null);
-  const key = JSON.stringify([merchantId, branchId, productId, imageUrl, variant]);
+  const key = JSON.stringify([merchantId, branchId, productId, imageUrl, variant, language]);
 
   const refresh = useCallback(async () => {
     if (!merchantId || !branchId || !productId || !imageUrl || attempted.current.has(key)) return;
@@ -29,8 +31,8 @@ export function useProductImage({ merchantId, branchId, productId, imageUrl, var
     observability.info('product_image_url_refresh_requested', context);
     try {
       const product = await queryClient.fetchQuery({
-        queryKey: ['product-image-refresh', merchantId, branchId, productId],
-        queryFn: () => fetchProductDetail(merchantId, branchId, productId),
+        queryKey: ['product-image-refresh', merchantId, branchId, productId, language],
+        queryFn: () => fetchProductDetail(merchantId, branchId, productId, language),
         staleTime: 5_000,
         gcTime: 60_000,
         retry: false,
@@ -46,7 +48,7 @@ export function useProductImage({ merchantId, branchId, productId, imageUrl, var
         reason: error instanceof Error ? error.name : 'unknown_error',
       });
     }
-  }, [merchantId, branchId, productId, imageUrl, variant, key, queryClient]);
+  }, [merchantId, branchId, productId, imageUrl, variant, key, queryClient, language]);
 
   return { imageUrl: replacement?.key === key ? replacement.uri : imageUrl, refresh };
 }

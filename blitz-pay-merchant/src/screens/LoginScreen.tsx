@@ -1,3 +1,4 @@
+import { LanguageSelector } from '../features/app-language/components/LanguageSelector';
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView,
@@ -77,6 +78,7 @@ export default function LoginScreen() {
             </View>
 
             <View style={styles.card}>
+              <LanguageSelector />
               <Text style={styles.cardTitle}>{t('log_in')}</Text>
 
               {error ? (

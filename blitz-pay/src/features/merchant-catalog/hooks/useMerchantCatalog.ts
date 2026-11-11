@@ -1,4 +1,6 @@
-import { useCallback } from 'react';
+import { useLanguage } from '../../../lib/LanguageContext';
+import type { Language } from '../../../lib/translations';
+import { useCallback, useEffect } from 'react';
 import * as Location from 'expo-location';
 import { useQuery } from '@tanstack/react-query';
 import { useFocusEffect } from '@react-navigation/native';
@@ -23,9 +25,9 @@ type CatalogResult = {
 
 async function loadCatalog(
   merchantId: string,
-  merchantName: string,
   preferredBranchId?: string,
   includeProducts = true,
+  language: Language = 'de',
 ): Promise<CatalogResult> {
   const [branches, merchantDetails, stripeStatus] = await Promise.all([
     fetchMerchantBranches(merchantId),
@@ -46,7 +48,7 @@ async function loadCatalog(
     ?? resolveMerchantBranch(branches, coords);
   if (!branch) throw new MerchantCatalogError('merchant_branch_unavailable');
 
-  const products = includeProducts ? await fetchActiveProducts(merchantId, branch.branchId) : [];
+  const products = includeProducts ? await fetchActiveProducts(merchantId, branch.branchId, undefined, language) : [];
   const branchWithPolicy = {
     ...branch,
     delayedPaymentEnabled: merchantDetails.delayedPaymentEnabled,
@@ -57,13 +59,6 @@ async function loadCatalog(
     ] as MerchantBranch['activePaymentChannels'],
   };
 
-  setBasketMerchantContext({
-    merchantId,
-    merchantName,
-    branchId: branchWithPolicy.branchId,
-    branchName: branchWithPolicy.name,
-  });
-
   return { branch: branchWithPolicy, merchantLogoUrl: merchantDetails.logoUrl, appointmentsEnabled: merchantDetails.appointmentsEnabled, products };
 }
 
@@ -73,14 +68,24 @@ export function useMerchantCatalog(params: {
   preferredBranchId?: string;
   contextOnly?: boolean;
 }) {
+  const { language } = useLanguage();
   const { merchantId, merchantName = 'Merchant', preferredBranchId, contextOnly = false } = params;
 
   const { data, isLoading, error, refetch, isStale } = useQuery({
-    queryKey: contextOnly ? [...QUERY_KEYS.catalog(merchantId!, preferredBranchId), 'context'] : QUERY_KEYS.catalog(merchantId!, preferredBranchId),
-    queryFn: () => loadCatalog(merchantId!, merchantName, preferredBranchId, !contextOnly),
+    queryKey: contextOnly
+      ? [...QUERY_KEYS.catalog(merchantId!, preferredBranchId), 'context']
+      : [...QUERY_KEYS.catalog(merchantId!, preferredBranchId), 'products', language],
+    queryFn: () => loadCatalog(merchantId!, preferredBranchId, !contextOnly, language),
     enabled: !!merchantId,
     staleTime: STALE_TIMES.PRODUCTS,
   });
+
+  useEffect(() => {
+    if (!merchantId || !data?.branch) return;
+    setBasketMerchantContext({
+      merchantId, merchantName, branchId: data.branch.branchId, branchName: data.branch.name,
+    });
+  }, [merchantId, merchantName, data?.branch]);
 
   useFocusEffect(
     useCallback(() => {

@@ -1,3 +1,4 @@
+import { LanguageSelector } from '../features/app-language/components/LanguageSelector';
 import React, { useState } from 'react';
 import {
   View,
@@ -110,6 +111,7 @@ export default function SignupScreen() {
           </View>
 
           <View style={styles.card}>
+            <LanguageSelector />
             {error ? (
               <View style={styles.errorBox}>
                 <Ionicons name="alert-circle-outline" size={16} color={colors.error} />
