@@ -98,7 +98,6 @@ function toSession(args: ConfirmCheckoutArgs, order: OrderSummary): OrderPayment
     paymentRequestId: order.lastPaymentRequestId,
     paymentProvider: order.lastPaymentProvider,
     retryPreferredMethod: args.selectedMethod ?? undefined,
-    hasTable: Boolean(args.table),
   };
 }
 

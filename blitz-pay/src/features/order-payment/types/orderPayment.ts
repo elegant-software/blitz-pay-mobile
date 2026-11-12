@@ -128,8 +128,9 @@ export interface OrderSummary {
   pickupNumber?: number | null;
   /** Null for legacy orders and orders without one (Appointment, Invoice). */
   fulfilmentType?: FulfilmentType | null;
-  /** Present only if the backend reports the order's Table; otherwise see OrderPaymentSession.hasTable. */
-  tableCode?: string | null;
+  /** The order's Table, when it was placed at one. */
+  tableId?: string | null;
+  tableName?: string | null;
 }
 
 export interface RecentOrderSummary extends OrderSummary {
@@ -159,8 +160,6 @@ export interface OrderPaymentSession {
   paymentRequestId?: string;
   paymentProvider?: string;
   retryPreferredMethod?: CheckoutPaymentMethod;
-  /** The order was placed at a Table. */
-  hasTable?: boolean;
 }
 
 export interface ResumeOrderPaymentArgs {
@@ -229,9 +228,9 @@ export function defaultFulfilmentType(hasTable: boolean): FulfilmentType {
 /** Translation key for the in-app 'ready' wording: DINE_IN with a Table is brought over, everything else is collected. */
 export function readyPickupMessageKey(
   fulfilmentType: FulfilmentType | null | undefined,
-  hasTable: boolean,
+  tableId: string | null | undefined,
 ): 'order_ready_to_table' | 'order_ready_at_counter' {
-  return fulfilmentType === 'DINE_IN' && hasTable ? 'order_ready_to_table' : 'order_ready_at_counter';
+  return fulfilmentType === 'DINE_IN' && tableId != null ? 'order_ready_to_table' : 'order_ready_at_counter';
 }
 
 export function isOrderEditable(status: OrderStatus): boolean {

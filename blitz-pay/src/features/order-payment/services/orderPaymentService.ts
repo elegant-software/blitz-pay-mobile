@@ -57,7 +57,8 @@ interface RawOrderResponse {
   preparationStatus?: string | null;
   pickupNumber?: number | null;
   fulfilmentType?: string | null;
-  tableCode?: string | null;
+  tableId?: string | null;
+  tableName?: string | null;
 }
 
 interface RawOrderListResponse {
@@ -184,7 +185,8 @@ function parseOrder(payload: RawOrderResponse): OrderSummary {
     preparationStatus: normalizePreparationStatus(payload.preparationStatus),
     pickupNumber: typeof payload.pickupNumber === 'number' ? payload.pickupNumber : null,
     fulfilmentType: normalizeFulfilmentType(payload.fulfilmentType),
-    tableCode: payload.tableCode ?? null,
+    tableId: payload.tableId ?? null,
+    tableName: payload.tableName ?? null,
   };
 }
 

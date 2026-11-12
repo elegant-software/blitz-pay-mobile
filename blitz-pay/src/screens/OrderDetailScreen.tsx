@@ -350,7 +350,7 @@ export default function OrderDetailScreen() {
               ) : null}
               {order.preparationStatus === 'READY' ? (
                 <Text style={styles.readyHint}>
-                  {t(readyPickupMessageKey(order.fulfilmentType, Boolean(order.tableCode) || Boolean(session?.hasTable)))}
+                  {t(readyPickupMessageKey(order.fulfilmentType, order.tableId))}
                 </Text>
               ) : null}
             </View>
