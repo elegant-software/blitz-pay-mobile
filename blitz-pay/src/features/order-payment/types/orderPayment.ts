@@ -6,6 +6,8 @@ export type OrderPaymentChannel = MerchantPaymentChannel;
 export type CreateOrderPaymentMethod = 'TRUELAYER' | 'STRIPE' | 'BRAINTREE';
 export type BackendCheckoutPaymentMethod = 'BANK_ACCOUNT' | 'CARD' | 'PAY_BY_BANK' | 'TERMINAL' | 'PAYPAL' | 'CASH';
 export type OrderType = 'PRE_ORDER' | 'WALK_IN_ORDERING';
+/** How a Walk-In or Pre-Order is consumed; independent of the Table (ADR-0025). Fixed at placement. */
+export type FulfilmentType = 'DINE_IN' | 'TAKE_AWAY';
 export type CheckoutIntent = 'PAY_NOW' | 'PAY_LATER';
 export type PaymentSource = 'APP_PAYMENT' | 'MANUAL_SETTLEMENT';
 export type OrderPriceSource = 'CATALOG' | 'MERCHANT_OVERRIDE';
@@ -37,6 +39,8 @@ export interface CreateOrderInput {
   tableCode?: string;
   /** People at the Table; the backend applies it only when the Table has no Guest Count yet. */
   guestCount?: number;
+  /** Always sent explicitly by the app; the backend defaults it (Table -> DINE_IN, else TAKE_AWAY) when omitted. */
+  fulfilmentType?: FulfilmentType;
   customerLocation?: CustomerLocationInput;
 }
 
@@ -122,6 +126,10 @@ export interface OrderSummary {
   preparationStatus?: PreparationStatus;
   /** Number staff call out at pickup. Null for legacy orders and orders without a Branch. */
   pickupNumber?: number | null;
+  /** Null for legacy orders and orders without one (Appointment, Invoice). */
+  fulfilmentType?: FulfilmentType | null;
+  /** Present only if the backend reports the order's Table; otherwise see OrderPaymentSession.hasTable. */
+  tableCode?: string | null;
 }
 
 export interface RecentOrderSummary extends OrderSummary {
@@ -151,6 +159,8 @@ export interface OrderPaymentSession {
   paymentRequestId?: string;
   paymentProvider?: string;
   retryPreferredMethod?: CheckoutPaymentMethod;
+  /** The order was placed at a Table. */
+  hasTable?: boolean;
 }
 
 export interface ResumeOrderPaymentArgs {
@@ -209,6 +219,19 @@ export function isOrderStatusTerminal(status: OrderStatus): boolean {
 
 export function isOrderResumable(status: OrderStatus): boolean {
   return status === 'PENDING_PAYMENT' || status === 'PAYMENT_FAILED';
+}
+
+/** Table gives DINE_IN, no Table gives TAKE_AWAY (mirrors the backend default). */
+export function defaultFulfilmentType(hasTable: boolean): FulfilmentType {
+  return hasTable ? 'DINE_IN' : 'TAKE_AWAY';
+}
+
+/** Translation key for the in-app 'ready' wording: DINE_IN with a Table is brought over, everything else is collected. */
+export function readyPickupMessageKey(
+  fulfilmentType: FulfilmentType | null | undefined,
+  hasTable: boolean,
+): 'order_ready_to_table' | 'order_ready_at_counter' {
+  return fulfilmentType === 'DINE_IN' && hasTable ? 'order_ready_to_table' : 'order_ready_at_counter';
 }
 
 export function isOrderEditable(status: OrderStatus): boolean {
