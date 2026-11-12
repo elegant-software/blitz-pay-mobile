@@ -25,7 +25,8 @@ import {
   searchShopperByEmail,
   MerchantOrderError,
 } from '../features/orders/services/orderService';
-import type { BranchCustomer } from '../features/orders/types/order';
+import { getFulfilmentTypeIcon, getFulfilmentTypeLabelKey } from '../features/orders/orderPresentation';
+import type { BranchCustomer, FulfilmentType } from '../features/orders/types/order';
 import type { RootStackNav } from '../types';
 import type { Product } from '../types';
 
@@ -71,6 +72,8 @@ export default function CreateOrderScreen() {
   const [searchError, setSearchError] = useState('');
   const [searchResult, setSearchResult] = useState<BranchCustomer | null | undefined>(undefined);
   const [dueDate, setDueDate] = useState('');
+  // Counter orders have no Table, so they default to take-away.
+  const [fulfilmentType, setFulfilmentType] = useState<FulfilmentType>('TAKE_AWAY');
 
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -181,6 +184,7 @@ export default function CreateOrderScreen() {
         activeBranchScope.merchantId,
         activeBranchScope.branchId,
         items,
+        { fulfilmentType },
       );
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setCreatedOrderId(order.orderId);
@@ -252,6 +256,7 @@ export default function CreateOrderScreen() {
     setCreatedOrderId('');
     setCreateError('');
     setOrderTotal(0);
+    setFulfilmentType('TAKE_AWAY');
     setSelectedShopper(null);
     setSearchEmail('');
     setSearchError('');
@@ -485,6 +490,32 @@ export default function CreateOrderScreen() {
           <View style={styles.intentSummary}>
             <Text style={styles.intentSummaryLabel}>{t('create_order_total')}</Text>
             <Text style={styles.intentSummaryAmount}>{formatCurrency(runningTotal)}</Text>
+          </View>
+
+          <Text style={styles.fulfilmentTitle}>{t('create_order_fulfilment_title')}</Text>
+          <View style={styles.fulfilmentRow}>
+            {(['TAKE_AWAY', 'DINE_IN'] as const).map((type) => {
+              const active = fulfilmentType === type;
+              return (
+                <TouchableOpacity
+                  key={type}
+                  style={[styles.fulfilmentOption, active && styles.fulfilmentOptionActive]}
+                  onPress={() => setFulfilmentType(type)}
+                  activeOpacity={0.85}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: active }}
+                >
+                  <Ionicons
+                    name={getFulfilmentTypeIcon(type) as React.ComponentProps<typeof Ionicons>['name']}
+                    size={18}
+                    color={active ? colors.white : colors.gray600}
+                  />
+                  <Text style={[styles.fulfilmentOptionText, active && styles.fulfilmentOptionTextActive]}>
+                    {t(getFulfilmentTypeLabelKey(type))}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
 
           {createError ? <Text style={styles.errorText}>{createError}</Text> : null}
@@ -969,6 +1000,21 @@ const styles = StyleSheet.create({
   },
   intentSummaryLabel: { fontSize: 15, color: colors.gray600, fontWeight: '600' },
   intentSummaryAmount: { fontSize: 20, fontWeight: '800', color: colors.onSurface },
+  fulfilmentTitle: { fontSize: 14, fontWeight: '600', color: colors.gray600, marginBottom: spacing.xs },
+  fulfilmentRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
+  fulfilmentOption: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: radius.xl,
+    backgroundColor: colors.white,
+  },
+  fulfilmentOptionActive: { backgroundColor: colors.primary },
+  fulfilmentOptionText: { fontSize: 14, fontWeight: '700', color: colors.gray600 },
+  fulfilmentOptionTextActive: { color: colors.white },
   intentCard: {
     flexDirection: 'row',
     alignItems: 'center',

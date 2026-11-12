@@ -23,6 +23,7 @@ import {
   tablePinTone,
 } from '../features/tables/tableLogic';
 import { formatPickupNumber } from '../features/orders/orderPresentation';
+import { FulfilmentTypeBadge } from '../features/orders/components/FulfilmentTypeBadge';
 import { PreparationStatusBadge } from '../features/orders/components/PreparationStatusBadge';
 import type { MerchantPreparationStatus } from '../features/orders/types/order';
 import type { TableOrderSummary } from '../features/tables/types/table';
@@ -168,6 +169,7 @@ export default function TableDetailScreen() {
                     {t(paymentStatusLabel(order.paymentStatus))}
                   </Text>
                 </View>
+                {order.fulfilmentType ? <FulfilmentTypeBadge type={order.fulfilmentType} /> : null}
                 {isPreparationStatus(order.preparationStatus) ? <PreparationStatusBadge status={order.preparationStatus} /> : null}
               </View>
             </TouchableOpacity>

@@ -19,6 +19,8 @@ export type MerchantPaymentProvider =
 export type MerchantOrderPriceSource = 'CATALOG' | 'MERCHANT_OVERRIDE';
 export type MerchantOrderUpdateActor = 'MERCHANT' | 'SHOPPER';
 export type MerchantPreparationStatus = 'RECEIVED' | 'PREPARING' | 'READY';
+/** How a walk-in or pre-order is consumed; fixed at placement. Absent for invoice and appointment orders. */
+export type FulfilmentType = 'DINE_IN' | 'TAKE_AWAY';
 
 export interface MerchantOrderItem {
   lineId: string;
@@ -47,6 +49,8 @@ export interface MerchantOrderSummary {
   preparationStatus?: MerchantPreparationStatus;
   /** Null for legacy orders and orders without a Branch; hide it then. */
   pickupNumber: number | null;
+  /** Null for invoice and appointment orders, and orders placed before the field existed; hide the badge then. */
+  fulfilmentType: FulfilmentType | null;
 }
 
 export interface MerchantOrderDetail extends MerchantOrderSummary {
