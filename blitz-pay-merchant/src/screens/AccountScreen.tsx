@@ -20,6 +20,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useLanguage } from '../lib/LanguageContext';
 import { useAuth } from '../lib/auth';
 import { useGeofence } from '../hooks/useGeofence';
+import VersionLine from '../features/app-version/components/VersionLine';
 import { authedFetch } from '../lib/api';
 import { fetchLegal } from '../lib/legal';
 import { spacing, radius, shadow, type ThemeColors } from '../lib/theme';
@@ -506,6 +507,7 @@ export default function AccountScreen() {
           <Ionicons name="log-out-outline" size={18} color={colors.error} />
           <Text style={styles.logoutText}>{t('logout')}</Text>
         </TouchableOpacity>
+        <VersionLine />
       </View>
 
       <Modal

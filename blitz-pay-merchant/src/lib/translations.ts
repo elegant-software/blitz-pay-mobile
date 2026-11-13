@@ -68,6 +68,7 @@ export const translations = {
     network_error: 'Unable to connect. Check your internet connection.',
     biometric_failed: 'Biometric authentication failed.',
     logout: 'Sign Out',
+    version_unknown: 'unknown',
     // Navigation
     dashboard: 'Dashboard',
     orders: 'Orders',
@@ -777,6 +778,7 @@ export const translations = {
     network_error: 'Keine Verbindung. Überprüfe deine Internetverbindung.',
     biometric_failed: 'Biometrische Authentifizierung fehlgeschlagen.',
     logout: 'Abmelden',
+    version_unknown: 'unbekannt',
     // Navigation
     dashboard: 'Dashboard',
     orders: 'Bestellungen',
