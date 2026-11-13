@@ -10,6 +10,7 @@ module.exports = {
     name: "BlitzPay",
     slug: "blitzpay-mobile",
     scheme: "blitzpay",
+    // Rewritten from the GitHub release tag by cd-build-mobile-app.yml; shown in Account and used as runtimeVersion.
     version: "1.0.0",
     runtimeVersion: { policy: "appVersion" },
     updates: { url: "https://u.expo.dev/283f0dd6-d7d4-4dcc-8613-66621b812e7f" },

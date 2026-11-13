@@ -135,6 +135,8 @@ jobs:
       run_eas_update: ${{ steps.resolve.outputs.run_eas_update }}
       release_notes_tag: ${{ steps.resolve.outputs.release_notes_tag }}
       submit_to_app_stores: ${{ steps.resolve.outputs.submit_to_app_stores }}
+      app_version: ${{ steps.release-version.outputs.app_version }}
+      release_tag: ${{ steps.release-version.outputs.release_tag }}
     steps:
       - name: Resolve inputs for both workflow_dispatch and workflow_call
         id: resolve
@@ -151,6 +153,45 @@ jobs:
             echo "release_notes_tag=${{ inputs.release-notes-tag || github.event.inputs.release-notes-tag || 'latest' }}"
             echo "submit_to_app_stores=${{ (inputs.submit-to-app-stores || github.event.inputs.submit-to-app-stores == 'true') && 'true' || 'false' }}"
           } >> "$GITHUB_OUTPUT"
+
+      - name: Resolve app release version
+        id: release-version
+        if: ${{ steps.resolve.outputs.run_eas_build == 'true' || steps.resolve.outputs.run_eas_update == 'true' }}
+        env:
+          RELEASE_NOTES_TAG: ${{ steps.resolve.outputs.release_notes_tag }}
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const requestedTag = (process.env.RELEASE_NOTES_TAG || "latest").trim();
+            const semverPattern = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
+
+            let release;
+            if (requestedTag.toLowerCase() === "latest") {
+              ({ data: release } = await github.rest.repos.getLatestRelease({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+              }));
+            } else {
+              ({ data: release } = await github.rest.repos.getReleaseByTag({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tag: requestedTag,
+              }));
+            }
+
+            const releaseTag = String(release.tag_name || requestedTag).trim();
+            const appVersion = releaseTag.replace(/^v/i, "");
+
+            if (!semverPattern.test(appVersion)) {
+              core.setFailed(
+                `Release tag "${releaseTag}" is not SemVer. Use tags like v1.2.3 (or 1.2.3).`
+              );
+              return;
+            }
+
+            core.info(`Resolved app version ${appVersion} from release tag "${releaseTag}".`);
+            core.setOutput("release_tag", releaseTag);
+            core.setOutput("app_version", appVersion);
 
   quality:
     name: Quality
@@ -178,7 +219,6 @@ jobs:
       NODE_VERSION: ${{ needs.resolve-config.outputs.node_version }}
       REQUESTED_PROFILE: ${{ needs.resolve-config.outputs.eas_profile }}
       REQUESTED_PLATFORM: ${{ needs.resolve-config.outputs.eas_platform }}
-      RELEASE_NOTES_TAG: ${{ needs.resolve-config.outputs.release_notes_tag }}
       EXPO_PUBLIC_KEYCLOAK_URL: ${{ vars.EXPO_PUBLIC_KEYCLOAK_URL }}
       EXPO_PUBLIC_KEYCLOAK_REALM: ${{ vars.EXPO_PUBLIC_KEYCLOAK_REALM }}
       EXPO_PUBLIC_KEYCLOAK_CLIENT_ID: ${{ vars.EXPO_PUBLIC_KEYCLOAK_CLIENT_ID }}
@@ -219,56 +259,26 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
-      - name: Resolve app release version
-        id: release-version
-        uses: actions/github-script@v9
-        with:
-          script: |
-            const requestedTag = (process.env.RELEASE_NOTES_TAG || "latest").trim();
-            const semverPattern = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
-
-            let release;
-            if (requestedTag.toLowerCase() === "latest") {
-              ({ data: release } = await github.rest.repos.getLatestRelease({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-              }));
-            } else {
-              ({ data: release } = await github.rest.repos.getReleaseByTag({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                tag: requestedTag,
-              }));
-            }
-
-            const releaseTag = String(release.tag_name || requestedTag).trim();
-            const appVersion = releaseTag.replace(/^v/i, "");
-
-            if (!semverPattern.test(appVersion)) {
-              core.setFailed(
-                `Release tag "${releaseTag}" is not SemVer. Use tags like v1.2.3 (or 1.2.3).`
-              );
-              return;
-            }
-
-            core.info(`Resolved app version ${appVersion} from release tag "${releaseTag}".`);
-            core.setOutput("release_tag", releaseTag);
-            core.setOutput("app_version", appVersion);
-
       - name: Apply release version to Expo app config
         working-directory: ${{ env.APP_DIR }}
+        env:
+          APP_VERSION: ${{ needs.resolve-config.outputs.app_version }}
+          RELEASE_TAG: ${{ needs.resolve-config.outputs.release_tag }}
         run: |
-          app_version="${{ steps.release-version.outputs.app_version }}"
-          release_tag="${{ steps.release-version.outputs.release_tag }}"
-          if [ -z "$app_version" ]; then
+          if [ -z "$APP_VERSION" ]; then
             echo "Resolved app version is empty."
             exit 1
           fi
 
           test -f app.config.js || { echo "app.config.js not found in $(pwd)"; exit 1; }
-          sed -i.bak -E "s/version: \"[^\"]*\"/version: \"$app_version\"/" app.config.js
+          sed -i.bak -E "s/version: \"[^\"]*\"/version: \"$APP_VERSION\"/" app.config.js
           rm -f app.config.js.bak
-          echo "Using Expo app version $app_version from GitHub release $release_tag"
+          resolved="$(npx expo config --json | jq -r '.version // .expo.version // empty')"
+          if [ "$resolved" != "$APP_VERSION" ]; then
+            echo "Expo config version is \"$resolved\", expected \"$APP_VERSION\" from $RELEASE_TAG."
+            exit 1
+          fi
+          echo "Using Expo app version $APP_VERSION from GitHub release $RELEASE_TAG"
 
       - name: Create runtime .env for Expo/EAS
         working-directory: ${{ env.APP_DIR }}
@@ -359,7 +369,7 @@ jobs:
       - name: Add EAS build to job summary
         if: ${{ always() && steps.duplicate-build-check.outputs.skip_build != 'true' }}
         run: |
-          version="${{ steps.release-version.outputs.app_version }}"
+          version="${{ needs.resolve-config.outputs.app_version }}"
           {
             echo "### 📱 EAS build ${version:+v$version }· ${REQUESTED_PLATFORM} · ${REQUESTED_PROFILE}"
             echo '```'
@@ -416,6 +426,27 @@ jobs:
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Apply release version to Expo app config
+        working-directory: ${{ env.APP_DIR }}
+        env:
+          APP_VERSION: ${{ needs.resolve-config.outputs.app_version }}
+          RELEASE_TAG: ${{ needs.resolve-config.outputs.release_tag }}
+        run: |
+          if [ -z "$APP_VERSION" ]; then
+            echo "Resolved app version is empty."
+            exit 1
+          fi
+
+          test -f app.config.js || { echo "app.config.js not found in $(pwd)"; exit 1; }
+          sed -i.bak -E "s/version: \"[^\"]*\"/version: \"$APP_VERSION\"/" app.config.js
+          rm -f app.config.js.bak
+          resolved="$(npx expo config --json | jq -r '.version // .expo.version // empty')"
+          if [ "$resolved" != "$APP_VERSION" ]; then
+            echo "Expo config version is \"$resolved\", expected \"$APP_VERSION\" from $RELEASE_TAG."
+            exit 1
+          fi
+          echo "Using Expo app version $APP_VERSION from GitHub release $RELEASE_TAG"
 
       - name: Create runtime .env for Expo/EAS
         working-directory: ${{ env.APP_DIR }}

@@ -28,6 +28,7 @@
     "@tanstack/react-query-persist-client": "^5.100.11",
     "eol": "^0.10.0",
     "expo": "~55.0.27",
+    "expo-application": "~55.0.19",
     "expo-asset": "~55.0.17",
     "expo-audio": "~55.0.15",
     "expo-build-properties": "~55.0.15",
