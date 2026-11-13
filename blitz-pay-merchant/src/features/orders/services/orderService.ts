@@ -378,7 +378,7 @@ export async function fetchMerchantOrderInvoice(
       status: response.status,
       reason,
     });
-    throw new Error('merchant_order_invoice_load_failed');
+    throw new MerchantOrderError("invoice_download_failed", reason, response.status);
   }
   return response.json() as Promise<InvoiceDownloadResponse>;
 }

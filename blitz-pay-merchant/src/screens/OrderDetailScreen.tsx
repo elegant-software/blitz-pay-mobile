@@ -1,3 +1,4 @@
+import { PaidOrderInvoice } from '../features/orders/components/PaidOrderInvoice';
 import { useTheme } from "../lib/ThemeContext";
 import React from 'react';
 import {
@@ -17,7 +18,6 @@ import { PreparationStatusBadge } from '../features/orders/components/Preparatio
 import { useMerchantOrderDetail } from '../features/orders/hooks/useMerchantOrderDetail';
 import { useMerchantProducts } from '../features/products/hooks/useMerchantProducts';
 import { terminalStatusLabelKey, useStripeTerminalPayment } from '../hooks/useStripeTerminalPayment';
-import { fetchMerchantOrderInvoice } from '../features/orders/services/orderService';
 
 type RouteProps = RouteProp<RootStackParamList, 'OrderDetail'>;
 
@@ -66,9 +66,6 @@ export default function OrderDetailScreen() {
   } = useStripeTerminalPayment();
   const [terminalReconciling, setTerminalReconciling] = React.useState(false);
   const [addItemVisible, setAddItemVisible] = React.useState(false);
-  const [invoiceUrl, setInvoiceUrl] = React.useState<string | null>(null);
-  const [invoiceChecked, setInvoiceChecked] = React.useState(false);
-  const isInvoiceOrder = order?.checkoutIntent === 'PAY_LATER';
   const terminalCollecting = ['discovering', 'connecting', 'collecting', 'insert_card'].includes(terminalStatus);
   const terminalBusy = terminalReconciling || terminalCollecting;
   const reconcileTerminal = async () => {
@@ -82,31 +79,6 @@ export default function OrderDetailScreen() {
   const existingProductIds = new Set(order?.items.map((item) => item.productId) ?? []);
   const availableProducts = products.filter((product) => product.active && !existingProductIds.has(product.id));
 
-  React.useEffect(() => {
-    if (!order?.orderId || !activeBranchScope) {
-      setInvoiceUrl(null);
-      setInvoiceChecked(false);
-      return;
-    }
-    let active = true;
-    setInvoiceChecked(false);
-    void fetchMerchantOrderInvoice(order.orderId, activeBranchScope)
-      .then((invoice) => {
-        if (!active) return;
-        setInvoiceUrl(invoice?.url ?? null);
-      })
-      .catch(() => {
-        if (!active) return;
-        setInvoiceUrl(null);
-      })
-      .finally(() => {
-        if (!active) return;
-        setInvoiceChecked(true);
-      });
-    return () => {
-      active = false;
-    };
-  }, [activeBranchScope, order?.orderId, order?.status]);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -275,28 +247,7 @@ export default function OrderDetailScreen() {
             </View>
           </View>
 
-          {isInvoiceOrder ? (
-            !invoiceChecked ? (
-              <View style={styles.invoiceButton}>
-                <ActivityIndicator size="small" color={colors.gray400} />
-                <Text style={[styles.invoiceButtonText, { color: colors.gray400 }]}>{t('merchant_invoice_checking')}</Text>
-              </View>
-            ) : invoiceUrl ? (
-              <TouchableOpacity
-                style={styles.invoiceButton}
-                onPress={() => navigation.navigate('InvoicePdf', { url: invoiceUrl, title: t('merchant_invoice_view') })}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="document-text-outline" size={18} color={colors.onSurface} />
-                <Text style={styles.invoiceButtonText}>{t('merchant_invoice_view')}</Text>
-              </TouchableOpacity>
-            ) : (
-              <View style={[styles.invoiceButton, { opacity: 0.6 }]}>
-                <Ionicons name="time-outline" size={18} color={colors.gray500} />
-                <Text style={[styles.invoiceButtonText, { color: colors.gray500 }]}>{t('merchant_invoice_pending')}</Text>
-              </View>
-            )
-          ) : null}
+          <PaidOrderInvoice orderId={order.orderId} paid={order.status === 'paid'} scope={activeBranchScope} />
 
           {(order.status === 'awaiting_payment' || order.status === 'payment_failed' || order.status === 'payment_in_progress') ? (
             <View style={styles.actions}>

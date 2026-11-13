@@ -1,3 +1,4 @@
+import { PaidOrderInvoice } from '../features/order-payment/components/PaidOrderInvoice';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
@@ -34,7 +35,6 @@ import { MerchantCatalogError, fetchMerchantStripeConnectStatus } from '../featu
 import type { PaymentChannel } from '../features/merchant-catalog/types/catalog';
 import { observability } from '../lib/observability';
 import type { RootStackNav, RootStackParamList } from '../types';
-import { fetchOrderInvoice } from '../lib/api/shopperInvoice';
 
 const METHODS: Array<{
   key: CheckoutPaymentMethod;
@@ -97,9 +97,6 @@ export default function OrderDetailScreen() {
     setPayCash(false);
   }, [route.params.orderId]);
   const [activePaymentChannels, setActivePaymentChannels] = useState<PaymentChannel[]>([]);
-  const [invoiceUrl, setInvoiceUrl] = useState<string | null>(null);
-  const [invoiceChecked, setInvoiceChecked] = useState(false);
-  const isInvoiceOrder = order?.usesDeferredPayment === true && order?.targetShopperId != null;
   const session = orderPaymentStore.getSession(route.params.orderId);
 
   useEffect(() => {
@@ -151,15 +148,6 @@ export default function OrderDetailScreen() {
     return () => sub.remove();
   }, [reloadOrder, route.params.orderId]);
 
-  useEffect(() => {
-    if (!order?.orderId) return;
-    const orderId = order.orderId;
-    setInvoiceChecked(false);
-    void fetchOrderInvoice(orderId)
-      .then((inv) => { setInvoiceUrl(inv?.url ?? null); })
-      .catch(() => { setInvoiceUrl(null); })
-      .finally(() => { setInvoiceChecked(true); });
-  }, [order?.orderId]);
 
   useEffect(() => {
     let active = true;
@@ -411,28 +399,7 @@ export default function OrderDetailScreen() {
             ))}
           </View>
 
-          {isInvoiceOrder ? (
-            !invoiceChecked ? (
-              <View style={styles.invoiceButton}>
-                <ActivityIndicator size="small" color={colors.gray400} />
-                <Text style={[styles.invoiceButtonText, { color: colors.gray400 }]}>{t('invoice_checking')}</Text>
-              </View>
-            ) : invoiceUrl ? (
-              <TouchableOpacity
-                style={styles.invoiceButton}
-                onPress={() => navigation.navigate('InvoicePdf', { url: invoiceUrl, title: t('invoice_view') })}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="document-text-outline" size={18} color={colors.onSurface} />
-                <Text style={styles.invoiceButtonText}>{t('invoice_view')}</Text>
-              </TouchableOpacity>
-            ) : (
-              <View style={[styles.invoiceButton, { opacity: 0.6 }]}>
-                <Ionicons name="time-outline" size={18} color={colors.gray500} />
-                <Text style={[styles.invoiceButtonText, { color: colors.gray500 }]}>{t('invoice_pending')}</Text>
-              </View>
-            )
-          ) : null}
+          <PaidOrderInvoice orderId={order.orderId} paid={order.status === 'PAID'} />
 
           {canResume ? (
             <View style={styles.section}>

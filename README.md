@@ -176,3 +176,11 @@ Workflow: `.github/workflows/cd-build-mobile-app.yml`
    - `EXPO_PUBLIC_OBSERVABILITY_ENVIRONMENT=production`
 2. Logs are batched on-device and posted to `POST /api/observability/mobile-logs` on the backend, then forwarded as OTLP logs.
 3. Query in Grafana Explore by `service.name="blitzpay-mobile"` and `deployment.environment`.
+
+## Invoice downloads after payment
+
+The merchant app shows a private invoice download link and a QR code on the payment-success and
+order-detail screens. The shopper app shows a download button on paid order details; scanning the
+merchant's invoice QR code with the shopper app's scanner opens the invoice in the app.
+Links expire after 30 minutes; use **Refresh invoice** to renew them. Invoice availability and
+download errors have retry actions.
