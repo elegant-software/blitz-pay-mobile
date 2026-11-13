@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { Alert, Platform } from 'react-native';
-import { requestNeededAndroidPermissions, useStripeTerminal } from '@stripe/stripe-terminal-react-native';
+import { requestNeededAndroidPermissions, useStripeTerminal } from '../lib/terminalSdk';
 import type { PaymentIntent, Reader, StripeError } from '@stripe/stripe-terminal-react-native';
 import * as Location from 'expo-location';
 import {
@@ -165,7 +165,7 @@ export function useStripeTerminalPayment() {
             autoReconnectOnUnexpectedDisconnect: true,
           });
           if (error) throw stripeFailure(error, 'Card reader connection failed');
-          return { kind: 'card_reader', serial: reader.serialNumber };
+          return { kind: 'card_reader', serial: reader.serialNumber ?? null };
         }
         observability.warn('terminal_card_reader_unreachable', { orderId: params.orderId, readerSerial: paired.serialNumber });
         const choice = await askReaderFallback();
@@ -256,6 +256,7 @@ export function useStripeTerminalPayment() {
 
       const { paymentIntent, error: retrieveError } = await retrievePaymentIntent(clientSecret);
       if (retrieveError || !paymentIntent) throw stripeFailure(retrieveError, 'Failed to retrieve payment intent');
+      if (!paymentIntent.id) throw new Error('Retrieved payment intent has no id');
       paymentIntentId = paymentIntent.id;
       const reused = lastIntentIdByOrderRef.current.get(orderId) === paymentIntent.id;
       lastIntentIdByOrderRef.current.set(orderId, paymentIntent.id);

@@ -1,7 +1,8 @@
+import { useTheme } from "../../../lib/ThemeContext";
 import React from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useLanguage } from '../../../lib/LanguageContext';
-import { colors, radius, spacing } from '../../../lib/theme';
+import { radius, spacing, type ThemeColors } from '../../../lib/theme';
 
 type Props = {
   loading: boolean;
@@ -12,6 +13,9 @@ type Props = {
 };
 
 export function CatalogListFooter({ loading, hasMore, error, onLoadMore, onRetry }: Props) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   const { t } = useLanguage();
   if (!loading && !hasMore && !error) return null;
   return (
@@ -36,7 +40,7 @@ export function CatalogListFooter({ loading, hasMore, error, onLoadMore, onRetry
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: { padding: spacing.md, alignItems: 'center', gap: spacing.sm },
   button: { minHeight: 44, justifyContent: 'center', paddingHorizontal: spacing.md, backgroundColor: colors.primary, borderRadius: radius.full },
   label: { color: colors.black, fontWeight: '600' },

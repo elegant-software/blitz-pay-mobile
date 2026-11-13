@@ -1,3 +1,4 @@
+import { useTheme } from "../lib/ThemeContext";
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -15,7 +16,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../lib/auth';
 import { useLanguage } from '../lib/LanguageContext';
-import { colors, spacing, radius, shadow } from '../lib/theme';
+import { spacing, radius, shadow, type ThemeColors } from '../lib/theme';
 import type { RootStackNav } from '../types';
 import {
   fetchAppointmentPolicy,
@@ -24,6 +25,9 @@ import {
 } from '../features/appointments/services/employeeService';
 
 export default function AppointmentPolicyScreen() {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   const { t } = useLanguage();
   const { activeBranchScope } = useAuth();
   const navigation = useNavigation<RootStackNav>();
@@ -194,6 +198,9 @@ function PolicyField({
   onChange: (v: string) => void;
   hint?: string;
 }) {
+  const { colors } = useTheme();
+  const fieldStyles = createFieldStyles(colors);
+
   return (
     <View style={fieldStyles.container}>
       <Text style={fieldStyles.label}>{label}</Text>
@@ -213,11 +220,11 @@ function PolicyField({
   );
 }
 
-const fieldStyles = StyleSheet.create({
+const createFieldStyles = (colors: ThemeColors) => StyleSheet.create({
   container: { gap: 4 },
   label: { fontSize: 13, fontWeight: '600', color: colors.gray700 },
   inputWrap: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.cardBg,
     borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.gray200,
@@ -231,16 +238,16 @@ const fieldStyles = StyleSheet.create({
   hint: { fontSize: 12, color: colors.gray500, marginTop: 2 },
 });
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.surface },
-  safeTop: { backgroundColor: colors.white },
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
+  safeTop: { backgroundColor: colors.background },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    backgroundColor: colors.white,
+    backgroundColor: colors.background,
     borderBottomWidth: 1,
     borderBottomColor: colors.gray200,
   },
@@ -282,7 +289,7 @@ const styles = StyleSheet.create({
   },
   errorBannerText: { flex: 1, fontSize: 13, color: colors.onSurface },
   footer: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.cardBg,
     paddingHorizontal: spacing.md,
     paddingTop: spacing.md,
     borderTopWidth: 1,

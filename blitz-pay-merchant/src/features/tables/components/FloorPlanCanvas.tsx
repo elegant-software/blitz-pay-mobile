@@ -1,9 +1,10 @@
+import { useTheme } from "../../../lib/ThemeContext";
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Image, PanResponder, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle, G, Rect, Text as SvgText } from 'react-native-svg';
 import { observability } from '../../../lib/observability';
-import { colors, radius } from '../../../lib/theme';
+import { radius, type ThemeColors } from '../../../lib/theme';
 import { dragFraction, fractionToPoint, pinCaption, tableChairs, type TablePinTone } from '../tableLogic';
 import type { FloorArea } from '../types/table';
 
@@ -55,6 +56,9 @@ export function FloorPlanCanvas({
   areas?: FloorArea[];
   children: (size: CanvasSize) => React.ReactNode;
 }) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   const drawn = areas.length > 0;
   const [aspect, setAspect] = useState(DEFAULT_ASPECT);
   const [size, setSize] = useState<CanvasSize>({ width: 0, height: 0 });
@@ -116,6 +120,9 @@ export function FloorPlanCanvas({
  * nobody is seated and "?" marks Tables without seats so the gap is visible.
  */
 function PinLabel({ name, seats, guests }: { name: string; seats: number | null; guests?: number | null }) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   return (
     <View style={styles.pinLabel}>
       <Text style={styles.pinText} numberOfLines={1}>{name}</Text>
@@ -152,6 +159,9 @@ export function LiveTablePin({
   size: CanvasSize;
   onPress?: () => void;
 }) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   const { left, top } = fractionToPoint(x, y, size.width, size.height);
   const occupied = tone === 'paid' || tone === 'unpaid';
   const reserved = tone === 'reserved';
@@ -230,6 +240,9 @@ export function DraggableTablePin({
   onDrop: (fraction: { x: number; y: number }) => void;
   onLongPress?: () => void;
 }) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   const translate = useRef(new Animated.ValueXY()).current;
   const latest = useRef({ x, y, size, onDrop });
   latest.current = { x, y, size, onDrop };
@@ -276,7 +289,7 @@ export function DraggableTablePin({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   canvas: {
     width: '100%',
     borderRadius: radius.lg,
@@ -303,7 +316,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: FLOOR.areaText,
   },
-  empty: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', gap: 8, padding: 16 },
+  empty: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', gap: 8, padding: 16 },
   emptyText: { fontSize: 13, color: colors.gray600, textAlign: 'center' },
   pin: {
     position: 'absolute',

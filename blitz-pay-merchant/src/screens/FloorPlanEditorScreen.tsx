@@ -1,8 +1,9 @@
+import { useTheme } from "../lib/ThemeContext";
 import React from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import { useLanguage } from '../lib/LanguageContext';
-import { colors, radius, spacing } from '../lib/theme';
+import { radius, spacing, type ThemeColors } from '../lib/theme';
 import type { RootStackNav, RootStackParamList } from '../types';
 import { useFloorPlans } from '../features/tables/hooks/useFloorPlans';
 import { DraggableTablePin, FloorPlanCanvas } from '../features/tables/components/FloorPlanCanvas';
@@ -11,10 +12,14 @@ import {
   CenterState,
   ErrorBanner,
   TablesScreenFrame,
-  tableStyles,
+  createTableStyles,
 } from '../features/tables/components/TablesChrome';
 
 export default function FloorPlanEditorScreen() {
+  const { colors } = useTheme();
+  const tableStyles = createTableStyles(colors);
+  const styles = createStyles(colors);
+
   const { t } = useLanguage();
   const navigation = useNavigation<RootStackNav>();
   const { floorPlanId } = useRoute<RouteProp<RootStackParamList, 'FloorPlanEditor'>>().params;
@@ -89,7 +94,7 @@ export default function FloorPlanEditorScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   flex: { flex: 1 },
   canvasWrap: { marginTop: spacing.md },
   tray: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },

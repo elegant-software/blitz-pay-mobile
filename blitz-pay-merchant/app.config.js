@@ -5,11 +5,11 @@ module.exports = {
     scheme: "blitzpaymerchant",
     // Rewritten from the GitHub release tag by cd-build-mobile-app.yml; shown in Account and used as runtimeVersion.
     version: "1.0.0",
-    runtimeVersion: { policy: "appVersion" },
+    runtimeVersion: { policy: "fingerprint" },
     updates: { url: "https://u.expo.dev/c42ff88d-abd7-4905-9996-fefa3a619370" },
     orientation: "default",
     platforms: ["ios", "android", "web"],
-    userInterfaceStyle: "light",
+    userInterfaceStyle: "automatic",
     icon: "./assets/app-icon.png",
     splash: {
       image: "./assets/app-icon.png",
@@ -62,6 +62,8 @@ module.exports = {
       ],
     },
     plugins: [
+      "./plugins/withGradleWrapperConfig",
+      "./plugins/withAndroidBuildConfig",
       [
         "expo-build-properties",
         {
@@ -69,7 +71,7 @@ module.exports = {
             minSdkVersion: 26,
           },
           ios: {
-            deploymentTarget: "15.1",
+            deploymentTarget: "16.4",
           },
         },
       ],

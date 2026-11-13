@@ -1,10 +1,12 @@
+import AppSwitch from '../shared/components/AppSwitch';
+import { useTheme } from "../lib/ThemeContext";
 import React, { useEffect, useMemo, useState } from 'react';
 import { ProductImage } from '../features/products/components/ProductImage';
 import * as ImagePicker from 'expo-image-picker';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet,
-  KeyboardAvoidingView, ActivityIndicator, Alert, Switch, Modal, FlatList,
+  KeyboardAvoidingView, ActivityIndicator, Alert, Modal, FlatList,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,7 +15,7 @@ import { useAuth } from '../lib/auth';
 import { useLanguage } from '../lib/LanguageContext';
 import { observability } from '../lib/observability';
 import { QUERY_KEYS } from '../lib/queryClient';
-import { colors, spacing, radius, shadow } from '../lib/theme';
+import { spacing, radius, shadow, type ThemeColors } from '../lib/theme';
 import {
   createMerchantProduct,
   fetchBranchProducts,
@@ -51,6 +53,9 @@ type CategoryOption = {
 
 
 export default function ProductEditScreen() {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   const { t } = useLanguage();
   const navigation = useNavigation();
   const queryClient = useQueryClient();
@@ -392,11 +397,10 @@ export default function ProductEditScreen() {
 
             <View style={styles.toggleRow}>
               <Text style={styles.toggleLabel}>{t('product_active')}</Text>
-              <Switch
+              <AppSwitch
+                accessibilityLabel={t('product_active')}
                 value={form.active}
                 onValueChange={(v) => handleChange('active', v)}
-                trackColor={{ false: colors.gray300, true: colors.primary }}
-                thumbColor={colors.white}
               />
             </View>
 
@@ -501,6 +505,9 @@ export default function ProductEditScreen() {
 }
 
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
+  const { colors } = useTheme();
+  const fieldStyles = createFieldStyles(colors);
+
   return (
     <View style={fieldStyles.container}>
       <Text style={fieldStyles.label}>{label}{required ? ' *' : ''}</Text>
@@ -509,17 +516,17 @@ function Field({ label, required, children }: { label: string; required?: boolea
   );
 }
 
-const fieldStyles = StyleSheet.create({
+const createFieldStyles = (colors: ThemeColors) => StyleSheet.create({
   container: { marginBottom: spacing.md },
   label: { fontSize: 13, fontWeight: '600', color: colors.gray600, marginBottom: 6 },
 });
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.surface },
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
-    backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.gray200,
+    backgroundColor: colors.background, borderBottomWidth: 1, borderBottomColor: colors.gray200,
   },
   backBtn: { width: 40, height: 40, justifyContent: 'center' },
   headerTitle: { fontSize: 17, fontWeight: '700', color: colors.onSurface },
@@ -537,7 +544,7 @@ const styles = StyleSheet.create({
   stateText: { fontSize: 14, color: colors.onSurface, textAlign: 'center' },
   scroll: { padding: spacing.md },
   card: {
-    backgroundColor: colors.white, borderRadius: radius.xl,
+    backgroundColor: colors.cardBg, borderRadius: radius.xl,
     padding: spacing.lg, marginBottom: spacing.md,
   },
   scopeLabel: { fontSize: 12, fontWeight: '700', color: colors.gray600, textTransform: 'uppercase' },
@@ -566,7 +573,7 @@ const styles = StyleSheet.create({
     flex: 1, backgroundColor: colors.overlayDark, justifyContent: 'flex-end',
   },
   modalSheet: {
-    backgroundColor: colors.white, borderTopLeftRadius: radius.xxl, borderTopRightRadius: radius.xxl,
+    backgroundColor: colors.cardBg, borderTopLeftRadius: radius.xxl, borderTopRightRadius: radius.xxl,
     paddingTop: spacing.sm, paddingBottom: spacing.xl, maxHeight: '60%',
   },
   modalHandle: {

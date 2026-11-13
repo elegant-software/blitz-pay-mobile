@@ -1,10 +1,11 @@
+import { useTheme } from "../lib/ThemeContext";
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import { WebView } from 'react-native-webview';
-import { colors, spacing } from '../lib/theme';
+import { spacing, type ThemeColors } from '../lib/theme';
 import type { RootStackParamList } from '../types';
 
 type RouteProps = RouteProp<RootStackParamList, 'InvoicePdf'>;
@@ -16,6 +17,9 @@ function pdfUri(url: string): string {
 }
 
 export default function InvoicePdfScreen() {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   const navigation = useNavigation();
   const route = useRoute<RouteProps>();
   const insets = useSafeAreaInsets();
@@ -43,12 +47,12 @@ export default function InvoicePdfScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.surface },
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
-    backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.gray200,
+    backgroundColor: colors.background, borderBottomWidth: 1, borderBottomColor: colors.gray200,
   },
   headerButton: { width: 40, height: 40, justifyContent: 'center' },
   headerTitle: { flex: 1, fontSize: 17, fontWeight: '700', color: colors.onSurface, textAlign: 'center' },
