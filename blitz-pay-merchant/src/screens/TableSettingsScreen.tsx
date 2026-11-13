@@ -1,12 +1,14 @@
+import AppSwitch from '../shared/components/AppSwitch';
+import { useTheme } from "../lib/ThemeContext";
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Platform, ScrollView, Share, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Platform, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import QRCode from 'react-native-qrcode-svg';
 import * as Clipboard from 'expo-clipboard';
 import { useLanguage } from '../lib/LanguageContext';
 import { observability } from '../lib/observability';
-import { colors, shadow, spacing } from '../lib/theme';
+import { shadow, spacing, type ThemeColors } from '../lib/theme';
 import type { RootStackNav, RootStackParamList } from '../types';
 import { useTableSetup } from '../features/tables/hooks/useTableSetup';
 import { useNfcTagWriter } from '../features/tables/hooks/useNfcTagWriter';
@@ -16,7 +18,7 @@ import {
   CenterState,
   ErrorBanner,
   TablesScreenFrame,
-  tableStyles,
+  createTableStyles,
 } from '../features/tables/components/TablesChrome';
 import type { BranchTable } from '../features/tables/types/table';
 
@@ -66,13 +68,19 @@ export default function TableSettingsScreen() {
 }
 
 function TableLinkCard({ table }: { table: BranchTable }) {
+  const { colors } = useTheme();
+  const tableStyles = createTableStyles(colors);
+  const styles = createStyles(colors);
+
   const { t } = useLanguage();
   const [copied, setCopied] = useState(false);
 
   return (
     <View style={[tableStyles.card, shadow.sm, styles.qrCard]}>
       {table.link ? (
-        <QRCode value={table.link} size={200} color={colors.onSurface} backgroundColor={colors.white} />
+        <View style={styles.qrFrame}>
+          <QRCode value={table.link} size={200} color={colors.black} backgroundColor={colors.white} />
+        </View>
       ) : null}
       <Text style={styles.qrTitle}>{t('table_label', { name: table.name })}</Text>
       <Text style={styles.code}>{t('table_code_label', { code: table.code })}</Text>
@@ -106,6 +114,10 @@ function TableLinkCard({ table }: { table: BranchTable }) {
 }
 
 function NfcCard({ table, onWritten }: { table: BranchTable; onWritten: () => void }) {
+  const { colors } = useTheme();
+  const tableStyles = createTableStyles(colors);
+  const styles = createStyles(colors);
+
   const { t } = useLanguage();
   const nfc = useNfcTagWriter();
 
@@ -189,6 +201,10 @@ function TableEditCard({
   onSetActive: (active: boolean) => Promise<boolean>;
   onDelete: () => void;
 }) {
+  const { colors } = useTheme();
+  const tableStyles = createTableStyles(colors);
+  const styles = createStyles(colors);
+
   const { t } = useLanguage();
   const [name, setName] = useState(table.name);
   useEffect(() => setName(table.name), [table.name]);
@@ -236,7 +252,8 @@ function TableEditCard({
           <Text style={styles.toggleTitle}>{t('table_active')}</Text>
           <Text style={tableStyles.hint}>{t('table_active_hint')}</Text>
         </View>
-        <Switch value={table.active} disabled={busy} onValueChange={(value) => void onSetActive(value)} />
+        <AppSwitch accessibilityLabel={t('table_active')}
+                value={table.active} disabled={busy} onValueChange={(value) => void onSetActive(value)} />
       </View>
       <TouchableOpacity style={[tableStyles.secondaryBtn, styles.spaced]} disabled={busy} onPress={onDelete}>
         <Ionicons name="trash-outline" size={16} color={colors.error} />
@@ -246,7 +263,8 @@ function TableEditCard({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
+  qrFrame: { backgroundColor: colors.white, padding: spacing.md, borderRadius: 16 },
   qrCard: { alignItems: 'center', paddingVertical: spacing.lg },
   qrTitle: { marginTop: spacing.md, fontSize: 18, fontWeight: '800', color: colors.onSurface },
   code: { marginTop: 4, fontSize: 13, fontWeight: '600', color: colors.gray700, letterSpacing: 1 },

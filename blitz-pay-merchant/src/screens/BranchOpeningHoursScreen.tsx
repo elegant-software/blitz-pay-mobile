@@ -1,3 +1,4 @@
+import { useTheme } from "../lib/ThemeContext";
 import React, { useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
@@ -9,7 +10,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../lib/auth';
 import { useLanguage } from '../lib/LanguageContext';
-import { colors, spacing, radius, shadow } from '../lib/theme';
+import { spacing, radius, shadow, type ThemeColors } from '../lib/theme';
 import type { RootStackNav } from '../types';
 import {
   fetchBranchOpeningHours,
@@ -28,6 +29,9 @@ const DAY_LABELS: Record<number, string> = {
 const DAYS = [1, 2, 3, 4, 5, 6, 7];
 
 export default function BranchOpeningHoursScreen() {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   const { t } = useLanguage();
   const { activeBranchScope } = useAuth();
   const navigation = useNavigation<RootStackNav>();
@@ -301,6 +305,9 @@ function WindowRow({ window: w, onRemove, removing }: {
   onRemove: () => void;
   removing: boolean;
 }) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   return (
     <View style={styles.slotRow}>
       <Text style={styles.slotLabel}>
@@ -319,6 +326,9 @@ function ExceptionRow({ exception: ex, onRemove }: {
   exception: BranchOpeningException;
   onRemove: () => void;
 }) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   const label = ex.type === 'CLOSED'
     ? `${ex.date} — Closed`
     : `${ex.date} ${ex.startTime ?? ''} – ${ex.endTime ?? ''}`;
@@ -332,12 +342,12 @@ function ExceptionRow({ exception: ex, onRemove }: {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.surface },
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: spacing.md, paddingBottom: spacing.sm,
-    backgroundColor: colors.white,
+    backgroundColor: colors.background,
     borderBottomWidth: 1, borderBottomColor: colors.gray200,
   },
   backBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
@@ -345,11 +355,11 @@ const styles = StyleSheet.create({
   scroll: { padding: spacing.md, gap: spacing.md },
   infoCard: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
-    backgroundColor: colors.white, borderRadius: radius.xl, padding: spacing.md,
+    backgroundColor: colors.cardBg, borderRadius: radius.xl, padding: spacing.md,
   },
   infoText: { fontSize: 15, fontWeight: '600', color: colors.onSurface },
   section: {
-    backgroundColor: colors.white, borderRadius: radius.xl, padding: spacing.lg,
+    backgroundColor: colors.cardBg, borderRadius: radius.xl, padding: spacing.lg,
   },
   sectionTitle: { fontSize: 15, fontWeight: '700', color: colors.onSurface, marginBottom: spacing.sm },
   sectionHint: { fontSize: 12, color: colors.gray500, marginBottom: spacing.sm },

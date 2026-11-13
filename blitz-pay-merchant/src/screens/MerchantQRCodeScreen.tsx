@@ -1,6 +1,7 @@
+import { useTheme } from "../lib/ThemeContext";
 import React, { useState } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Share,
+  View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Share, useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,7 +11,7 @@ import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../lib/auth';
 import { useLanguage } from '../lib/LanguageContext';
-import { colors, spacing, radius, shadow } from '../lib/theme';
+import { spacing, radius, shadow, type ThemeColors } from '../lib/theme';
 import type { RootStackParamList } from '../types';
 
 type RouteProps = RouteProp<RootStackParamList, 'MerchantQRCode'>;
@@ -25,6 +26,11 @@ function buildPaymentUrl(merchantId: string, amount?: number, label?: string) {
 }
 
 export default function MerchantQRCodeScreen() {
+  const { width } = useWindowDimensions();
+  const qrSize = Math.max(120, Math.min(220, width - 2 * (spacing.md + spacing.xl + spacing.md)));
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   const { t } = useLanguage();
   const navigation = useNavigation();
   const route = useRoute<RouteProps>();
@@ -46,13 +52,13 @@ export default function MerchantQRCodeScreen() {
   };
 
   const handleShare = async () => {
-    await Share.share({ message: qrValue, title: 'BlitzPay Payment Link' });
+    await Share.share({ message: qrValue, title: t('merchant_qr') });
   };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('back')} onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={22} color={colors.onSurface} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t('merchant_qr')}</Text>
@@ -62,15 +68,17 @@ export default function MerchantQRCodeScreen() {
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + spacing.xl }]} keyboardShouldPersistTaps="handled">
         {/* QR code */}
         <View style={[styles.qrCard, shadow.lg]}>
-          <QRCode value={qrValue} size={220} color={colors.onSurface} backgroundColor={colors.white} />
-          <Text style={styles.merchantName}>{activeBranchScope?.merchantName ?? user?.name ?? 'Merchant'}</Text>
-          {activeBranchScope?.branchName ? <Text style={styles.amountHint}>{activeBranchScope.branchName}</Text> : null}
+          <View style={styles.qrFrame}>
+            <QRCode value={qrValue} size={qrSize} color={colors.black} backgroundColor={colors.white} />
+          </View>
+          <Text style={styles.merchantName}>{activeBranchScope?.branchName ?? activeBranchScope?.merchantName ?? user?.name ?? t('account_merchant')}</Text>
+          {activeBranchScope?.branchName && activeBranchScope.merchantName ? <Text style={styles.amountHint}>{activeBranchScope.merchantName}</Text> : null}
           {amount ? (
             <Text style={styles.amountHint}>
               {new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(amount)}
             </Text>
           ) : (
-            <Text style={styles.amountHint}>Any amount</Text>
+            <Text style={styles.amountHint}>{t('qr_any_amount')}</Text>
           )}
         </View>
 
@@ -94,7 +102,7 @@ export default function MerchantQRCodeScreen() {
             style={styles.inputFull}
             value={label}
             onChangeText={setLabel}
-            placeholder="Table 5, Invoice #42..."
+            placeholder={t('qr_label_placeholder')}
             placeholderTextColor={colors.gray400}
           />
         </View>
@@ -103,11 +111,11 @@ export default function MerchantQRCodeScreen() {
         <View style={styles.actions}>
           <TouchableOpacity style={[styles.actionBtn, styles.copyBtn]} onPress={handleCopy} activeOpacity={0.85}>
             <Ionicons name={copied ? 'checkmark' : 'copy-outline'} size={18} color={colors.primary} />
-            <Text style={styles.copyBtnText}>{copied ? 'Copied!' : 'Copy Link'}</Text>
+            <Text style={styles.copyBtnText} numberOfLines={1}>{t(copied ? 'qr_copied' : 'copy_link')}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.actionBtn, styles.shareBtn]} onPress={handleShare} activeOpacity={0.85}>
             <Ionicons name="share-outline" size={18} color={colors.black} />
-            <Text style={styles.shareBtnText}>Share</Text>
+            <Text style={styles.shareBtnText}>{t('qr_share')}</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -115,25 +123,26 @@ export default function MerchantQRCodeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.surface },
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
+  qrFrame: { backgroundColor: colors.white, padding: spacing.md, borderRadius: radius.lg },
+  container: { flex: 1, backgroundColor: colors.background },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
-    backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.gray200,
+    backgroundColor: colors.background, borderBottomWidth: 1, borderBottomColor: colors.gray200,
   },
   backBtn: { width: 40, height: 40, justifyContent: 'center' },
   headerTitle: { fontSize: 17, fontWeight: '700', color: colors.onSurface },
   scroll: { padding: spacing.md, alignItems: 'center' },
   qrCard: {
-    backgroundColor: colors.white, borderRadius: radius.xxl,
+    backgroundColor: colors.cardBg, borderRadius: radius.xxl,
     padding: spacing.xl, alignItems: 'center', gap: spacing.sm,
     width: '100%', marginBottom: spacing.md,
   },
   merchantName: { fontSize: 17, fontWeight: '700', color: colors.onSurface, marginTop: spacing.sm },
   amountHint: { fontSize: 14, color: colors.gray500 },
   fieldsCard: {
-    backgroundColor: colors.white, borderRadius: radius.xl,
+    backgroundColor: colors.cardBg, borderRadius: radius.xl,
     padding: spacing.lg, width: '100%', marginBottom: spacing.md,
   },
   fieldLabel: { fontSize: 13, fontWeight: '600', color: colors.gray600, marginBottom: 6 },
@@ -159,7 +168,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5, borderColor: colors.primary,
     backgroundColor: `${colors.primary}10`,
   },
-  copyBtnText: { fontSize: 15, fontWeight: '600', color: colors.primary },
+  copyBtnText: { fontSize: 13, fontWeight: '600', color: colors.secondary, flexShrink: 1 },
   shareBtn: { backgroundColor: colors.primary },
-  shareBtnText: { fontSize: 15, fontWeight: '700', color: colors.black },
+  shareBtnText: { fontSize: 13, fontWeight: '700', color: colors.black, flexShrink: 1 },
 });

@@ -1,10 +1,11 @@
+import { useTheme } from "../lib/ThemeContext";
 import React, { useEffect, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useLanguage } from '../lib/LanguageContext';
 import type { TranslationKeys } from '../lib/translations';
-import { colors, radius, spacing } from '../lib/theme';
+import { radius, spacing, type ThemeColors } from '../lib/theme';
 import type { RootStackNav } from '../types';
 import { useLiveFloor } from '../features/tables/hooks/useLiveFloor';
 import { useBranchRef } from '../features/tables/hooks/useBranchRef';
@@ -12,7 +13,7 @@ import { FloorPlanCanvas, LiveTablePin, PIN_COLORS } from '../features/tables/co
 import {
   CenterState,
   TablesScreenFrame,
-  tableStyles,
+  createTableStyles,
   useErrorText,
 } from '../features/tables/components/TablesChrome';
 import { exceedsBranchCapacity, seatedFor, tablePinTone, type TablePinTone } from '../features/tables/tableLogic';
@@ -25,6 +26,10 @@ const TONE_LABELS: Record<TablePinTone, TranslationKeys> = {
 };
 
 export default function FloorViewScreen() {
+  const { colors } = useTheme();
+  const tableStyles = createTableStyles(colors);
+  const styles = createStyles(colors);
+
   const { t } = useLanguage();
   const navigation = useNavigation<RootStackNav>();
   const { isManager } = useBranchRef();
@@ -186,6 +191,10 @@ function SummaryStat({
   label: string;
   warn?: boolean;
 }) {
+  const { colors } = useTheme();
+  const tableStyles = createTableStyles(colors);
+  const styles = createStyles(colors);
+
   return (
     <View style={styles.stat}>
       <View style={tableStyles.row}>
@@ -197,12 +206,12 @@ function SummaryStat({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   flex: { flex: 1 },
   offline: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: spacing.md, paddingTop: spacing.sm },
   offlineText: { fontSize: 12, color: colors.gray600 },
   summary: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.md, paddingTop: spacing.md },
-  stat: { flex: 1, backgroundColor: colors.white, borderRadius: radius.lg, padding: spacing.sm, gap: 2 },
+  stat: { flex: 1, backgroundColor: colors.cardBg, borderRadius: radius.lg, padding: spacing.sm, gap: 2 },
   statValue: { fontSize: 17, fontWeight: '800', color: colors.onSurface },
   statLabel: { fontSize: 11, color: colors.gray600 },
   tabs: { paddingHorizontal: spacing.md, paddingTop: spacing.md, gap: spacing.sm },
@@ -210,7 +219,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: radius.full,
-    backgroundColor: colors.white,
+    backgroundColor: colors.cardBg,
     borderWidth: 1,
     borderColor: colors.gray200,
   },
@@ -220,7 +229,7 @@ const styles = StyleSheet.create({
   legend: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: spacing.md },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   legendDot: { width: 12, height: 12, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
-  legendFree: { backgroundColor: colors.white, borderWidth: 1.5, borderColor: '#B4B2A9' },
+  legendFree: { backgroundColor: colors.cardBg, borderWidth: 1.5, borderColor: '#B4B2A9' },
   legendUnpaid: { backgroundColor: '#EF9F27' },
   legendEuro: { fontSize: 8, fontWeight: '800', color: '#412402' },
   legendText: { fontSize: 12, color: colors.gray700 },
@@ -235,13 +244,13 @@ const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, paddingHorizontal: spacing.md, paddingTop: spacing.sm },
   tile: {
     width: '31%',
-    backgroundColor: colors.white,
+    backgroundColor: colors.cardBg,
     borderRadius: radius.lg,
     borderWidth: 2,
     padding: spacing.sm,
     gap: 2,
   },
   tileName: { fontSize: 16, fontWeight: '800', color: colors.onSurface },
-  tileStatus: { fontSize: 11, fontWeight: '700' },
+  tileStatus: { color: colors.onSurface, fontSize: 11, fontWeight: '700' },
   tileMeta: { fontSize: 11, color: colors.gray600 },
 });

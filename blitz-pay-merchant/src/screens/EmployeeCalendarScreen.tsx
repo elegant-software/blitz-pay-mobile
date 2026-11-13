@@ -1,3 +1,4 @@
+import { useTheme } from "../lib/ThemeContext";
 import React, { useMemo, useState } from 'react';
 import {
   View,
@@ -12,7 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../lib/auth';
 import { useLanguage } from '../lib/LanguageContext';
-import { colors, spacing, radius, shadow } from '../lib/theme';
+import { spacing, radius, shadow, type ThemeColors } from '../lib/theme';
 import type { RootStackNav } from '../types';
 import { useEmployeeAppointments } from '../features/appointments/hooks/useEmployeeAppointments';
 import type { AppointmentResponse } from '../features/appointments/types/appointment';
@@ -33,6 +34,9 @@ import {
 type ViewMode = 'day' | 'week';
 
 export default function EmployeeCalendarScreen() {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   const { t } = useLanguage();
   const { activeBranchScope, user, branchScopeError } = useAuth();
   const navigation = useNavigation<RootStackNav>();
@@ -274,6 +278,9 @@ function EmployeeAppointmentCard({
   appointment: AppointmentResponse;
   onPress: () => void;
 }) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   const statusColor = APPOINTMENT_STATUS_COLORS[appointment.status];
   const isMuted =
     appointment.status === 'CANCELLED' || appointment.status === 'COMPLETED';
@@ -314,10 +321,10 @@ function EmployeeAppointmentCard({
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.surface },
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   header: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.background,
     borderBottomWidth: 1,
     borderBottomColor: colors.gray200,
     paddingHorizontal: spacing.md,
@@ -350,7 +357,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: 6,
   },
-  toggleBtnActive: { backgroundColor: colors.white, ...shadow.sm },
+  toggleBtnActive: { backgroundColor: colors.cardBg, ...shadow.sm },
   toggleBtnText: { fontSize: 13, fontWeight: '600', color: colors.gray600 },
   toggleBtnTextActive: { color: colors.onSurface },
   todayBtn: {
@@ -424,7 +431,7 @@ const styles = StyleSheet.create({
   dayEmpty: { paddingVertical: spacing.md, paddingHorizontal: spacing.sm },
   dayEmptyText: { fontSize: 13, color: colors.gray400, fontStyle: 'italic' },
   card: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.cardBg,
     borderRadius: radius.xl,
     marginBottom: spacing.sm,
     flexDirection: 'row',
@@ -442,7 +449,7 @@ const styles = StyleSheet.create({
   },
   cardTime: { fontSize: 13, fontWeight: '700', color: colors.onSurface, flex: 1 },
   cardStatusPill: { borderRadius: radius.full, paddingHorizontal: 8, paddingVertical: 2 },
-  cardStatusText: { fontSize: 11, fontWeight: '700' },
+  cardStatusText: { color: colors.onSurface, fontSize: 11, fontWeight: '700' },
   cardContact: { fontSize: 15, fontWeight: '700', color: colors.onSurface, marginBottom: 2 },
   cardProduct: { fontSize: 13, color: colors.gray600 },
   cardNote: { fontSize: 12, color: colors.gray500, marginTop: 4, fontStyle: 'italic' },

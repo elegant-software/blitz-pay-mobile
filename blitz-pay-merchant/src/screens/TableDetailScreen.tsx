@@ -1,9 +1,10 @@
+import { useTheme } from "../lib/ThemeContext";
 import React, { useState } from 'react';
 import { ActivityIndicator, Alert, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import { useLanguage } from '../lib/LanguageContext';
-import { colors, radius, spacing } from '../lib/theme';
+import { radius, spacing, type ThemeColors } from '../lib/theme';
 import type { RootStackNav, RootStackParamList } from '../types';
 import { useLiveFloor, useTableActions } from '../features/tables/hooks/useLiveFloor';
 import { terminalStatusLabelKey } from '../hooks/useStripeTerminalPayment';
@@ -12,7 +13,7 @@ import {
   CenterState,
   ErrorBanner,
   TablesScreenFrame,
-  tableStyles,
+  createTableStyles,
 } from '../features/tables/components/TablesChrome';
 import {
   hasUnpaidOrders,
@@ -43,6 +44,10 @@ function isPreparationStatus(value: string | null): value is MerchantPreparation
 }
 
 export default function TableDetailScreen() {
+  const { colors } = useTheme();
+  const tableStyles = createTableStyles(colors);
+  const styles = createStyles(colors);
+
   const { t } = useLanguage();
   const navigation = useNavigation<RootStackNav>();
   const { tableId } = useRoute<RouteProp<RootStackParamList, 'TableDetail'>>().params;
@@ -215,6 +220,10 @@ export default function TableDetailScreen() {
 }
 
 function GuestStepper({ value, disabled, onChange }: { value: number; disabled: boolean; onChange: (next: number) => void }) {
+  const { colors } = useTheme();
+  const tableStyles = createTableStyles(colors);
+  const styles = createStyles(colors);
+
   const { t } = useLanguage();
   return (
     <View style={tableStyles.row}>
@@ -239,7 +248,7 @@ function GuestStepper({ value, disabled, onChange }: { value: number; disabled: 
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   guestsLabel: { flex: 1, fontSize: 14, color: colors.gray700 },
   stepBtn: {
     width: 34,
@@ -270,5 +279,5 @@ const styles = StyleSheet.create({
   time: { fontSize: 12, color: colors.gray600 },
   amount: { fontSize: 15, fontWeight: '700', color: colors.onSurface },
   paymentPill: { borderRadius: radius.full, paddingHorizontal: 10, paddingVertical: 4 },
-  paymentText: { fontSize: 12, fontWeight: '700' },
+  paymentText: { color: colors.onSurface, fontSize: 12, fontWeight: '700' },
 });

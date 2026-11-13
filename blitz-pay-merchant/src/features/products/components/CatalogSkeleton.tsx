@@ -1,9 +1,13 @@
+import { useTheme } from "../../../lib/ThemeContext";
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useLanguage } from '../../../lib/LanguageContext';
-import { colors, radius, spacing } from '../../../lib/theme';
+import { radius, spacing, type ThemeColors } from '../../../lib/theme';
 
 export function CatalogSkeleton() {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   const { t } = useLanguage();
   return (
     <View accessibilityRole="progressbar" accessibilityLabel={t('catalog_loading')} style={styles.container}>
@@ -21,7 +25,7 @@ export function CatalogSkeleton() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: { paddingHorizontal: spacing.md },
   row: { minHeight: 88, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.gray200 },
   image: { width: 44, height: 44, borderRadius: radius.md, backgroundColor: colors.gray200 },

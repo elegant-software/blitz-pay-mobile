@@ -1,3 +1,4 @@
+import { useTheme } from "../lib/ThemeContext";
 import React, { useState } from 'react';
 import {
   View,
@@ -14,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
 import { useLanguage } from '../lib/LanguageContext';
-import { colors, spacing, radius, shadow } from '../lib/theme';
+import { spacing, radius, shadow, type ThemeColors } from '../lib/theme';
 import type { RootStackParamList, RootStackNav } from '../types';
 import {
   cancelAppointment,
@@ -79,6 +80,9 @@ async function fetchSingleAppointment(
 }
 
 export default function AppointmentDetailScreen() {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   const { t } = useLanguage();
   const navigation = useNavigation<RootStackNav>();
   const route = useRoute<RouteProps>();
@@ -553,6 +557,9 @@ function DetailRow({
   label: string;
   value: string;
 }) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   return (
     <View style={styles.detailRow}>
       <View style={styles.detailIconWrap}>
@@ -566,15 +573,15 @@ function DetailRow({
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.surface },
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    backgroundColor: colors.white,
+    backgroundColor: colors.background,
     borderBottomWidth: 1,
     borderBottomColor: colors.gray200,
   },
@@ -597,7 +604,7 @@ const styles = StyleSheet.create({
   },
   retryBtnText: { color: colors.black, fontWeight: '700' },
   summaryCard: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.cardBg,
     borderRadius: radius.xl,
     margin: spacing.md,
     padding: spacing.lg,
@@ -617,7 +624,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
   },
-  statusText: { fontSize: 12, fontWeight: '700' },
+  statusText: { color: colors.onSurface, fontSize: 12, fontWeight: '700' },
   divider: { height: 1, backgroundColor: colors.gray200, marginVertical: spacing.md },
   detailRow: {
     flexDirection: 'row',
@@ -655,7 +662,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   sectionCard: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.cardBg,
     borderRadius: radius.xl,
     padding: spacing.md,
   },
@@ -748,7 +755,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     borderWidth: 1,
     borderColor: colors.gray300,
-    backgroundColor: colors.white,
+    backgroundColor: colors.cardBg,
   },
   destructiveActionText: { fontSize: 15, fontWeight: '600', color: colors.error },
   modalOverlay: {
@@ -757,7 +764,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.6)',
   },
   modalSheet: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.cardBg,
     borderTopLeftRadius: radius.xxl,
     borderTopRightRadius: radius.xxl,
     padding: spacing.lg,

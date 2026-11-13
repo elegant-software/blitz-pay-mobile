@@ -1,16 +1,22 @@
-import React, { useEffect } from 'react';
+import { useTheme } from "../lib/ThemeContext";
+import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing } from '../lib/theme';
+import BrandLogo from './BrandLogo';
+import { useLanguage } from '../lib/LanguageContext';
+import { spacing, type ThemeColors } from '../lib/theme';
 
 interface Props {
   onComplete: () => void;
 }
 
 export default function SplashScreen({ onComplete }: Props) {
-  const opacity = new Animated.Value(0);
-  const scale = new Animated.Value(0.85);
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
+  const { t } = useLanguage();
+  const opacity = useRef(new Animated.Value(0)).current;
+  const scale = useRef(new Animated.Value(0.85)).current;
 
   useEffect(() => {
     Animated.parallel([
@@ -23,22 +29,17 @@ export default function SplashScreen({ onComplete }: Props) {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <LinearGradient colors={['#000000', '#0A0A1E', '#0D0D2B']} style={styles.container}>
+    <LinearGradient colors={[colors.background, colors.surface]} style={styles.container}>
       <Animated.View style={[styles.content, { opacity, transform: [{ scale }] }]}>
-        <View style={styles.iconRing}>
-          <View style={styles.iconCore}>
-            <Ionicons name="storefront" size={36} color={colors.primary} />
-          </View>
-        </View>
-        <Text style={styles.brand}>BlitzPay</Text>
-        <Text style={styles.sub}>Merchant Portal</Text>
+        <BrandLogo />
+        <Text style={styles.sub}>{t('account_merchant')}</Text>
       </Animated.View>
     </LinearGradient>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
+  container: { ...StyleSheet.absoluteFill, zIndex: 1000, justifyContent: 'center', alignItems: 'center' },
   content: { alignItems: 'center', gap: spacing.sm },
   iconRing: {
     width: 96,

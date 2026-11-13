@@ -1,3 +1,4 @@
+import { useTheme } from "../lib/ThemeContext";
 import React from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, FlatList,
@@ -8,7 +9,7 @@ import { useNavigation, useRoute, type RouteProp } from '@react-navigation/nativ
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useLanguage } from '../lib/LanguageContext';
 import { useAuth } from '../lib/auth';
-import { colors, spacing, radius, shadow } from '../lib/theme';
+import { colors, spacing, radius, shadow, type ThemeColors } from '../lib/theme';
 import type { RootStackParamList } from '../types';
 import { formatPickupNumber, getMerchantOrderStatusIcon, getMerchantOrderStatusLabelKey } from '../features/orders/orderPresentation';
 import { FulfilmentTypeBadge } from '../features/orders/components/FulfilmentTypeBadge';
@@ -33,6 +34,9 @@ function formatCurrency(amountMinor: number, currency = 'EUR') {
 }
 
 export default function OrderDetailScreen() {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   const { t } = useLanguage();
   const { activeBranchScope, branchScopeError } = useAuth();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -406,12 +410,12 @@ export default function OrderDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.surface },
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
-    backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.gray200,
+    backgroundColor: colors.background, borderBottomWidth: 1, borderBottomColor: colors.gray200,
   },
   backBtn: { width: 40, height: 40, justifyContent: 'center' },
   headerTitle: { fontSize: 17, fontWeight: '700', color: colors.onSurface },
@@ -419,7 +423,7 @@ const styles = StyleSheet.create({
   centerTitle: { fontSize: 16, fontWeight: '700', color: colors.onSurface },
   centerText: { fontSize: 14, color: colors.gray600, textAlign: 'center' },
   summaryCard: {
-    backgroundColor: colors.white, borderRadius: radius.xl,
+    backgroundColor: colors.cardBg, borderRadius: radius.xl,
     margin: spacing.md, padding: spacing.lg,
   },
   summaryTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: spacing.md },
@@ -436,13 +440,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
   },
-  statusText: { flexShrink: 1, fontSize: 12, lineHeight: 15, fontWeight: '700', textAlign: 'center' },
+  statusText: { color: colors.onSurface, flexShrink: 1, fontSize: 12, lineHeight: 15, fontWeight: '700', textAlign: 'center' },
   divider: { height: 1, backgroundColor: colors.gray200, marginVertical: spacing.md },
   detailRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.sm },
   detailRowCentered: { alignItems: 'center' },
   detailLabel: { fontSize: 14, color: colors.gray600 },
   detailValue: { fontSize: 14, fontWeight: '600', color: colors.onSurface },
-  amountText: { fontSize: 18, fontWeight: '800' },
+  amountText: { color: colors.onSurface, fontSize: 18, fontWeight: '800' },
   banner: {
     marginTop: spacing.md,
     flexDirection: 'row',
@@ -466,7 +470,7 @@ const styles = StyleSheet.create({
   section: { paddingHorizontal: spacing.md },
   sectionTitle: { fontSize: 17, fontWeight: '700', color: colors.onSurface, marginBottom: spacing.sm },
   itemsCard: {
-    backgroundColor: colors.white, borderRadius: radius.xl,
+    backgroundColor: colors.cardBg, borderRadius: radius.xl,
     padding: spacing.lg,
   },
   itemRow: { gap: spacing.sm, marginBottom: spacing.md },
@@ -495,7 +499,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.sm,
-    backgroundColor: colors.white,
+    backgroundColor: colors.cardBg,
     borderRadius: radius.xl,
     padding: spacing.md,
     borderWidth: 1,
@@ -504,7 +508,7 @@ const styles = StyleSheet.create({
   invoiceButtonText: { fontSize: 15, fontWeight: '600', color: colors.onSurface },
   modalOverlay: { flex: 1, backgroundColor: colors.overlayDark, justifyContent: 'flex-end' },
   modalSheet: {
-    backgroundColor: colors.white, borderTopLeftRadius: radius.xxl, borderTopRightRadius: radius.xxl,
+    backgroundColor: colors.cardBg, borderTopLeftRadius: radius.xxl, borderTopRightRadius: radius.xxl,
     paddingTop: spacing.sm, paddingBottom: spacing.xl, maxHeight: '65%',
   },
   modalHandle: {
@@ -542,7 +546,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
     paddingVertical: spacing.md,
     alignItems: 'center',
-    backgroundColor: colors.white,
+    backgroundColor: colors.cardBg,
     borderWidth: 1,
     borderColor: colors.gray300,
   },

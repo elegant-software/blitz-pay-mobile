@@ -1,3 +1,5 @@
+import AppSwitch from '../shared/components/AppSwitch';
+import { useTheme } from "../lib/ThemeContext";
 import React, { useState } from 'react';
 import {
   View,
@@ -7,7 +9,6 @@ import {
   TextInput,
   StyleSheet,
   ActivityIndicator,
-  Switch,
   KeyboardAvoidingView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,7 +17,7 @@ import { useNavigation, useRoute, type RouteProp } from '@react-navigation/nativ
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../lib/auth';
 import { useLanguage } from '../lib/LanguageContext';
-import { colors, spacing, radius, shadow } from '../lib/theme';
+import { spacing, radius, shadow, type ThemeColors } from '../lib/theme';
 import type { RootStackParamList, RootStackNav } from '../types';
 import {
   fetchEmployeeBranchAssignments,
@@ -49,6 +50,9 @@ const DAY_LABELS: Record<DayOfWeek, string> = {
 };
 
 export default function EmployeeDetailScreen() {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   const { t } = useLanguage();
   const { activeBranchScope } = useAuth();
   const navigation = useNavigation<RootStackNav>();
@@ -400,11 +404,10 @@ export default function EmployeeDetailScreen() {
                 />
                 <View style={styles.exceptionToggleRow}>
                   <Text style={styles.exceptionToggleLabel}>{t('employee_detail_exception_unavailable')}</Text>
-                  <Switch
-                    value={exceptionType === 'BLOCKED'}
+                  <AppSwitch
+                    accessibilityLabel={t('employee_detail_exception_unavailable')}
+                value={exceptionType === 'BLOCKED'}
                     onValueChange={(v) => setExceptionType(v ? 'BLOCKED' : 'EXTRA_WINDOW')}
-                    trackColor={{ false: colors.gray300, true: `${colors.primary}80` }}
-                    thumbColor={exceptionType === 'BLOCKED' ? colors.primary : colors.gray500}
                   />
                 </View>
                 {exceptionType === 'EXTRA_WINDOW' ? (
@@ -450,6 +453,9 @@ export default function EmployeeDetailScreen() {
 // ─── Sub-components ────────────────────────────────────────────────────────────
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  const { colors } = useTheme();
+  const sectionStyles = createSectionStyles(colors);
+
   return (
     <View style={sectionStyles.container}>
       <Text style={sectionStyles.title}>{title}</Text>
@@ -458,11 +464,11 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-const sectionStyles = StyleSheet.create({
+const createSectionStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {},
   title: { fontSize: 15, fontWeight: '700', color: colors.onSurface, marginBottom: spacing.sm },
   card: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.cardBg,
     borderRadius: radius.xl,
     padding: spacing.md,
     gap: spacing.sm,
@@ -470,6 +476,8 @@ const sectionStyles = StyleSheet.create({
 });
 
 function LoadingRow({ label }: { label: string }) {
+  const { colors } = useTheme();
+
   return (
     <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
       <ActivityIndicator size="small" color={colors.primary} />
@@ -479,10 +487,14 @@ function LoadingRow({ label }: { label: string }) {
 }
 
 function EmptyText({ text }: { text: string }) {
+  const { colors } = useTheme();
+
   return <Text style={{ fontSize: 13, color: colors.gray500, fontStyle: 'italic' }}>{text}</Text>;
 }
 
 function ErrorText({ text }: { text: string }) {
+  const { colors } = useTheme();
+
   return <Text style={{ fontSize: 13, color: colors.error }}>{text}</Text>;
 }
 
@@ -497,6 +509,9 @@ function AssignmentRow({
   onRemove: () => void;
   removing: boolean;
 }) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   const { t } = useLanguage();
   return (
     <View style={styles.assignmentRow}>
@@ -527,6 +542,9 @@ function SelectRow({
   onSelect: (value: string) => void;
   adding: boolean;
 }) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   const [open, setOpen] = useState(false);
 
   if (options.length === 0) return null;
@@ -577,6 +595,9 @@ function ExceptionRow({
   onRemove: () => void;
   removing: boolean;
 }) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   const { t } = useLanguage();
   const label = exception.type === 'BLOCKED'
     ? `${exception.date} — full day`
@@ -596,15 +617,15 @@ function ExceptionRow({
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.surface },
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    backgroundColor: colors.white,
+    backgroundColor: colors.background,
     borderBottomWidth: 1,
     borderBottomColor: colors.gray200,
   },
@@ -640,7 +661,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: colors.gray100,
-    backgroundColor: colors.white,
+    backgroundColor: colors.cardBg,
   },
   selectOptionText: { fontSize: 14, color: colors.onSurface },
   btnDisabled: { opacity: 0.45 },

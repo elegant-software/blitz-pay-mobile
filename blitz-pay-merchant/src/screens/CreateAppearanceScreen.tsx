@@ -1,3 +1,4 @@
+import { useTheme } from "../lib/ThemeContext";
 import React, { useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -6,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../lib/auth';
 import { useLanguage } from '../lib/LanguageContext';
 import { resolveFreshCoordinates, reverseGeocodeCoordinates } from '../lib/location';
-import { colors, radius, spacing } from '../lib/theme';
+import { radius, spacing, type ThemeColors } from '../lib/theme';
 import { canManageAppearances } from '../features/appearances/hooks/useAppearances';
 import { createAppearance, MerchantAppearanceError } from '../features/appearances/services/appearanceService';
 import type { RootStackNav } from '../types';
@@ -16,6 +17,9 @@ const localInput = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${p
 const parseLocal = (value: string) => new Date(value.replace(' ', 'T'));
 
 export default function CreateAppearanceScreen() {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   const { user, activeBranchScope } = useAuth();
   const { t } = useLanguage();
   const navigation = useNavigation<RootStackNav>();
@@ -69,7 +73,7 @@ export default function CreateAppearanceScreen() {
         <Text style={styles.counter}>{name.length}/60</Text>
         <Text style={styles.label}>{t('merchant_appearance_start')}</Text><TextInput style={styles.input} value={start} onChangeText={setStart} placeholder="YYYY-MM-DD HH:MM" />
         <Text style={styles.label}>{t('merchant_appearance_end')}</Text><TextInput style={styles.input} value={end} onChangeText={setEnd} placeholder="YYYY-MM-DD HH:MM" />
-        {preview ? <View style={styles.preview}><Text style={styles.previewTitle}>{t('merchant_appearance_preview')}</Text><Text>{name}</Text><Text>{activeBranchScope?.branchName}</Text><Text>{start} - {end}</Text><Text>{preview.label}</Text></View> : null}
+        {preview ? <View style={styles.preview}><Text style={styles.previewTitle}>{t('merchant_appearance_preview')}</Text><Text style={{ color: colors.onSurface }}>{name}</Text><Text style={{ color: colors.onSurface }}>{activeBranchScope?.branchName}</Text><Text style={{ color: colors.onSurface }}>{start} - {end}</Text><Text style={{ color: colors.onSurface }}>{preview.label}</Text></View> : null}
         <TouchableOpacity style={styles.button} disabled={saving} onPress={() => void (preview ? submit() : prepare())}>
           {saving ? <ActivityIndicator color={colors.black} /> : <Text style={styles.buttonText}>{preview ? t('confirm') : t('merchant_appearance_preview')}</Text>}
         </TouchableOpacity>
@@ -78,10 +82,10 @@ export default function CreateAppearanceScreen() {
   </View>;
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.surface }, header: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, backgroundColor: colors.white },
-  title: { fontSize: 21, fontWeight: '800' }, content: { padding: spacing.md, gap: spacing.sm }, label: { fontWeight: '700' },
-  input: { backgroundColor: colors.white, padding: spacing.md, borderRadius: radius.lg }, counter: { textAlign: 'right', color: colors.gray500 },
-  preview: { backgroundColor: colors.white, padding: spacing.md, borderRadius: radius.xl, gap: spacing.xs }, previewTitle: { fontWeight: '800' },
-  button: { backgroundColor: colors.primary, padding: spacing.md, borderRadius: radius.full, alignItems: 'center' }, buttonText: { fontWeight: '700' }, error: { color: colors.error },
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background }, header: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, backgroundColor: colors.background },
+  title: { color: colors.onSurface, fontSize: 21, fontWeight: '800' }, content: { padding: spacing.md, gap: spacing.sm }, label: { color: colors.onSurface, fontWeight: '700' },
+  input: { backgroundColor: colors.cardBg, padding: spacing.md, borderRadius: radius.lg }, counter: { textAlign: 'right', color: colors.gray500 },
+  preview: { backgroundColor: colors.cardBg, padding: spacing.md, borderRadius: radius.xl, gap: spacing.xs }, previewTitle: { color: colors.onSurface, fontWeight: '800' },
+  button: { backgroundColor: colors.primary, padding: spacing.md, borderRadius: radius.full, alignItems: 'center' }, buttonText: { color: colors.onSurface, fontWeight: '700' }, error: { color: colors.error },
 });

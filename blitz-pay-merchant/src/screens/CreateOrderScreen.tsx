@@ -1,3 +1,4 @@
+import { useTheme } from "../lib/ThemeContext";
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
@@ -7,6 +8,7 @@ import {
   FlatList,
   ActivityIndicator,
   TextInput,
+  useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,7 +18,7 @@ import * as Haptics from 'expo-haptics';
 import { useAuth } from '../lib/auth';
 import { useLanguage } from '../lib/LanguageContext';
 import { observability } from '../lib/observability';
-import { colors, spacing, radius, shadow } from '../lib/theme';
+import { spacing, radius, shadow, type ThemeColors } from '../lib/theme';
 import { useMerchantProducts } from '../features/products/hooks/useMerchantProducts';
 import {
   createMerchantOrder,
@@ -47,6 +49,11 @@ function formatDate(iso: string) {
 type Mode = 'compose' | 'intent' | 'shopper' | 'qr' | 'paid' | 'expired' | 'invoice_sent';
 
 export default function CreateOrderScreen() {
+  const { width } = useWindowDimensions();
+  const qrSize = Math.max(120, Math.min(240, width - 2 * (spacing.lg + spacing.xl + spacing.md)));
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   const { t } = useLanguage();
   const navigation = useNavigation<RootStackNav>();
   const insets = useSafeAreaInsets();
@@ -424,10 +431,11 @@ export default function CreateOrderScreen() {
 
         <View style={styles.qrContainer}>
           <View style={[styles.qrCard, shadow.lg]}>
+            <View style={styles.qrFrame}>
             <QRCode
               value={qrValue}
-              size={240}
-              color={colors.onSurface}
+              size={qrSize}
+              color={colors.black}
               backgroundColor={colors.white}
               logo={APP_LOGO}
               logoSize={52}
@@ -436,6 +444,7 @@ export default function CreateOrderScreen() {
               logoBorderRadius={10}
               ecl="H"
             />
+            </View>
             <Text style={styles.qrReadyText}>{t('create_order_qr_ready')}</Text>
             <View style={styles.qrMeta}>
               <Text style={styles.qrTotal}>{formatCurrency(orderTotal)}</Text>
@@ -577,7 +586,7 @@ export default function CreateOrderScreen() {
 
         <FlatList
           data={[]} // use ListHeaderComponent for content since list is heterogeneous
-          renderItem={null}
+          renderItem={() => null}
           keyExtractor={() => ''}
           contentContainerStyle={styles.shopperContent}
           ListHeaderComponent={
@@ -785,6 +794,9 @@ function ProductRow({
   onIncrement: () => void;
   onDecrement: () => void;
 }) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   const selected = quantity > 0;
   return (
     <View style={[styles.productRow, selected && styles.productRowSelected]}>
@@ -821,15 +833,16 @@ function ProductRow({
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.surface },
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
+  qrFrame: { backgroundColor: colors.white, padding: spacing.md, borderRadius: radius.lg },
+  container: { flex: 1, backgroundColor: colors.background },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    backgroundColor: colors.white,
+    backgroundColor: colors.background,
     borderBottomWidth: 1,
     borderBottomColor: colors.gray200,
   },
@@ -841,7 +854,7 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 13, color: colors.gray600, marginBottom: spacing.sm },
   listContent: { padding: spacing.md, paddingBottom: 160 },
   productRow: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.cardBg,
     borderRadius: radius.xl,
     padding: spacing.md,
     marginBottom: spacing.sm,
@@ -881,7 +894,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: colors.white,
+    backgroundColor: colors.cardBg,
     paddingHorizontal: spacing.md,
     paddingTop: spacing.md,
     borderTopWidth: 1,
@@ -920,7 +933,7 @@ const styles = StyleSheet.create({
     gap: spacing.xl,
   },
   qrCard: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.cardBg,
     borderRadius: radius.xxl,
     padding: spacing.xl,
     alignItems: 'center',
@@ -956,7 +969,7 @@ const styles = StyleSheet.create({
     gap: spacing.xl,
   },
   resultCard: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.cardBg,
     borderRadius: radius.xxl,
     padding: spacing.xl,
     alignItems: 'center',
@@ -993,7 +1006,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: colors.white,
+    backgroundColor: colors.cardBg,
     borderRadius: radius.xl,
     padding: spacing.md,
     marginBottom: spacing.sm,
@@ -1018,7 +1031,7 @@ const styles = StyleSheet.create({
   intentCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.white,
+    backgroundColor: colors.cardBg,
     borderRadius: radius.xl,
     padding: spacing.md,
     gap: spacing.md,
@@ -1049,7 +1062,7 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    backgroundColor: colors.white,
+    backgroundColor: colors.cardBg,
     borderRadius: radius.xl,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm + 2,
@@ -1071,7 +1084,7 @@ const styles = StyleSheet.create({
   customerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.white,
+    backgroundColor: colors.cardBg,
     borderRadius: radius.xl,
     padding: spacing.md,
     marginBottom: spacing.sm,
@@ -1087,7 +1100,7 @@ const styles = StyleSheet.create({
   emptyCustomersText: { fontSize: 13, color: colors.gray500, textAlign: 'center', paddingVertical: spacing.md },
   loadingText: { fontSize: 13, color: colors.gray500 },
   dateInput: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.cardBg,
     borderRadius: radius.xl,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm + 2,

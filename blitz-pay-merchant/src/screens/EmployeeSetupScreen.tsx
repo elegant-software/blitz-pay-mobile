@@ -1,3 +1,4 @@
+import { useTheme } from "../lib/ThemeContext";
 import React, { useState } from 'react';
 import {
   View,
@@ -17,7 +18,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../lib/auth';
 import { useLanguage } from '../lib/LanguageContext';
-import { colors, spacing, radius, shadow } from '../lib/theme';
+import { spacing, radius, shadow, type ThemeColors } from '../lib/theme';
 import type { RootStackNav } from '../types';
 import {
   fetchEmployees,
@@ -29,6 +30,9 @@ import {
 } from '../features/appointments/services/employeeService';
 
 export default function EmployeeSetupScreen() {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   const { t } = useLanguage();
   const { activeBranchScope } = useAuth();
   const navigation = useNavigation<RootStackNav>();
@@ -331,6 +335,9 @@ function EmployeeRow({
   onDeactivate: () => void;
   onViewDetail: () => void;
 }) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   const { t } = useLanguage();
   const statusColor = employee.active ? colors.success : colors.gray400;
 
@@ -383,15 +390,15 @@ function EmployeeRow({
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.surface },
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    backgroundColor: colors.white,
+    backgroundColor: colors.background,
     borderBottomWidth: 1,
     borderBottomColor: colors.gray200,
   },
@@ -426,7 +433,7 @@ const styles = StyleSheet.create({
   },
   retryBtnText: { color: colors.black, fontWeight: '700' },
   employeeCard: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.cardBg,
     borderRadius: radius.xl,
     padding: spacing.md,
     flexDirection: 'row',
@@ -437,7 +444,7 @@ const styles = StyleSheet.create({
   statusDot: { width: 10, height: 10, borderRadius: 5 },
   employeeCardText: { flex: 1 },
   employeeName: { fontSize: 15, fontWeight: '600', color: colors.onSurface },
-  employeeStatus: { fontSize: 12, marginTop: 2 },
+  employeeStatus: { color: colors.onSurface, fontSize: 12, marginTop: 2 },
   employeeCardActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   iconBtn: {
     width: 32,
@@ -455,7 +462,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.6)',
   },
   modalSheet: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.cardBg,
     borderTopLeftRadius: radius.xxl,
     borderTopRightRadius: radius.xxl,
     padding: spacing.lg,

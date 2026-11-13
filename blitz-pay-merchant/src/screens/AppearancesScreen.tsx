@@ -1,3 +1,4 @@
+import { useTheme } from "../lib/ThemeContext";
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -5,7 +6,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../lib/auth';
 import { useLanguage } from '../lib/LanguageContext';
-import { colors, radius, shadow, spacing } from '../lib/theme';
+import { radius, shadow, spacing, type ThemeColors } from '../lib/theme';
 import { useAppearances } from '../features/appearances/hooks/useAppearances';
 import type { AppearanceHistoryStatus, MerchantAppearance } from '../features/appearances/types/appearance';
 import type { RootStackNav } from '../types';
@@ -15,6 +16,9 @@ const yearAgo = () => new Date(Date.now() - 365 * 86400000).toISOString().slice(
 const today = () => new Date().toISOString().slice(0, 10);
 
 export default function AppearancesScreen() {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   const { user, activeBranchScope } = useAuth();
   const { t, language } = useLanguage();
   const navigation = useNavigation<RootStackNav>();
@@ -67,7 +71,7 @@ export default function AppearancesScreen() {
       <View style={styles.filterRow}>
         {[undefined, 'COMPLETED', 'CANCELLED'].map(value => (
           <TouchableOpacity key={value ?? 'ALL'} style={[styles.filterPill, status === value && styles.filterPillActive]} onPress={() => { setStatus(value as AppearanceHistoryStatus | undefined); setPage(0); }}>
-            <Text>{value ? t(`merchant_appearance_status_${value.toLowerCase()}` as Parameters<typeof t>[0]) : t('all')}</Text>
+            <Text style={{ color: colors.onSurface }}>{value ? t(`merchant_appearance_status_${value.toLowerCase()}` as Parameters<typeof t>[0]) : t('all')}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -80,9 +84,9 @@ export default function AppearancesScreen() {
       items.length === 0 ? <State icon="calendar-outline" text={t('merchant_appearance_empty')} /> :
       items.map(item => <AppearanceCard key={item.appearanceId} item={item} locale={language === 'de' ? 'de-DE' : 'en-US'} cancelLabel={t('cancel')} onCancel={vm.canCreate && tab !== 'HISTORY' ? () => cancel(item) : undefined} />)}
     {tab === 'HISTORY' && (vm.history?.totalPages ?? 0) > 1 ? <View style={styles.pagination}>
-      <TouchableOpacity disabled={page === 0} onPress={() => setPage(p => p - 1)}><Text>{t('previous')}</Text></TouchableOpacity>
-      <Text>{page + 1} / {vm.history?.totalPages}</Text>
-      <TouchableOpacity disabled={page + 1 >= (vm.history?.totalPages ?? 0)} onPress={() => setPage(p => p + 1)}><Text>{t('next')}</Text></TouchableOpacity>
+      <TouchableOpacity disabled={page === 0} onPress={() => setPage(p => p - 1)}><Text style={{ color: colors.onSurface }}>{t('previous')}</Text></TouchableOpacity>
+      <Text style={{ color: colors.onSurface }}>{page + 1} / {vm.history?.totalPages}</Text>
+      <TouchableOpacity disabled={page + 1 >= (vm.history?.totalPages ?? 0)} onPress={() => setPage(p => p + 1)}><Text style={{ color: colors.onSurface }}>{t('next')}</Text></TouchableOpacity>
     </View> : null}
     {vm.canCreate && <TouchableOpacity style={styles.create} onPress={() => navigation.navigate('CreateAppearance')}>
       <Ionicons name="add" size={20} color={colors.black} /><Text style={styles.createText}>{t('merchant_appearance_create_cta')}</Text>
@@ -91,6 +95,9 @@ export default function AppearancesScreen() {
 }
 
 function ScreenFrame({ title, onBack, top, children }: { title: string; onBack: () => void; top: number; children: React.ReactNode }) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   return <View style={[styles.container, { paddingTop: top }]}>
     <View style={styles.header}><TouchableOpacity onPress={onBack}><Ionicons name="chevron-back" size={24} /></TouchableOpacity><Text style={styles.title}>{title}</Text></View>
     <ScrollView contentContainerStyle={styles.content}>{children}</ScrollView>
@@ -98,10 +105,16 @@ function ScreenFrame({ title, onBack, top, children }: { title: string; onBack: 
 }
 
 function State({ icon, text }: { icon: React.ComponentProps<typeof Ionicons>['name']; text: string }) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   return <View style={[styles.state, shadow.sm]}><Ionicons name={icon} size={28} color={colors.gray500} /><Text style={styles.stateText}>{text}</Text></View>;
 }
 
 function AppearanceCard({ item, locale, cancelLabel, onCancel }: { item: MerchantAppearance; locale: string; cancelLabel: string; onCancel?: () => void }) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   const format = (value: string) => new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
   return <View style={[styles.card, shadow.sm]}>
     <View style={styles.cardHeader}><Text style={styles.cardTitle}>{item.name}</Text><Text style={styles.status}>{item.status}</Text></View>
@@ -112,17 +125,17 @@ function AppearanceCard({ item, locale, cancelLabel, onCancel }: { item: Merchan
   </View>;
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.surface }, header: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center', padding: spacing.md, backgroundColor: colors.white },
-  title: { fontSize: 22, fontWeight: '800' }, content: { padding: spacing.md, paddingBottom: 120, gap: spacing.sm }, scope: { color: colors.gray600 },
-  tabs: { flexDirection: 'row', backgroundColor: colors.white, borderRadius: radius.full, padding: 4 }, tab: { flex: 1, padding: spacing.sm, alignItems: 'center', borderRadius: radius.full },
-  tabActive: { backgroundColor: colors.primary }, tabText: { fontSize: 12, fontWeight: '600' }, tabTextActive: { color: colors.black },
-  filters: { gap: spacing.sm }, filterRow: { flexDirection: 'row', gap: spacing.sm }, filterPill: { padding: spacing.sm, backgroundColor: colors.white, borderRadius: radius.full },
-  filterPillActive: { backgroundColor: colors.primary }, dateInput: { flex: 1, backgroundColor: colors.white, padding: spacing.sm, borderRadius: radius.lg },
-  loader: { marginTop: spacing.xl }, state: { alignItems: 'center', gap: spacing.sm, padding: spacing.xl, backgroundColor: colors.white, borderRadius: radius.xl },
-  stateText: { textAlign: 'center', color: colors.gray600 }, card: { backgroundColor: colors.white, padding: spacing.md, borderRadius: radius.xl, gap: spacing.xs },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between' }, cardTitle: { fontWeight: '700', fontSize: 16 }, status: { fontSize: 11, color: colors.secondary },
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background }, header: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center', padding: spacing.md, backgroundColor: colors.background },
+  title: { color: colors.onSurface, fontSize: 22, fontWeight: '800' }, content: { padding: spacing.md, paddingBottom: 120, gap: spacing.sm }, scope: { color: colors.gray600 },
+  tabs: { flexDirection: 'row', backgroundColor: colors.cardBg, borderRadius: radius.full, padding: 4 }, tab: { flex: 1, padding: spacing.sm, alignItems: 'center', borderRadius: radius.full },
+  tabActive: { backgroundColor: colors.primary }, tabText: { color: colors.onSurface, fontSize: 12, fontWeight: '600' }, tabTextActive: { color: colors.black },
+  filters: { gap: spacing.sm }, filterRow: { flexDirection: 'row', gap: spacing.sm }, filterPill: { padding: spacing.sm, backgroundColor: colors.cardBg, borderRadius: radius.full },
+  filterPillActive: { backgroundColor: colors.primary }, dateInput: { flex: 1, backgroundColor: colors.cardBg, padding: spacing.sm, borderRadius: radius.lg },
+  loader: { marginTop: spacing.xl }, state: { alignItems: 'center', gap: spacing.sm, padding: spacing.xl, backgroundColor: colors.cardBg, borderRadius: radius.xl },
+  stateText: { textAlign: 'center', color: colors.gray600 }, card: { backgroundColor: colors.cardBg, padding: spacing.md, borderRadius: radius.xl, gap: spacing.xs },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between' }, cardTitle: { color: colors.onSurface, fontWeight: '700', fontSize: 16 }, status: { fontSize: 11, color: colors.secondary },
   meta: { color: colors.gray600, fontSize: 12 }, cancelText: { color: colors.error, fontWeight: '700', marginTop: spacing.xs },
   pagination: { flexDirection: 'row', justifyContent: 'space-between', padding: spacing.md }, create: { flexDirection: 'row', justifyContent: 'center', gap: spacing.xs, backgroundColor: colors.primary, padding: spacing.md, borderRadius: radius.full },
-  createText: { fontWeight: '700' },
+  createText: { color: colors.onSurface, fontWeight: '700' },
 });

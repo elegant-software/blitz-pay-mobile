@@ -1,14 +1,15 @@
+import { useTheme } from "../lib/ThemeContext";
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { requestNeededAndroidPermissions, useStripeTerminal } from '@stripe/stripe-terminal-react-native';
+import { requestNeededAndroidPermissions, useStripeTerminal } from '../lib/terminalSdk';
 import type { Reader } from '@stripe/stripe-terminal-react-native';
 import { useLanguage } from '../lib/LanguageContext';
 import { useAuth } from '../lib/auth';
 import { observability } from '../lib/observability';
-import { colors, spacing, radius, shadow } from '../lib/theme';
+import { spacing, radius, shadow, type ThemeColors } from '../lib/theme';
 import {
   clearPairedCardReader,
   fetchConnectionToken,
@@ -22,6 +23,9 @@ const SCAN_TIMEOUT_S = 30;
 
 /** Settings → "Kartenterminal koppeln": pair the Bluetooth Card Reader (WisePad 3) used for girocard. */
 export default function CardReaderScreen() {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   const { t } = useLanguage();
   const { activeBranchScope } = useAuth();
   const navigation = useNavigation();
@@ -63,6 +67,7 @@ export default function CardReaderScreen() {
   }, [activeBranchScope, initialize, t]);
 
   const scan = useCallback(async () => {
+    observability.info('card_reader_scan_requested');
     setError(null);
     setFound([]);
     setScanning(true);
@@ -80,8 +85,10 @@ export default function CardReaderScreen() {
       });
       if (discoverError && discoverError.code !== 'CANCELED') throw new Error(discoverError.message);
     } catch (err) {
+      observability.error('card_reader_scan_failed', { reason: err instanceof Error ? err.message : String(err) });
       setError(err instanceof Error ? err.message : t('card_reader_pair_failed'));
     } finally {
+      observability.info('card_reader_scan_finished');
       setScanning(false);
       setScanned(true);
     }
@@ -89,6 +96,11 @@ export default function CardReaderScreen() {
 
   const pair = useCallback(async (reader: Reader.Type) => {
     if (!activeBranchScope) return;
+    if (!reader.serialNumber) {
+      observability.warn('card_reader_pair_missing_serial');
+      setError(t('card_reader_pair_failed'));
+      return;
+    }
     setError(null);
     setConnectingSerial(reader.serialNumber);
     observability.info('card_reader_pair_requested', { branchId: activeBranchScope.branchId, readerSerial: reader.serialNumber });
@@ -114,6 +126,7 @@ export default function CardReaderScreen() {
       setBattery(connected?.batteryLevel ?? null);
       observability.info('card_reader_pair_result', { readerSerial: reader.serialNumber, deviceType: reader.deviceType });
     } catch (err) {
+      observability.error('card_reader_pair_failed', { reason: err instanceof Error ? err.message : String(err) });
       setError(err instanceof Error ? err.message : t('card_reader_pair_failed'));
     } finally {
       setConnectingSerial(null);
@@ -210,17 +223,17 @@ export default function CardReaderScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.surface },
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
-    backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.gray200,
+    backgroundColor: colors.background, borderBottomWidth: 1, borderBottomColor: colors.gray200,
   },
   backBtn: { width: 40, height: 40, justifyContent: 'center' },
   headerTitle: { fontSize: 17, fontWeight: '700', color: colors.onSurface },
   hint: { fontSize: 13, color: colors.gray600 },
-  card: { backgroundColor: colors.white, borderRadius: radius.xl, padding: spacing.md, gap: spacing.sm },
+  card: { backgroundColor: colors.cardBg, borderRadius: radius.xl, padding: spacing.md, gap: spacing.sm },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   flex: { flex: 1 },
   title: { fontSize: 15, fontWeight: '600', color: colors.onSurface },

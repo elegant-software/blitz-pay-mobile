@@ -1,10 +1,11 @@
+import { useTheme } from "../lib/ThemeContext";
 import React, { useState, useEffect } from 'react';
 import { View, ActivityIndicator, StyleSheet, Modal, Text, TouchableOpacity } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../lib/auth';
 import { useLanguage } from '../lib/LanguageContext';
-import { colors, spacing, radius } from '../lib/theme';
+import { spacing, radius, type ThemeColors } from '../lib/theme';
 import type { RootStackParamList } from '../types';
 
 import LoginScreen from '../screens/LoginScreen';
@@ -39,6 +40,9 @@ import TableDetailScreen from '../screens/TableDetailScreen';
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function AppNavigator() {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   const { initialized, authenticated, isBiometricAvailable, biometricEnrolled, biometricPromptDismissed, enrollBiometric, dismissBiometricPrompt } = useAuth();
   const { t } = useLanguage();
   const [showBiometricPrompt, setShowBiometricPrompt] = useState(false);
@@ -141,7 +145,7 @@ export default function AppNavigator() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   loading: {
     flex: 1,
     justifyContent: 'center',
@@ -154,7 +158,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.6)',
   },
   promptSheet: {
-    backgroundColor: '#0D0D2B',
+    backgroundColor: colors.cardBg,
     borderTopLeftRadius: radius.xxl,
     borderTopRightRadius: radius.xxl,
     padding: spacing.lg,
@@ -175,7 +179,7 @@ const styles = StyleSheet.create({
   promptTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: colors.white,
+    color: colors.onSurface,
     marginBottom: spacing.sm,
     textAlign: 'center',
   },
