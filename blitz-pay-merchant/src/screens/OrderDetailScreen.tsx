@@ -11,6 +11,7 @@ import { useAuth } from '../lib/auth';
 import { colors, spacing, radius, shadow } from '../lib/theme';
 import type { RootStackParamList } from '../types';
 import { formatPickupNumber, getMerchantOrderStatusIcon, getMerchantOrderStatusLabelKey } from '../features/orders/orderPresentation';
+import { FulfilmentTypeBadge } from '../features/orders/components/FulfilmentTypeBadge';
 import { PreparationStatusBadge } from '../features/orders/components/PreparationStatusBadge';
 import { useMerchantOrderDetail } from '../features/orders/hooks/useMerchantOrderDetail';
 import { useMerchantProducts } from '../features/products/hooks/useMerchantProducts';
@@ -149,6 +150,12 @@ export default function OrderDetailScreen() {
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>{t('merchant_pickup_number')}</Text>
                 <Text style={[styles.detailValue, styles.amountText]}>{formatPickupNumber(order.pickupNumber)}</Text>
+              </View>
+            ) : null}
+            {order.fulfilmentType ? (
+              <View style={[styles.detailRow, styles.detailRowCentered]}>
+                <Text style={styles.detailLabel}>{t('fulfilment_type_label')}</Text>
+                <FulfilmentTypeBadge type={order.fulfilmentType} />
               </View>
             ) : null}
             {order.preparationStatus ? (

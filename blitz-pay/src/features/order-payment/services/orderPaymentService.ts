@@ -6,6 +6,7 @@ import type { BraintreeCheckoutRequest, BraintreeCheckoutResponse } from '../../
 import type {
   AddOrderItemInput,
   CreateOrderInput,
+  FulfilmentType,
   ManualSettlementInput,
   OrderPaymentIntentContext,
   OrderStatus,
@@ -55,6 +56,9 @@ interface RawOrderResponse {
   usesDeferredPayment?: boolean | null;
   preparationStatus?: string | null;
   pickupNumber?: number | null;
+  fulfilmentType?: string | null;
+  tableId?: string | null;
+  tableName?: string | null;
 }
 
 interface RawOrderListResponse {
@@ -132,6 +136,10 @@ function normalizeBanner(raw: RawOrderResponse): OrderSummary['banner'] {
   return undefined;
 }
 
+function normalizeFulfilmentType(value: unknown): FulfilmentType | null {
+  return value === 'DINE_IN' || value === 'TAKE_AWAY' ? value : null;
+}
+
 function parseOrder(payload: RawOrderResponse): OrderSummary {
   if (!payload.orderId || !payload.merchantId || !payload.currency) {
     throw new Error('order_invalid_response');
@@ -176,6 +184,9 @@ function parseOrder(payload: RawOrderResponse): OrderSummary {
     usesDeferredPayment: payload.usesDeferredPayment ?? undefined,
     preparationStatus: normalizePreparationStatus(payload.preparationStatus),
     pickupNumber: typeof payload.pickupNumber === 'number' ? payload.pickupNumber : null,
+    fulfilmentType: normalizeFulfilmentType(payload.fulfilmentType),
+    tableId: payload.tableId ?? null,
+    tableName: payload.tableName ?? null,
   };
 }
 
@@ -230,11 +241,13 @@ export async function createOrder(input: CreateOrderInput): Promise<OrderSummary
     checkoutPaymentMethod: input.checkoutPaymentMethod,
     tableCode: input.tableCode,
     guestCount: input.guestCount,
+    fulfilmentType: input.fulfilmentType,
     customerLocation: input.customerLocation,
   };
 
   observability.info('order_create_started', {
     hasTable: Boolean(input.tableCode),
+    fulfilmentType: input.fulfilmentType ?? null,
     hasCustomerLocation: Boolean(input.customerLocation),
     checkoutIntent: input.checkoutIntent,
     branchId: input.branchId,

@@ -1,6 +1,6 @@
 import type { TranslationKeys } from '../../lib/translations';
 import { colors } from '../../lib/theme';
-import type { MerchantOrderStatus, MerchantPreparationStatus } from './types/order';
+import type { FulfilmentType, MerchantOrderStatus, MerchantPreparationStatus } from './types/order';
 
 export type MerchantOrderSectionKey =
   | 'payment_failed'
@@ -71,4 +71,16 @@ export function getPreparationStatusColor(status: MerchantPreparationStatus): st
 
 export function formatPickupNumber(pickupNumber: number): string {
   return `#${String(pickupNumber).padStart(3, '0')}`;
+}
+
+export function parseFulfilmentType(value: unknown): FulfilmentType | null {
+  return value === 'DINE_IN' || value === 'TAKE_AWAY' ? value : null;
+}
+
+export function getFulfilmentTypeLabelKey(type: FulfilmentType): TranslationKeys {
+  return type === 'DINE_IN' ? 'fulfilment_type_dine_in' : 'fulfilment_type_take_away';
+}
+
+export function getFulfilmentTypeIcon(type: FulfilmentType): string {
+  return type === 'DINE_IN' ? 'restaurant-outline' : 'bag-handle-outline';
 }

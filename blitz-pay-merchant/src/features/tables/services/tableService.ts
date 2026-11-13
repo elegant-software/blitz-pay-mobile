@@ -2,6 +2,7 @@ import { authedFetch } from '../../../lib/api';
 import { config } from '../../../lib/config';
 import { observability } from '../../../lib/observability';
 import { createSseParser } from '../sseParser';
+import { parseFulfilmentType } from '../../orders/orderPresentation';
 import { parseSeats } from '../tableLogic';
 import type {
   BranchFloor,
@@ -122,6 +123,7 @@ function parseOrder(raw: Partial<TableOrderSummary>): TableOrderSummary {
     currency: raw.currency ?? 'EUR',
     paymentStatus: String(raw.paymentStatus ?? ''),
     preparationStatus: raw.preparationStatus ?? null,
+    fulfilmentType: parseFulfilmentType(raw.fulfilmentType),
     createdAt: raw.createdAt ?? '',
   };
 }

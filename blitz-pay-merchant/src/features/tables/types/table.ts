@@ -1,3 +1,4 @@
+import type { FulfilmentType } from '../../orders/types/order';
 export interface TablePlacement {
   floorPlanId: string;
   /** Fraction of the Floor Plan picture width, 0..1 */
@@ -47,6 +48,7 @@ export interface TableOrderSummary {
   currency: string;
   paymentStatus: TableOrderPaymentStatus;
   preparationStatus: string | null;
+  fulfilmentType: FulfilmentType | null;
   createdAt: string;
 }
 

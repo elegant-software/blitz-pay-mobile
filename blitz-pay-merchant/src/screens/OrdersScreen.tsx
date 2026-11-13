@@ -23,6 +23,7 @@ import {
   type MerchantOrderSectionKey,
 } from '../features/orders/orderPresentation';
 import type { MerchantOrderStatus, MerchantOrderSummary } from '../features/orders/types/order';
+import { FulfilmentTypeBadge } from '../features/orders/components/FulfilmentTypeBadge';
 import { PreparationStatusBadge } from '../features/orders/components/PreparationStatusBadge';
 
 const STATUS_COLORS: Record<MerchantOrderStatus, string> = {
@@ -310,6 +311,11 @@ export default function OrdersScreen() {
                         <Text style={[styles.statusText, { color: STATUS_COLORS[order.status] }]}>
                           {t(getMerchantOrderStatusLabelKey(order.status))}
                         </Text>
+                        {order.fulfilmentType ? (
+                          <View style={styles.preparationBadgeWrap}>
+                            <FulfilmentTypeBadge type={order.fulfilmentType} />
+                          </View>
+                        ) : null}
                         {order.preparationStatus ? (
                           <View style={styles.preparationBadgeWrap}>
                             <PreparationStatusBadge status={order.preparationStatus} />

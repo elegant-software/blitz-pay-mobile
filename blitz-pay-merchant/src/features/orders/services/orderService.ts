@@ -4,6 +4,7 @@ import type { ActiveBranchScope } from '../../../lib/auth';
 import type {
   BranchCustomer,
   MerchantAddOrderItemInput,
+  FulfilmentType,
   MerchantCheckoutPaymentMethod,
   MerchantManualSettlementInput,
   MerchantOrderDetail,
@@ -15,6 +16,7 @@ import type {
   MerchantUpdateOrderLineQuantityInput,
 } from '../types/order';
 import { readApiError } from '../../../lib/apiError';
+import { parseFulfilmentType } from '../orderPresentation';
 
 interface RawOrderItem {
   itemId?: string;
@@ -46,6 +48,7 @@ interface RawOrder {
   lastUpdatedBy?: string | null;
   preparationStatus?: string | null;
   pickupNumber?: number | null;
+  fulfilmentType?: string | null;
 }
 
 function mapStatus(status: unknown): MerchantOrderStatus {
@@ -129,6 +132,7 @@ function parseSummary(raw: RawOrder): MerchantOrderSummary {
     itemCount: itemCount && itemCount > 0 ? itemCount : undefined,
     preparationStatus: mapPreparationStatus(raw.preparationStatus),
     pickupNumber: typeof raw.pickupNumber === 'number' ? raw.pickupNumber : null,
+    fulfilmentType: parseFulfilmentType(raw.fulfilmentType),
   };
 }
 
@@ -224,6 +228,8 @@ export interface CreateMerchantOrderItem {
 export interface CreateMerchantOrderOptions {
   targetShopperId?: string;
   dueDate?: string;
+  /** Walk-in orders only; ignored for invoice orders, which have no Fulfilment Type. */
+  fulfilmentType?: FulfilmentType;
 }
 
 export async function createMerchantOrder(
@@ -243,6 +249,7 @@ export async function createMerchantOrder(
   };
   if (options?.targetShopperId) body.targetShopperId = options.targetShopperId;
   if (options?.dueDate) body.dueDate = options.dueDate;
+  if (!isInvoice && options?.fulfilmentType) body.fulfilmentType = options.fulfilmentType;
   const response = await authedFetch('/v1/merchant/orders', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },

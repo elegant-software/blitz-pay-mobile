@@ -22,6 +22,7 @@ import { useOrderCashPayment } from '../features/order-payment/hooks/useOrderCas
 import { orderPaymentStore } from '../features/order-payment/store/orderPaymentStore';
 import {
   formatPickupNumber,
+  readyPickupMessageKey,
   isMethodAvailable,
   isOrderResumable,
   type CheckoutPaymentMethod,
@@ -347,6 +348,11 @@ export default function OrderDetailScreen() {
                   </Text>
                 </View>
               ) : null}
+              {order.preparationStatus === 'READY' ? (
+                <Text style={styles.readyHint}>
+                  {t(readyPickupMessageKey(order.fulfilmentType, order.tableId))}
+                </Text>
+              ) : null}
             </View>
           ) : null}
           <View style={[styles.summaryCard, shadow.sm]}>
@@ -368,6 +374,11 @@ export default function OrderDetailScreen() {
             </View>
             <Text style={styles.amountText}>{formatAmount(order.totalAmountMinor, order.currency)}</Text>
             <Text style={styles.summaryMeta}>{`${t('order_checkout_intent_label')}: ${order.checkoutIntent}`}</Text>
+            {order.fulfilmentType ? (
+              <Text style={styles.summaryMeta}>
+                {`${t('order_fulfilment_label')}: ${t(`order_fulfilment_${order.fulfilmentType}` as never)}`}
+              </Text>
+            ) : null}
             {order.paymentSource ? (
               <Text style={styles.summaryMeta}>
                 {`${t('order_payment_source_label')}: ${t(`payment_source_${order.paymentSource}` as never)}`}
@@ -537,6 +548,7 @@ const styles = StyleSheet.create({
   pickupLabel: { fontSize: 12, fontWeight: '600', color: colors.gray600, textTransform: 'uppercase' },
   pickupNumber: { marginTop: spacing.xs, fontSize: 48, fontWeight: '800', color: colors.onSurface },
   preparationBadge: { alignSelf: 'center', marginTop: spacing.sm, paddingHorizontal: 14, paddingVertical: 6 },
+  readyHint: { marginTop: spacing.sm, fontSize: 14, fontWeight: '600', color: colors.onSurface, textAlign: 'center' },
   preparationText: { fontSize: 13, fontWeight: '700' },
   amountText: { marginTop: spacing.md, fontSize: 24, fontWeight: '800', color: colors.onSurface },
   section: { marginTop: spacing.md, backgroundColor: colors.white, borderRadius: radius.xl, padding: spacing.md },

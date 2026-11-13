@@ -29,6 +29,7 @@ import {
   mapOrderStatusToPaymentResult,
   type CheckoutIntent,
   type CheckoutPaymentMethod,
+  type FulfilmentType,
   type OrderPaymentChannel,
   type OrderPaymentSession,
   type OrderSummary,
@@ -67,6 +68,8 @@ interface ConfirmCheckoutArgs {
   navigation: RootStackNav;
   /** Ordering at a Table: a Walk-In order with fresh geolocation (ADR-0023). */
   table?: { tableCode: string; guestCount?: number };
+  /** Chosen at checkout; fixed once the order is placed. */
+  fulfilmentType: FulfilmentType;
   /** Cash Payment: the order stays unpaid until staff confirm the cash. */
   payWithCash?: boolean;
 }
@@ -140,7 +143,7 @@ export function useOrderPayment() {
   const startPayment = useCallback(
     async (
       session: OrderPaymentSession,
-      args: Omit<ConfirmCheckoutArgs, 'selectedIntent'> & { selectedMethod: CheckoutPaymentMethod },
+      args: Omit<ConfirmCheckoutArgs, 'selectedIntent' | 'fulfilmentType'> & { selectedMethod: CheckoutPaymentMethod },
     ): Promise<void> => {
       const selectedChannel = mapMethodToChannel(args.selectedMethod);
       observability.info('order_payment_handoff_started', {
@@ -501,6 +504,7 @@ export function useOrderPayment() {
             : undefined,
         tableCode: args.table?.tableCode,
         guestCount: args.table?.guestCount,
+        fulfilmentType: args.fulfilmentType,
         customerLocation,
         items: args.basketItems.map((item) => ({
           productId: item.productId,

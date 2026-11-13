@@ -20,8 +20,8 @@ import { config } from '../lib/config';
 import { colors, spacing, radius } from '../lib/theme';
 import type { RootStackNav, RootStackParamList } from '../types';
 import { useOrderPayment } from '../features/order-payment/hooks/useOrderPayment';
-import type { CheckoutIntent, CheckoutPaymentMethod } from '../features/order-payment/types/orderPayment';
-import { isMethodAvailable } from '../features/order-payment/types/orderPayment';
+import type { CheckoutIntent, CheckoutPaymentMethod, FulfilmentType } from '../features/order-payment/types/orderPayment';
+import { defaultFulfilmentType, isMethodAvailable } from '../features/order-payment/types/orderPayment';
 import { fetchMerchantStripeConnectStatus } from '../features/merchant-catalog/services/merchantCatalogService';
 import type { PaymentChannel } from '../features/merchant-catalog/types/catalog';
 
@@ -81,6 +81,7 @@ export default function CheckoutScreen() {
   const [selectedIntent, setSelectedIntent] = useState<CheckoutIntent>(
     route.params?.delayedPaymentEnabled ? 'PAY_LATER' : 'PAY_NOW',
   );
+  const [fulfilmentType, setFulfilmentType] = useState<FulfilmentType>(defaultFulfilmentType(Boolean(tableCode)));
   const [selectedMethod, setSelectedMethod] = useState<CheckoutPaymentMethod | null>(null);
   const [payCash, setPayCash] = useState(false);
   const canConfirm = selectedIntent === 'PAY_LATER' || Boolean(selectedMethod) || payCash;
@@ -205,6 +206,7 @@ export default function CheckoutScreen() {
         availableChannels: activePaymentChannels,
         navigation,
         table: tableCode ? { tableCode, guestCount } : undefined,
+        fulfilmentType,
         payWithCash: payCash,
       });
 
@@ -334,6 +336,29 @@ export default function CheckoutScreen() {
               })}
             </View>
           ) : null}
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{t('checkout_fulfilment_title')}</Text>
+          <View style={styles.intentGrid}>
+            {([
+              { key: 'DINE_IN', icon: 'restaurant-outline', title: 'checkout_fulfilment_dine_in', hint: 'checkout_fulfilment_dine_in_hint' },
+              { key: 'TAKE_AWAY', icon: 'bag-handle-outline', title: 'checkout_fulfilment_take_away', hint: 'checkout_fulfilment_take_away_hint' },
+            ] as const).map((option) => (
+              <TouchableOpacity
+                key={option.key}
+                style={[styles.intentCard, fulfilmentType === option.key && styles.intentCardSelected]}
+                onPress={() => setFulfilmentType(option.key)}
+                activeOpacity={0.85}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: fulfilmentType === option.key }}
+              >
+                <Ionicons name={option.icon} size={18} color={colors.onSurface} />
+                <Text style={styles.intentTitle}>{t(option.title)}</Text>
+                <Text style={styles.intentBody}>{t(option.hint)}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
 
         <View style={styles.section}>

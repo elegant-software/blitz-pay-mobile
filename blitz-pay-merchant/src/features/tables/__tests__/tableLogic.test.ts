@@ -45,6 +45,7 @@ describe('table status', () => {
     currency: 'EUR',
     paymentStatus,
     preparationStatus: null,
+    fulfilmentType: null,
     createdAt: '',
   });
 
