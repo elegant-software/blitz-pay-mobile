@@ -22,7 +22,7 @@
       "env": {
         "EXPO_PUBLIC_API_URL": "https://api.zackpay.de",
         "EXPO_PUBLIC_KEYCLOAK_URL": "https://auth.zackpay.de",
-        "EXPO_PUBLIC_KEYCLOAK_REALM": "blitzpay",
+        "EXPO_PUBLIC_KEYCLOAK_REALM": "blitzpay-customers",
         "EXPO_PUBLIC_KEYCLOAK_CLIENT_ID": "blitzpay-mobile",
         "EXPO_PUBLIC_AUTH_BYPASS": "true"
       },

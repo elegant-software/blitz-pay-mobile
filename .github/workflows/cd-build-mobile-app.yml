@@ -220,7 +220,8 @@ jobs:
       REQUESTED_PROFILE: ${{ needs.resolve-config.outputs.eas_profile }}
       REQUESTED_PLATFORM: ${{ needs.resolve-config.outputs.eas_platform }}
       EXPO_PUBLIC_KEYCLOAK_URL: ${{ vars.EXPO_PUBLIC_KEYCLOAK_URL }}
-      EXPO_PUBLIC_KEYCLOAK_REALM: ${{ vars.EXPO_PUBLIC_KEYCLOAK_REALM }}
+      # Merchant app signs in to the business realm, shopper app to the customer realm
+      EXPO_PUBLIC_KEYCLOAK_REALM: ${{ contains(needs.resolve-config.outputs.app_directory, 'merchant') && 'blitzpay-business' || 'blitzpay-customers' }}
       EXPO_PUBLIC_KEYCLOAK_CLIENT_ID: ${{ vars.EXPO_PUBLIC_KEYCLOAK_CLIENT_ID }}
       EXPO_PUBLIC_AUTH_BYPASS: ${{ vars.EXPO_PUBLIC_AUTH_BYPASS }}
       EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL }}
@@ -394,7 +395,8 @@ jobs:
       RELEASE_NOTES_TAG: ${{ needs.resolve-config.outputs.release_notes_tag }}
       EAS_PROFILE: ${{ needs.resolve-config.outputs.eas_profile }}
       EXPO_PUBLIC_KEYCLOAK_URL: ${{ vars.EXPO_PUBLIC_KEYCLOAK_URL }}
-      EXPO_PUBLIC_KEYCLOAK_REALM: ${{ vars.EXPO_PUBLIC_KEYCLOAK_REALM }}
+      # Merchant app signs in to the business realm, shopper app to the customer realm
+      EXPO_PUBLIC_KEYCLOAK_REALM: ${{ contains(needs.resolve-config.outputs.app_directory, 'merchant') && 'blitzpay-business' || 'blitzpay-customers' }}
       EXPO_PUBLIC_KEYCLOAK_CLIENT_ID: ${{ vars.EXPO_PUBLIC_KEYCLOAK_CLIENT_ID }}
       EXPO_PUBLIC_AUTH_BYPASS: ${{ vars.EXPO_PUBLIC_AUTH_BYPASS }}
       EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL }}

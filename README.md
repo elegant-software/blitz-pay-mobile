@@ -42,7 +42,7 @@ Set `EXPO_PUBLIC_AUTH_BYPASS=true` in `blitz-pay/.env` to skip Keycloak and auto
 | Key | Description |
 |-----|-------------|
 | `EXPO_PUBLIC_KEYCLOAK_URL` | Keycloak server URL (e.g. `http://localhost:8080`) |
-| `EXPO_PUBLIC_KEYCLOAK_REALM` | Keycloak realm (e.g. `blitzpay`) |
+| `EXPO_PUBLIC_KEYCLOAK_REALM` | Keycloak realm: `blitzpay-customers` (shopper app) or `blitzpay-business` (merchant app); CI sets it per app |
 | `EXPO_PUBLIC_KEYCLOAK_CLIENT_ID` | Keycloak public client ID (e.g. `blitzpay-spa`) |
 | `EXPO_PUBLIC_AUTH_BYPASS` | `true` to skip Keycloak entirely |
 | `EXPO_PUBLIC_API_URL` | Backend API base URL |
@@ -85,7 +85,7 @@ Set `EXPO_PUBLIC_AUTH_BYPASS=true` in `blitz-pay-merchant/.env`.
 | Key | Description |
 |-----|-------------|
 | `EXPO_PUBLIC_KEYCLOAK_URL` | Keycloak server URL |
-| `EXPO_PUBLIC_KEYCLOAK_REALM` | Keycloak realm |
+| `EXPO_PUBLIC_KEYCLOAK_REALM` | Keycloak realm (`blitzpay-business`) |
 | `EXPO_PUBLIC_KEYCLOAK_CLIENT_ID` | Keycloak client ID (e.g. `blitzpay-merchant-spa`) |
 | `EXPO_PUBLIC_AUTH_BYPASS` | `true` to skip Keycloak entirely |
 | `EXPO_PUBLIC_API_URL` | Backend API base URL |

@@ -24,7 +24,7 @@ if (target && (!apiUrl || !keycloakUrl || !keycloakClientId)) {
 
 export const config = {
   keycloakUrl: keycloakUrl ?? 'http://localhost:8080',
-  keycloakRealm: process.env.EXPO_PUBLIC_KEYCLOAK_REALM ?? 'blitzpay',
+  keycloakRealm: process.env.EXPO_PUBLIC_KEYCLOAK_REALM ?? 'blitzpay-business',
   keycloakClientId: keycloakClientId,
   authBypass: parseBoolean(process.env.EXPO_PUBLIC_AUTH_BYPASS, false),
   apiUrl: apiUrl ?? 'https://api-blitzpay-staging.zackpay.de',

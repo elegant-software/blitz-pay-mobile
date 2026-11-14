@@ -19,7 +19,7 @@ const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? 'https://api-blitzpay-staging.
 
 export const config = {
   keycloakUrl: process.env.EXPO_PUBLIC_KEYCLOAK_URL ?? 'http://localhost:8080',
-  keycloakRealm: process.env.EXPO_PUBLIC_KEYCLOAK_REALM ?? 'blitzpay',
+  keycloakRealm: process.env.EXPO_PUBLIC_KEYCLOAK_REALM ?? 'blitzpay-customers',
   keycloakClientId: process.env.EXPO_PUBLIC_KEYCLOAK_CLIENT_ID ?? 'blitzpay-mobile',
   authBypass: process.env.EXPO_PUBLIC_AUTH_BYPASS === 'true',
   stripePublishableKey: process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '',
