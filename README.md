@@ -107,6 +107,14 @@ See `blitz-pay-merchant/.env.example` for the full list.
 
 ---
 
+## Simulated card reader (blitz-pay-merchant, dev only)
+
+Test card payments without hardware: set `EXPO_PUBLIC_SIMULATED_READER=1` in `blitz-pay-merchant/.env`, then restart Metro with `npx expo start -c --dev-client` (the value is inlined at bundle time; release builds ignore it).
+
+- Simulated discovery returns four readers (Chipper 2X, M2, U200, WisePad 3). Only the WisePad 3 is supported in our Stripe location's country, so the app picks it by type; the others fail at connect with `terminal_reader_invalid_location_for_activation`, shown as a generic "card declined".
+- The simulated reader never prompts for a card; the app pays with `4242424242424242` (change `SIMULATED_CARD` to `4000000000009995` to test an insufficient-funds decline).
+- Real SDK errors are logged in dev builds as `[terminal] <step>`: `adb logcat | grep ReactNativeJS`.
+
 ## Clean rebuild (both apps)
 
 If Metro or Expo ignores recent changes, clear caches and restart:

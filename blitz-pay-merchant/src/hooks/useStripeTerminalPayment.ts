@@ -60,6 +60,14 @@ type FallbackChoice = 'tapToPay' | 'retry' | 'cancel';
 
 const BLUETOOTH_SCAN_TIMEOUT_S = 10;
 const MAX_SOFT_DECLINE_RETRIES = 2;
+/** Simulated discovery returns four readers; only the WisePad 3 is supported in our Stripe location's country. */
+const SIMULATED_READER_TYPE = 'wisePad3';
+const SIMULATED_CARD = '4242424242424242'; // 4000000000009995 = insufficient funds decline
+
+/** Dev-only: the SDK's real error is otherwise hidden behind generic messages. */
+const dev = (step: string, e: unknown) => {
+  if (__DEV__) console.warn(`[terminal] ${step}`, JSON.stringify(e));
+};
 
 /** Error carrying the Stripe error so the failure log can record its code. */
 function stripeFailure(error: StripeError | undefined, fallback: string): Error {
@@ -77,7 +85,7 @@ export function useStripeTerminalPayment() {
   /** Order whose PaymentIntent is open and may be canceled with "Zahlung abbrechen". */
   const [cancelableOrderId, setCancelableOrderId] = useState<string | null>(null);
   const discoveredReadersRef = useRef<Reader.Type[]>([]);
-  const serialWaiterRef = useRef<{ serial: string; resolve: (reader: Reader.Type) => void } | null>(null);
+  const serialWaiterRef = useRef<{ serial: string; simulated: boolean; resolve: (reader: Reader.Type) => void } | null>(null);
   const openIntentRef = useRef<{ orderId: string; paymentIntent: PaymentIntent.Type } | null>(null);
   const lastIntentIdByOrderRef = useRef(new Map<string, string>());
   const cancelRequestedRef = useRef(false);
@@ -93,11 +101,14 @@ export function useStripeTerminalPayment() {
     cancelProcessPaymentIntent,
     cancelPaymentIntent,
     connectedReader,
+    setSimulatedCard,
   } = useStripeTerminal({
     onUpdateDiscoveredReaders: (readers) => {
       discoveredReadersRef.current = readers;
+      dev('discovered', readers.map((r) => ({ serial: r.serialNumber, simulated: r.simulated, type: r.deviceType })));
       const waiter = serialWaiterRef.current;
-      const match = waiter && readers.find((reader) => reader.serialNumber === waiter.serial);
+      const match = waiter && (readers.find((reader) => reader.serialNumber === waiter.serial)
+        ?? (waiter.simulated ? readers.find((reader) => reader.deviceType === SIMULATED_READER_TYPE) : undefined));
       if (waiter && match) waiter.resolve(match);
     },
   });
@@ -109,14 +120,17 @@ export function useStripeTerminalPayment() {
       if (error) throw new Error('Bluetooth permission is required to use the card reader');
     }
     const found = new Promise<Reader.Type>((resolve) => {
-      serialWaiterRef.current = { serial, resolve };
+      serialWaiterRef.current = { serial, simulated, resolve };
     });
     const finished = discoverReaders({ discoveryMethod: 'bluetoothScan', timeout: BLUETOOTH_SCAN_TIMEOUT_S, simulated })
-      .then(() => null);
+      .then(({ error }) => {
+        if (error && error.code !== 'CANCELED') dev('discover', error); // we cancel discovery ourselves once found
+        return null;
+      });
     try {
       const reader = await Promise.race([found, finished]);
       if (reader) await cancelDiscovering().catch(() => null);
-      return reader;
+      return reader ?? (simulated ? discoveredReadersRef.current.find((r) => r.deviceType === SIMULATED_READER_TYPE) ?? null : null);
     } finally {
       serialWaiterRef.current = null;
     }
@@ -146,12 +160,13 @@ export function useStripeTerminalPayment() {
   }): Promise<ConnectedReader | null> => {
     let useTapToPay = false;
     for (;;) {
-      const paired = useTapToPay ? null : await loadPairedCardReader();
+      // Simulated: no real pairing exists, so always use the simulated WisePad 3 (found by type, not serial).
+      const paired = useTapToPay ? null : params.simulated ? { serialNumber: '' } : await loadPairedCardReader();
       const current = connectedReader;
 
       if (paired) {
-        if (current?.serialNumber === paired.serialNumber) {
-          return { kind: 'card_reader', serial: paired.serialNumber };
+        if (params.simulated ? current?.deviceType === SIMULATED_READER_TYPE : current?.serialNumber === paired.serialNumber) {
+          return { kind: 'card_reader', serial: current?.serialNumber ?? paired.serialNumber };
         }
         if (current) await disconnectReader();
         setStatus('discovering');
@@ -164,7 +179,10 @@ export function useStripeTerminalPayment() {
             locationId: params.locationId,
             autoReconnectOnUnexpectedDisconnect: true,
           });
-          if (error) throw stripeFailure(error, 'Card reader connection failed');
+          if (error) {
+            dev('connect', error);
+            throw stripeFailure(error, 'Card reader connection failed');
+          }
           return { kind: 'card_reader', serial: reader.serialNumber ?? null };
         }
         observability.warn('terminal_card_reader_unreachable', { orderId: params.orderId, readerSerial: paired.serialNumber });
@@ -226,6 +244,7 @@ export function useStripeTerminalPayment() {
       setTerminalScope(params.branchId, params.merchantId);
 
       const { error: initError } = await initialize();
+      if (initError) dev('initialize', initError);
       if (initError) throw stripeFailure(initError, 'Terminal initialization failed');
 
       const { locationId } = await fetchConnectionToken(params.branchId, params.merchantId);
@@ -266,6 +285,9 @@ export function useStripeTerminalPayment() {
         orderId, paymentIntentId, readerSerial, reused, intentStatus: paymentIntent.status ?? null,
       });
 
+      // The simulated reader never prompts for a card; it pays with this one.
+      if (simulated) await setSimulatedCard(SIMULATED_CARD);
+
       let current = paymentIntent;
       for (let softRetries = 0; ; softRetries += 1) {
         const { error: processError } = await processPaymentIntent({ paymentIntent: current });
@@ -281,6 +303,7 @@ export function useStripeTerminalPayment() {
         }
         // Do NOT cancel the PaymentIntent: after a disconnect or unknown error it can still settle on Stripe.
         // The caller reconciles via the Order status; a retry reuses this PaymentIntent.
+        dev('process', processError);
         throw stripeFailure(processError, 'Card payment failed');
       }
 
@@ -298,7 +321,7 @@ export function useStripeTerminalPayment() {
       });
       return finish('failed', message);
     }
-  }, [t, initialize, ensureReader, retrievePaymentIntent, processPaymentIntent]);
+  }, [t, initialize, ensureReader, retrievePaymentIntent, processPaymentIntent, setSimulatedCard]);
 
   /** "Zahlung abbrechen": the only path that cancels the PaymentIntent. */
   const cancelPayment = useCallback(async () => {
