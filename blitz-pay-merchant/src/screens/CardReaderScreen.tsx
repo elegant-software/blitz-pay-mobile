@@ -81,7 +81,7 @@ export default function CardReaderScreen() {
       const { error: discoverError } = await discoverReaders({
         discoveryMethod: 'bluetoothScan',
         timeout: SCAN_TIMEOUT_S,
-        simulated: __DEV__,
+        simulated: __DEV__ && process.env.EXPO_PUBLIC_SIMULATED_READER === '1',
       });
       if (discoverError && discoverError.code !== 'CANCELED') throw new Error(discoverError.message);
     } catch (err) {

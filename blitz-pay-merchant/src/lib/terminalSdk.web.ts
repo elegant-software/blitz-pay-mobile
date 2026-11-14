@@ -27,6 +27,7 @@ export function useStripeTerminal() {
     processPaymentIntent: fail,
     cancelProcessPaymentIntent: fail,
     cancelPaymentIntent: fail,
+    setSimulatedCard: fail,
   };
 }
 

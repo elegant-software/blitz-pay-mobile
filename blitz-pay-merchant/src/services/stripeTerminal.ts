@@ -31,8 +31,16 @@ export async function terminalTokenProvider(): Promise<string> {
   if (!_currentBranchId || !_currentMerchantId) {
     await _scopeReady;
   }
-  const result = await fetchConnectionToken(_currentBranchId!, _currentMerchantId!);
-  return result.secret;
+  const t0 = Date.now();
+  if (__DEV__) console.warn('[terminal] token:start');
+  try {
+    const result = await fetchConnectionToken(_currentBranchId!, _currentMerchantId!);
+    if (__DEV__) console.warn('[terminal] token:ok', JSON.stringify({ ms: Date.now() - t0 }));
+    return result.secret;
+  } catch (e) {
+    if (__DEV__) console.warn('[terminal] token:fail', JSON.stringify({ ms: Date.now() - t0, e: e instanceof Error ? e.message : String(e) }));
+    throw e;
+  }
 }
 
 export interface StripeIntentResult {

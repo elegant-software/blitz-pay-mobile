@@ -157,7 +157,7 @@ export function useTableActions(tableId: string) {
         orderId,
         merchantId: ref.merchantId,
         branchId: ref.branchId,
-        simulated: __DEV__,
+        simulated: __DEV__ && process.env.EXPO_PUBLIC_SIMULATED_READER === '1',
       });
       observability.info('table_card_payment_result', { orderId, tableId, outcome: result.outcome });
       if (result.outcome === 'already_paid') {
