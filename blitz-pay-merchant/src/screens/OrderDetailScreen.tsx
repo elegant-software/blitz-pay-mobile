@@ -261,7 +261,7 @@ export default function OrderDetailScreen() {
                     orderId: order.orderId,
                     merchantId: activeBranchScope.merchantId,
                     branchId: activeBranchScope.branchId,
-                    simulated: __DEV__,
+                    simulated: __DEV__ && process.env.EXPO_PUBLIC_SIMULATED_READER === '1',
                   });
                   // The Order status (webhook-driven) is the truth for "paid", whatever the outcome on this screen:
                   // a failed or disconnected payment can still settle, and a cancel reverts the Order.
